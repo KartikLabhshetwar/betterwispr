@@ -70,6 +70,7 @@ import Testing
 @Test func cleanerKeepsDeliberateRepeats() {
     #expect(TranscriptCleaner.clean("Hello, hello, hello, is this on?", language: "en") == "Hello, hello, hello, is this on?")
     #expect(TranscriptCleaner.clean("I know that that works", language: "en") == "I know that that works")
+    #expect(TranscriptCleaner.clean("a long long time ago", language: "en") == "a long long time ago")
     #expect(TranscriptCleaner.clean("call 5 5 5 now", language: "en") == "call 5 5 5 now")
     #expect(TranscriptCleaner.clean("dial one one two", language: "en") == "dial one one two")
     #expect(TranscriptCleaner.clean("uh-huh, that sounds right", language: "en") == "uh-huh, that sounds right")
@@ -78,5 +79,7 @@ import Testing
 @Test func cleanerLeavesOtherLanguagesAndEmptiesFillerOnlyText() {
     #expect(TranscriptCleaner.clean(" Wir treffen uns um acht Uhr ", language: "de") == "Wir treffen uns um acht Uhr")
     #expect(TranscriptCleaner.clean("uh, um... hmm", language: "en") == "")
+    #expect(TranscriptCleaner.clean("Uh, um.", language: nil) == "")
+    #expect(TranscriptCleaner.clean("Wir treffen uns um acht Uhr", language: nil) == "Wir treffen uns um acht Uhr")
     #expect(TranscriptCleaner.clean("", language: "en") == "")
 }

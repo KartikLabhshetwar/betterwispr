@@ -8,19 +8,20 @@ public enum TranscriptCleaner {
     }
 
     private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm"]
-    private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "bye", "no", "ha"]
+    private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "long", "bye", "no", "ha"]
     private static let numberWords: Set<String> = ["zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
     private static let sentenceEnders: Set<Character> = [".", "?", "!"]
     private static let terminators = sentenceEnders.union(["…"])
 
     /// Removes English filled pauses and unpunctuated stutters; other languages are only trimmed.
     public static func clean(_ text: String, language: String?) -> String {
-        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
-            ?? NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
-        guard code == nil || code == "en" else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let ranges = text.ranges(of: /[\p{L}\p{M}\p{N}_'’-]+/)
         let ends = ranges.dropFirst().map(\.lowerBound) + [text.endIndex]
         let tokens = zip(ranges, ends).map { Token(word: String(text[$0]), trailing: String(text[$0.upperBound..<$1])) }
+        let spoken = tokens.map(\.word).filter { !fillers.contains($0.lowercased()) }.joined(separator: " ")
+        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
+            ?? NLLanguageRecognizer.dominantLanguage(for: spoken)?.rawValue
+        guard code == nil || code == "en" else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let leading = text[..<(ranges.first?.lowerBound ?? text.endIndex)]
         let rebuilt = String(leading) + destutter(dropFillers(tokens)).map { $0.word + $0.trailing }.joined()
         var result = rebuilt.replacing(/\ {2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)

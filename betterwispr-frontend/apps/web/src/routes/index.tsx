@@ -1,5 +1,4 @@
 import {
-  AppleLogoIcon,
   CaretRightIcon,
   ClockCounterClockwiseIcon,
   CpuIcon,
@@ -11,8 +10,9 @@ import {
 } from "@phosphor-icons/react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 
-import Capsule from "@/components/capsule";
+import AppleLogo from "@/components/apple-logo";
 import Changelog from "@/components/changelog";
+import HeroDemo from "@/components/hero-demo";
 import { DOWNLOAD_URL, GITHUB_URL } from "@/lib/links";
 
 export const Route = createFileRoute("/")({
@@ -71,7 +71,7 @@ function HomeComponent() {
             href={DOWNLOAD_URL}
             className="flex items-center gap-2 rounded-lg bg-ink px-3 py-2 text-base font-semibold text-white transition-all duration-700 ease-fluid hover:bg-zinc-700 active:scale-[0.98]"
           >
-            <AppleLogoIcon weight="fill" className="size-5" />
+            <AppleLogo className="size-5" />
             Download for macOS
           </a>
           <Link
@@ -87,7 +87,7 @@ function HomeComponent() {
       </section>
 
       <section className="px-6 pb-24">
-        <Capsule />
+        <HeroDemo />
       </section>
 
       <section aria-labelledby="features" className="reveal mx-auto max-w-[1100px] px-6 pb-24">

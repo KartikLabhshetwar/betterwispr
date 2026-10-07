@@ -15,6 +15,11 @@ The corpus work below remains a measurement plan, not benchmark results.
 | [Gandhi et al., Distil-Whisper, arXiv:2311.00430](https://arxiv.org/abs/2311.00430) | Distillation reduces inference cost while retaining much of the teacher's performance on the evaluated English tasks. This makes distilled models useful latency candidates; the reported numbers are not a guarantee for multilingual dictation or this Mac. |
 | [Bain et al., WhisperX, arXiv:2303.00747](https://arxiv.org/abs/2303.00747) | VAD-based segmentation improves long-form transcription and enables batching. Preserve speech boundaries and context when segmenting; forced alignment helps timestamps but does not independently repair wrong words. |
 | [Barański et al., arXiv:2501.11378](https://arxiv.org/abs/2501.11378) | Non-speech audio can produce recurring hallucinations. Include silent/noisy negative examples in the benchmark. The paper's phrase filtering motivates evaluation, not unconditional deletion of phrases a user may actually say. |
+| [Romana et al., arXiv:2311.00867](https://arxiv.org/abs/2311.00867) | Filled pauses were the easiest disfluency to detect (recall 1.00 in the authors' setup), repetitions came next and restarts were the hardest. A fixed English filler list is a sound first step. Repairs and restarts need a trained model, not rules. |
+| [Zayats et al., arXiv:1904.04388](https://arxiv.org/abs/1904.04388) | Repetitions were 46% of disfluent words in their data, and intended repetitions were only 4% of all repetitions, usually emphasis such as "a long long time ago". Collapsing adjacent repeats is usually right when emphatic and grammatical doubles are protected. |
+| [Andrusenko et al., arXiv:2406.07096](https://arxiv.org/abs/2406.07096) | A CTC word spotter that rescores a transducer's output raised recall of listed terms at a small precision cost. This is the route for names and jargon with Parakeet. FluidAudio implements it with a separate CTC model that must be installed explicitly. |
+| [Jogi et al., arXiv:2502.11572](https://arxiv.org/abs/2502.11572); [Peng et al., arXiv:2305.11095](https://arxiv.org/abs/2305.11095) | A Whisper keyword-list prompt helped rare words but raised average WER, and word-list prompts hurt multilingual models. The comma-joined Whisper vocabulary prompt should be measured with and without hints before it stays on by default. |
+| [Gu et al., arXiv:2405.15216](https://arxiv.org/abs/2405.15216); [Pu et al., arXiv:2310.11532](https://arxiv.org/abs/2310.11532) | Zero-shot LLM correction degraded strong recognizer output, and correcting every utterance raised WER. A general LLM rewrite is not an accuracy fix. |
 | [Orhon et al., WhisperKit, arXiv:2507.10860](https://arxiv.org/abs/2507.10860) | On-device inference optimization can combine useful latency with low WER in the authors' benchmark. Treat it as evidence that local execution is viable, not a measurement of BetterWispr or proof that every feature is in the public OSS SDK. |
 
 ## Models to compare
@@ -63,11 +68,18 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    exact entity recall and false insertions both with and without hints. Explicit
    user dictionary replacements should respect word boundaries and retain the
    original transcript for correction. Do not rewrite arbitrary near-matches.
+   Parakeet ignores vocabulary hints today. CTC word spotting is the evidenced
+   way to add them, and it needs an explicit download of its CTC model.
 5. **Separate recognition from rewriting.** First measure verbatim output. Local
    formatting or an optional local LLM must be scored separately and must not
    silently change negation, numbers, names or intent. Preserve raw and edited
-   text. Automatic filler removal and broad hallucination blocklists can delete
-   intended speech.
+   text. Broad hallucination blocklists can delete intended speech.
+   `TranscriptCleaner` removes only a fixed list of English filled pauses (uh,
+   um, er, hmm and their spellings) and back-to-back repeats of one to three
+   words that no punctuation separates. Digits, number words and a short list of
+   grammatical or emphatic doubles ("that that", "had had", "long long") are
+   kept. Language detection ignores the fillers, and non-English text is only
+   trimmed. Repairs and restarts are left alone. History keeps the raw output.
 6. **Measure streaming separately.** Partial text is provisional. Finalize with
    sufficient context, and measure final WER, first-text latency, stop-to-final
    latency and dropped/repeated boundary words. Re-transcribing the full growing

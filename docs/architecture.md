@@ -22,7 +22,7 @@ Sources/
     Persistence/      SavedState and atomic local JSON storage
     Audio/            Microphone capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
-    Transcription/    Deterministic, explicit vocabulary replacements
+    Transcription/    Deterministic English filler/stutter cleanup and explicit vocabulary replacements
     Integrations/     Clipboard and guarded paste delivery
   BetterWisprCLI/      Developer entry point for model and file smoke tests
 ```
@@ -38,8 +38,9 @@ Sources/
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running.
-5. Apply user-defined vocabulary substitutions once. Keep both raw and final
-   text; save a transcript only when history is enabled.
+5. Remove English filled pauses and unpunctuated stutters, then apply
+   user-defined vocabulary substitutions once. Keep both raw and final text;
+   save a transcript only when history is enabled.
 6. Deliver through clipboard/guarded paste when enabled. Only paste if the
    original destination is still suitable; never treat a changed focus as consent
    to paste elsewhere. With "Copy to clipboard" on, leave the transcript on the

@@ -37,3 +37,49 @@ import Testing
     toggled.copyToClipboard = false
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }
+
+@Test func cleanerDropsMidSentenceFillersAndKeepsPrecedingPunctuation() {
+    #expect(TranscriptCleaner.clean("The tests passed, uh, so merge it um now", language: "en")
+            == "The tests passed, so merge it now")
+    #expect(TranscriptCleaner.clean("Rename the file uh, then reload the hmm window", language: "en")
+            == "Rename the file then reload the window")
+    #expect(TranscriptCleaner.clean("and uh uh we can build um the export", language: "en") == "and we can build the export")
+}
+
+@Test func cleanerCapitalizesAfterSentenceInitialFiller() {
+    #expect(TranscriptCleaner.clean("Can you check the logs? um yes, and the tests too.", language: "en")
+            == "Can you check the logs? Yes, and the tests too.")
+    #expect(TranscriptCleaner.clean("uh iPhone builds are slow", language: "en") == "iPhone builds are slow")
+}
+
+@Test func cleanerMovesTerminalPunctuationFromFiller() {
+    #expect(TranscriptCleaner.clean("We are done for today uh.", language: "en") == "We are done for today.")
+    #expect(TranscriptCleaner.clean("Is the build ready um?", language: "en") == "Is the build ready?")
+}
+
+@Test func cleanerRemovesRepeatedPhrases() {
+    #expect(TranscriptCleaner.clean("Then we can we can deploy the app", language: "en") == "Then we can deploy the app")
+    #expect(TranscriptCleaner.clean("I want to I want to fix the login bug", language: nil) == "I want to fix the login bug")
+}
+
+@Test func cleanerKeepsFirstCopyOfStutteredWord() {
+    #expect(TranscriptCleaner.clean("We we should test it", language: "en") == "We should test it")
+    #expect(TranscriptCleaner.clean("I I I think so", language: "en") == "I think so")
+}
+
+@Test func cleanerKeepsDeliberateRepeats() {
+    #expect(TranscriptCleaner.clean("Hello, hello, hello, is this on?", language: "en") == "Hello, hello, hello, is this on?")
+    #expect(TranscriptCleaner.clean("I know that that works", language: "en") == "I know that that works")
+    #expect(TranscriptCleaner.clean("a long long time ago", language: "en") == "a long long time ago")
+    #expect(TranscriptCleaner.clean("call 5 5 5 now", language: "en") == "call 5 5 5 now")
+    #expect(TranscriptCleaner.clean("dial one one two", language: "en") == "dial one one two")
+    #expect(TranscriptCleaner.clean("uh-huh, that sounds right", language: "en") == "uh-huh, that sounds right")
+}
+
+@Test func cleanerLeavesOtherLanguagesAndEmptiesFillerOnlyText() {
+    #expect(TranscriptCleaner.clean(" Wir treffen uns um acht Uhr ", language: "de") == "Wir treffen uns um acht Uhr")
+    #expect(TranscriptCleaner.clean("uh, um... hmm", language: "en") == "")
+    #expect(TranscriptCleaner.clean("Uh, um.", language: nil) == "")
+    #expect(TranscriptCleaner.clean("Wir treffen uns um acht Uhr", language: nil) == "Wir treffen uns um acht Uhr")
+    #expect(TranscriptCleaner.clean("", language: "en") == "")
+}

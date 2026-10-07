@@ -1,0 +1,59 @@
+# Open-source provenance
+
+Reviewed 2026-10-08. BetterWispr's original code remains Apache-2.0. Third-party
+components retain their own licenses; model weights have separate terms from
+their inference engines.
+
+## Code actually adapted
+
+`Sources/BetterWisprCore/Speech/LocalWhisperTokenizer.swift` adapts the
+`WhisperTokenizer` implementation from
+[`Sources/WhisperKit/Core/Models.swift`](https://github.com/argmaxinc/argmax-oss-swift/blob/1e2a163736dfa5a198e637ae44c114e1c6d5cc2d/Sources/WhisperKit/Core/Models.swift#L1165),
+Argmax OSS v1.1.0, revision `1e2a163736dfa5a198e637ae44c114e1c6d5cc2d`.
+The upstream MIT license and copyright 2024 argmax, inc. are retained in the
+adapted source. Changes accept a locally loaded `TokenizerWrapper`, validate
+required tokens and handle Unicode scalar offsets safely while preserving the
+upstream language-aware word grouping. The adaptation is needed because the
+upstream initializer is internal and its convenience tokenizer loader may fall
+back to a network request. BetterWispr injects a tokenizer constructed from local
+files before model loading; it does not use that network fallback during dictation.
+
+`Sources/BetterWisprCore/Speech/ParakeetProvider.swift` uses
+[FluidAudio](https://github.com/FluidInference/FluidAudio) 0.17.5 (Apache-2.0)
+as a SwiftPM dependency to run NVIDIA Parakeet TDT on the Neural Engine. No
+FluidAudio source is copied. Models load with `AsrModels.loadLocal`, which never
+fetches missing files; downloads only run from an explicit model installation.
+
+`Sources/BetterWispr/App/ToastWindow.swift` adapts `ToastWindow` and its glass
+surface from BetterShot (`Sources/Views/ToastWindow.swift` and
+`Sources/Views/GlassSurface.swift`), BSD-3-Clause, copyright 2026 Kartik
+Labhshetwar, the same author as BetterWispr. Changes take a typed `Toast`, ignore
+mouse events, announce the toast to VoiceOver and use an opaque surface before
+macOS 26.
+
+## Runtime engines and alternatives reviewed
+
+| Project | Upstream terms | Use in this project / useful pattern |
+| --- | --- | --- |
+| [WhisperKit / Argmax OSS](https://github.com/argmaxinc/argmax-oss-swift) | [MIT](https://github.com/argmaxinc/argmax-oss-swift/blob/main/LICENSE); bundled third-party notices also apply | Native Swift on-device inference; use the OSS library rather than copying an entire app. The old WhisperKit repository URL redirects here. Argmax Pro is a separate product and is not included. |
+| [FluidAudio](https://github.com/FluidInference/FluidAudio) | [Apache-2.0](https://github.com/FluidInference/FluidAudio/blob/main/LICENSE) | Core ML Parakeet TDT inference, used for the Parakeet models. |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | [MIT](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE) | Local C/C++ inference and CLI integration; useful for a separately installed local engine and GGML models. |
+| [Handy](https://github.com/cjpais/Handy) | [MIT](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/LICENSE) | Reviewed its separation of recording, model management and transcription. Its [VAD smoother](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/src-tauri/src/audio_toolkit/vad/smoothed.rs) buffers speech onset and trailing frames. No Handy source is vendored by this research task. |
+| [VoiceInk](https://github.com/Beingpax/VoiceInk) | [GPL-3.0](https://github.com/Beingpax/VoiceInk/blob/main/LICENSE) | Product/reference research only. No source copied into this Apache-2.0 application. |
+
+The research table is not the dependency lock file: the actual compiled versions
+are recorded in `Package.swift` and `Package.resolved`, and a separately installed
+CLI has its own version. Keep upstream license files and notices in packaged
+releases when distributing those dependencies. A model installation needs its
+own model ID, version/hash and license record.
+
+Whisper's released code and weights use [MIT](https://github.com/openai/whisper/blob/main/LICENSE).
+[NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3)
+and [v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) weights use CC-BY-4.0
+according to the publisher's model cards. BetterWispr downloads the
+[FluidInference Core ML conversions](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml),
+which keep that attribution obligation. Do not infer weight terms
+from an ONNX/Core ML/MLX conversion library's license.
+
+The copied BetterShot development skills have separate provenance documented in
+[`skills.md`](skills.md).

@@ -1,0 +1,22 @@
+packages:
+  - apps/*
+  - packages/*
+allowBuilds:
+  esbuild: true
+  sharp: true
+  msgpackr-extract: true
+  workerd: true
+catalog:
+  zod: ^4.5.4
+  typescript: ^6.0.3
+  "@types/node": ^26.4.1
+  varlock: 1.18.0
+  "@cloudflare/workers-types": ^5.20260906.1
+  lucide-react: ^1.41.0
+  next-themes: ^0.4.6
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  sonner: ^2.0.8
+  "@types/react": ^19.2.18
+  "@types/react-dom": ^19.2.7
+  tailwindcss: ^4.3.3

@@ -1,0 +1,31 @@
+{
+  "name": "betterwispr-frontend",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r --if-present build",
+    "check-types": "pnpm -r check-types",
+    "dev:web": "pnpm --filter web dev:bare",
+    "dev:server": "pnpm --filter hono dev:bare",
+    "deploy": "pnpm --filter @betterwispr-frontend/infra deploy",
+    "destroy": "pnpm --filter @betterwispr-frontend/infra destroy",
+    "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/",
+    "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@betterwispr-frontend/config": "workspace:*",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "varlock": "catalog:"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

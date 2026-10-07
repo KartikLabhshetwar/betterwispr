@@ -1,0 +1,23 @@
+{
+  "name": "@betterwispr-frontend/infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "dev": "alchemy dev",
+    "deploy": "alchemy deploy",
+    "destroy": "alchemy destroy"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@betterwispr-frontend/config": "workspace:*",
+    "@effect/platform-bun": "4.0.0",
+    "@effect/platform-node": "4.0.0",
+    "alchemy": "2.0.0-beta.80",
+    "effect": "4.0.0",
+    "typescript": "catalog:",
+    "varlock": "catalog:"
+  }
+}

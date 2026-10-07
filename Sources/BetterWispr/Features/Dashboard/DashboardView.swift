@@ -2,7 +2,7 @@ import BetterWisprCore
 import SwiftUI
 
 enum AppPage: String, CaseIterable, Identifiable {
-    case overview, history, models, vocabulary, settings
+    case overview, history, models, vocabulary, settings, about
 
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
@@ -13,6 +13,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .models: "cpu.fill"
         case .vocabulary: "character.book.closed.fill"
         case .settings: "gearshape.fill"
+        case .about: "info"
         }
     }
     var color: Color {
@@ -22,6 +23,7 @@ enum AppPage: String, CaseIterable, Identifiable {
         case .models: .purple
         case .vocabulary: .green
         case .settings: .gray
+        case .about: .indigo
         }
     }
 }
@@ -54,6 +56,7 @@ struct DashboardView: View {
                 case .models: ModelsView(model: model)
                 case .vocabulary: VocabularyView(model: model)
                 case .settings: SettingsView(model: model)
+                case .about: AboutView(updater: model.updater)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -112,7 +112,7 @@ function Caret() {
   return <span className="ml-0.5 inline-block h-5 w-0.5 translate-y-1 bg-ink" />;
 }
 
-function Capsule({ phase }: { phase: Phase }) {
+export function Capsule({ phase }: { phase: Phase }) {
   if (phase === "pasted") {
     return <span className="h-2 w-10 rounded-full border border-white/50 bg-black/60" />;
   }

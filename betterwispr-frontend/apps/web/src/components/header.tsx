@@ -15,9 +15,8 @@ export default function Header() {
         </Link>
         <div className="flex items-center gap-1">
           <Link
-            to="/"
-            hash="changelog"
-            className="hidden rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors sm:block duration-700 ease-fluid hover:text-zinc-900"
+            to="/changelog"
+            className="hidden rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors duration-700 ease-fluid hover:text-zinc-900 sm:block data-[status=active]:bg-zinc-100 data-[status=active]:text-zinc-900"
           >
             Changelog
           </Link>

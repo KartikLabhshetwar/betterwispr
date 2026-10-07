@@ -30,7 +30,7 @@ export default function Footer() {
           <a href={DOWNLOAD_URL} className={LINK}>
             Download
           </a>
-          <Link to="/" hash="changelog" className={LINK}>
+          <Link to="/changelog" className={LINK}>
             Changelog
           </Link>
         </FooterColumn>

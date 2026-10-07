@@ -46,7 +46,6 @@ struct DashboardView: View {
                 }
             }
             .navigationSplitViewColumnWidth(215)
-            .toolbar(removing: .sidebarToggle)
         } detail: {
             Group {
                 switch model.selectedPage {
@@ -59,12 +58,6 @@ struct DashboardView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(model.selectedPage.title)
-            .toolbar {
-                Button { model.showCapsule() } label: {
-                    Label("Show recording capsule", systemImage: "waveform")
-                }
-                .help("Show recording capsule")
-            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if !model.statusMessage.isEmpty { statusBar }
             }

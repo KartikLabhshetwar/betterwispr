@@ -20,16 +20,13 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-router": "^1.170.32",
     "lucide-react": "catalog:",
-    "next-themes": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "sonner": "catalog:",
     "varlock": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@betterwispr-frontend/config": "workspace:*",
-    "@tanstack/react-router-devtools": "^1.167.1",
     "@tanstack/router-plugin": "^1.168.35",
     "@types/mdx": "^2.0.14",
     "@types/node": "catalog:",

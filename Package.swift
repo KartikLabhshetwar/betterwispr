@@ -11,14 +11,19 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/argmax-oss-swift.git", exact: "1.1.0"),
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.5")
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.17.5"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0")
     ],
     targets: [
         .target(name: "BetterWisprCore", dependencies: [
             .product(name: "WhisperKit", package: "argmax-oss-swift"),
             .product(name: "FluidAudio", package: "FluidAudio")
         ]),
-        .executableTarget(name: "BetterWispr", dependencies: ["BetterWisprCore"]),
+        .executableTarget(
+            name: "BetterWispr",
+            dependencies: ["BetterWisprCore", .product(name: "Sparkle", package: "Sparkle")],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
+        ),
         .executableTarget(name: "BetterWisprCLI", dependencies: ["BetterWisprCore"]),
         .testTarget(name: "BetterWisprCoreTests", dependencies: ["BetterWisprCore"])
     ],

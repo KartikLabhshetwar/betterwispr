@@ -23,7 +23,7 @@ public enum AudioRecordingError: LocalizedError {
 
 @MainActor
 public final class AudioRecorder {
-    public var onLevel: (@MainActor @Sendable (Float) -> Void)?
+    public var onLevel: (@MainActor @Sendable (VoiceLevels) -> Void)?
     /// RMS amplitude gate, not a semantic speech detector. Lower this for quiet microphones.
     public var silenceThreshold: Float = 0.002
     private var engine: AVAudioEngine?
@@ -56,11 +56,14 @@ public final class AudioRecorder {
         let id = UUID()
         recordingID = id
         meter = VoiceLevelMeter()
+        let sampleRate = format.sampleRate
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable [weak self] buffer, _ in
-            let rms = writer.write(buffer)
+            let loudness = writer.write(buffer)
+            let step = Double(buffer.frameLength) / sampleRate / Double(max(1, loudness.count))
             Task { @MainActor [weak self] in
                 guard let self, self.recordingID == id else { return }
-                self.onLevel?(self.meter.update(rms: rms))
+                let values = loudness.map { self.meter.update(rms: $0, over: step) }
+                self.onLevel?(VoiceLevels(values: values, start: .now, step: step))
             }
         }
         do {
@@ -88,7 +91,7 @@ public final class AudioRecorder {
         self.writer = nil
         recordingURL = nil
         recordingID = nil
-        onLevel?(0)
+        onLevel?(VoiceLevels())
         if let error = result.error {
             try? FileManager.default.removeItem(at: url)
             throw error
@@ -109,11 +112,31 @@ public final class AudioRecorder {
         writer = nil
         recordingURL = nil
         recordingID = nil
-        onLevel?(0)
+        onLevel?(VoiceLevels())
     }
 }
 
-/// Maps per-buffer RMS to a 0...1 waveform level relative to the room's noise floor and the speaker's recent peak.
+/// Waveform levels for consecutive slices of one audio buffer, played back across the time it covers.
+public struct VoiceLevels: Sendable, Equatable {
+    public var values: [Float]
+    public var start: Date
+    public var step: TimeInterval
+
+    public init(values: [Float] = [], start: Date = .distantPast, step: TimeInterval = 0) {
+        self.values = values
+        self.start = start
+        self.step = step
+    }
+
+    public func value(at date: Date) -> Float {
+        guard !values.isEmpty else { return 0 }
+        let last = Double(values.count - 1)
+        let elapsed = step > 0 ? date.timeIntervalSince(start) / step : last
+        return values[Int(min(last, max(0, elapsed)))]
+    }
+}
+
+/// Maps RMS over a stretch of audio to a 0...1 waveform level relative to the room's noise floor and the speaker's recent peak.
 public struct VoiceLevelMeter: Sendable {
     public private(set) var level: Float = 0
     private var floor: Float?
@@ -121,20 +144,24 @@ public struct VoiceLevelMeter: Sendable {
 
     public init() {}
 
-    public mutating func update(rms: Float) -> Float {
+    /// Rates are tuned per 0.1 s and scaled by `duration`, so the meter moves at the same speed for any slice length.
+    public mutating func update(rms: Float, over duration: TimeInterval) -> Float {
+        let ticks = Float(max(0, duration) / Self.tick)
         var target: Float = 0
         if rms.isFinite, rms > 0 {
             let decibels = max(-60, 20 * log10(rms))
-            let floor = min((self.floor ?? decibels) + Self.floorRise, decibels)
-            peak = max(decibels, peak - Self.peakFall, floor + Self.minimumRange)
+            let floor = min((self.floor ?? decibels) + Self.floorRise * ticks, decibels)
+            peak = max(decibels, peak - Self.peakFall * ticks, floor + Self.minimumRange)
             let span = peak - floor - Self.gate - Self.headroom
             target = pow(min(1, max(0, (decibels - floor - Self.gate) / span)), Self.curve)
             self.floor = floor
         }
-        level += (target - level) * (target > level ? Self.attack : Self.release)
+        let rate = target > level ? Self.attack : Self.release
+        level += (target - level) * (1 - pow(1 - rate, ticks))
         return level
     }
 
+    private static let tick: TimeInterval = 0.1
     private static let floorRise: Float = 0.1
     private static let peakFall: Float = 0.12
     private static let minimumRange: Float = 15
@@ -162,30 +189,36 @@ private final class RecordingWriter: @unchecked Sendable {
         self.threshold = threshold.isFinite ? max(0, threshold) : 0.002
     }
 
-    func write(_ buffer: AVAudioPCMBuffer) -> Float {
+    func write(_ buffer: AVAudioPCMBuffer) -> [Float] {
         lock.lock()
         defer { lock.unlock() }
-        guard let file, error == nil, buffer.frameLength > 0 else { return 0 }
+        guard let file, error == nil, buffer.frameLength > 0 else { return [] }
         do {
             try file.write(from: buffer)
         } catch {
             self.error = error
-            return 0
+            return []
         }
-        frames += AVAudioFramePosition(buffer.frameLength)
-        var rms: Float = 0
-        if let channels = buffer.floatChannelData {
-            for channel in 0..<Int(buffer.format.channelCount) {
-                var channelRMS: Float = 0
-                let interleaved = buffer.format.isInterleaved
-                let samples = interleaved ? channels[0].advanced(by: channel) : channels[channel]
-                let stride = interleaved ? Int(buffer.format.channelCount) : 1
-                vDSP_rmsqv(samples, vDSP_Stride(stride), &channelRMS, vDSP_Length(buffer.frameLength))
-                rms = max(rms, channelRMS)
-            }
+        let length = Int(buffer.frameLength)
+        frames += AVAudioFramePosition(length)
+        if Self.rms(of: buffer, in: 0..<length) >= threshold { activeFrames += AVAudioFramePosition(length) }
+        let slices = max(1, Int((Double(length) / Double(Self.sliceFrames)).rounded()))
+        return (0..<slices).map { Self.rms(of: buffer, in: $0 * length / slices ..< ($0 + 1) * length / slices) }
+    }
+
+    private static let sliceFrames = 1024
+
+    private static func rms(of buffer: AVAudioPCMBuffer, in frames: Range<Int>) -> Float {
+        guard let channels = buffer.floatChannelData else { return 0 }
+        let count = Int(buffer.format.channelCount)
+        let interleaved = buffer.format.isInterleaved
+        let spacing = interleaved ? count : 1
+        return (0..<count).reduce(0) { loudest, channel in
+            let first = interleaved ? channels[0].advanced(by: channel) : channels[channel]
+            var value: Float = 0
+            vDSP_rmsqv(first.advanced(by: frames.lowerBound * spacing), vDSP_Stride(spacing), &value, vDSP_Length(frames.count))
+            return max(loudest, value)
         }
-        if rms >= threshold { activeFrames += AVAudioFramePosition(buffer.frameLength) }
-        return rms
     }
 
     func finish() -> (duration: TimeInterval, hasSpeech: Bool, error: (any Error)?) {

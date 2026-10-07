@@ -22,20 +22,43 @@ import Testing
 @Test func waveformFillsForQuietVoicesAndStaysFlatInSteadyNoise() {
     func amplitude(_ decibels: Float) -> Float { pow(10, decibels / 20) }
     var quietRoom = VoiceLevelMeter()
-    let silence = (0..<40).map { _ in quietRoom.update(rms: amplitude(-60)) }
-    let quietVoice = (0..<40).map { quietRoom.update(rms: amplitude($0 % 4 == 0 ? -56 : -45)) }
-    let pause = (0..<20).map { _ in quietRoom.update(rms: amplitude(-60)) }
+    let silence = (0..<40).map { _ in quietRoom.update(rms: amplitude(-60), over: 0.1) }
+    let quietVoice = (0..<40).map { quietRoom.update(rms: amplitude($0 % 4 == 0 ? -56 : -45), over: 0.1) }
+    let pause = (0..<20).map { _ in quietRoom.update(rms: amplitude(-60), over: 0.1) }
     #expect(silence.allSatisfy { $0 < 0.05 })
     #expect(quietVoice.max()! > 0.9)
     #expect(quietVoice.suffix(20).reduce(0, +) / 20 > 0.6)
     #expect(pause.last! < 0.05)
 
     var noisyRoom = VoiceLevelMeter()
-    #expect((0..<200).map { _ in noisyRoom.update(rms: amplitude(-42)) }.allSatisfy { $0 < 0.05 })
-    #expect(noisyRoom.update(rms: amplitude(-25)) > 0.5)
+    #expect((0..<200).map { _ in noisyRoom.update(rms: amplitude(-42), over: 0.1) }.allSatisfy { $0 < 0.05 })
+    #expect(noisyRoom.update(rms: amplitude(-25), over: 0.1) > 0.5)
 
     var muted = VoiceLevelMeter()
-    #expect([0, .nan, .infinity].map { muted.update(rms: $0) } == [0, 0, 0])
+    #expect([0, .nan, .infinity].map { muted.update(rms: $0, over: 0.1) } == [0, 0, 0])
+}
+
+@Test func waveformMovesAtTheSameSpeedForAnySliceLength() {
+    func amplitude(_ decibels: Float) -> Float { pow(10, decibels / 20) }
+    let speech: [Float] = Array(repeating: -60, count: 10) + Array(repeating: -35, count: 3) + Array(repeating: -60, count: 4)
+    var buffers = VoiceLevelMeter()
+    var slices = VoiceLevelMeter()
+    for decibels in speech {
+        let buffered = buffers.update(rms: amplitude(decibels), over: 0.1)
+        let sliced = (0..<5).map { _ in slices.update(rms: amplitude(decibels), over: 0.02) }.last!
+        #expect(abs(buffered - sliced) < 0.02)
+    }
+    #expect(buffers.level > 0.2)
+}
+
+@Test func waveformPlaysBufferSlicesAcrossTheirDuration() {
+    let start = Date(timeIntervalSinceReferenceDate: 100)
+    let levels = VoiceLevels(values: [0.2, 0.9, 0.5], start: start, step: 0.02)
+    #expect(levels.value(at: start.addingTimeInterval(-1)) == 0.2)
+    #expect(levels.value(at: start.addingTimeInterval(0.025)) == 0.9)
+    #expect(levels.value(at: start.addingTimeInterval(0.045)) == 0.5)
+    #expect(levels.value(at: start.addingTimeInterval(5)) == 0.5)
+    #expect(VoiceLevels().value(at: start) == 0)
 }
 
 @MainActor

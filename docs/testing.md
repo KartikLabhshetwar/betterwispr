@@ -104,6 +104,8 @@ CLI. Neither recognizes microphone audio.
   must leave the clipboard untouched and show no toast.
 - [ ] While dictating or transcribing, the capsule must show only the waveform,
   never the recognized text.
+- [ ] After a successful paste no toast appears. Copy-only results still show
+  a "Copied" toast.
 - [ ] Repeat with a clipboard image or rich text; the app must preserve supported
   pasteboard representations, not just plain text.
 - [ ] Change clipboard contents while recognition/paste is pending. New user
@@ -150,6 +152,19 @@ CLI. Neither recognizes microphone audio.
 - [ ] Add vocabulary with punctuation, accented letters, Hindi combining marks,
   overlapping phrases and literal `$`/backslash text. Confirm whole-word matching,
   no cascading replacements and access to the original transcription.
+
+## Updates
+
+- [ ] Settings shows the installed version under About. "Check for Updates…" in
+  About and in the app menu opens Sparkle's update window and is disabled while
+  a check is already running.
+- [ ] Change both update toggles, quit and relaunch. Both keep their values, and
+  "Download and install automatically" is disabled while automatic checks are off.
+- [ ] Install an older signed release, publish a newer GitHub release with its
+  `appcast.xml`, then check for updates. The older build downloads, verifies and
+  installs the newer one and relaunches at the new version.
+- [ ] Turn off automatic checks and relaunch. A network monitor shows no request
+  for the appcast until you choose "Check for Updates…".
 
 ## Accuracy
 

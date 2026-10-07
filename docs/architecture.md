@@ -14,7 +14,7 @@ organization, not separate packages or a plugin loader.
 ```text
 Sources/
   BetterWispr/
-    App/              Lifecycle, session coordination, global shortcut, capsule and toast panels
+    App/              Lifecycle, session coordination, global shortcut, capsule and toast panels, updater
     Features/         Dashboard, history, models, vocabulary, settings and capsule UI
     Design/           Small shared view components and the brand mark, which also renders the app icon
   BetterWisprCore/
@@ -116,6 +116,18 @@ do not acknowledge receipt; slow recipient apps need explicit manual testing.
 Add only the concrete integration and its required settings. Do not introduce
 per-app speech providers or duplicate recording code. Any future network
 integration must require explicit opt-in and preserve the local default.
+
+## Updates
+
+`AppUpdater` wraps Sparkle's standard updater and is owned by `AppModel`. Sparkle
+reads `appcast.xml` from the latest GitHub release (`SUFeedURL`) and installs an
+update only when its EdDSA signature matches `SUPublicEDKey`. Its network use is
+limited to update checks and downloads. Automatic checks are opt-in: Sparkle
+asks on the second launch, and Settings can change automatic checks and
+automatic installs at any time. Update requests carry no audio, transcripts or
+vocabulary, and system profiling stays off. Sparkle keeps these preferences in
+its own user defaults, not in `SavedState`. `scripts/release.sh` signs the DMG
+with the private key in the login keychain and writes the appcast.
 
 ## Persistence and boundaries
 

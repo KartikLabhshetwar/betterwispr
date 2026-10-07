@@ -28,13 +28,14 @@ final class AppModel {
     var phase: RecordingPhase = .idle { didSet { onPresentationChange?() } }
     var statusMessage = ""
     var partialTranscript = ""
-    var audioLevel: Float = 0
+    var voiceLevels = VoiceLevels()
     var isHeldSession = false
     var recordingDuration: TimeInterval = 0
     var history: [Transcript] = []
     var vocabulary: [VocabularyEntry] = []
     var settings = AppSettings()
     let models = SpeechModel.catalog
+    let updater = AppUpdater()
     var preparingModelID: String?
     var downloadProgress: Double = 0
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -76,7 +77,7 @@ final class AppModel {
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         refreshModels()
-        recorder.onLevel = { [weak self] level in self?.audioLevel = level }
+        recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
     }
 
     func shortcutPressed() {
@@ -151,7 +152,7 @@ final class AppModel {
         guard phase == .recording else { return }
         ticker?.cancel()
         ticker = nil
-        audioLevel = 0
+        voiceLevels = VoiceLevels()
         let audio: RecordedAudio
         do { audio = try recorder.stop() }
         catch { recorder.cancel(); fail(DictationFailure(title: "Couldn’t finish recording.", message: error.localizedDescription)); return }
@@ -198,7 +199,10 @@ final class AppModel {
                 else {
                     self.phase = .idle
                     self.statusMessage = ""
-                    if let result { ToastWindow.shared.show(Toast(result)) }
+                    switch result {
+                    case .pasted, nil: break
+                    case let result?: ToastWindow.shared.show(Toast(result))
+                    }
                 }
                 if let persistenceWarning { self.statusMessage = "History could not be saved: \(persistenceWarning)" }
             } catch {
@@ -224,7 +228,7 @@ final class AppModel {
             preparedModelID = nil
         }
         preparingModelID = nil
-        audioLevel = 0
+        voiceLevels = VoiceLevels()
         partialTranscript = ""
         phase = .idle
         statusMessage = "Cancelled."

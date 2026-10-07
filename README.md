@@ -27,6 +27,10 @@ swift test
 Or use `make`: `make dev` builds, runs every check and launches the debug app.
 `make ship` builds, signs with Developer ID, notarizes and staples
 `release/BetterWispr-<version>_arm64.dmg`. `make help` lists every target.
+It also signs the DMG with the Sparkle key stored in the login keychain under
+the `betterwispr` account and writes `release/appcast.xml`. Publish both on a
+GitHub release tagged `v<version>` with the `gh release create` command the
+script prints; the app reads its update feed from the latest release.
 
 The development app bundle is `.build/debug/BetterWispr.app`. Launch the bundle
 using the run script so macOS can associate its microphone/speech usage

@@ -24,6 +24,12 @@ as a SwiftPM dependency to run NVIDIA Parakeet TDT on the Neural Engine. No
 FluidAudio source is copied. Models load with `AsrModels.loadLocal`, which never
 fetches missing files; downloads only run from an explicit model installation.
 
+`Sources/BetterWispr/App/AppUpdater.swift` uses
+[Sparkle](https://github.com/sparkle-project/Sparkle) 2.10.0 (MIT) as a SwiftPM
+dependency for in-app updates. No Sparkle source is copied; its license ships in
+the app bundle. `scripts/build-app.sh` removes Sparkle's XPC services because
+they exist only for sandboxed apps and BetterWispr is not sandboxed.
+
 `Sources/BetterWispr/App/ToastWindow.swift` adapts `ToastWindow` and its glass
 surface from BetterShot (`Sources/Views/ToastWindow.swift` and
 `Sources/Views/GlassSurface.swift`), BSD-3-Clause, copyright 2026 Kartik

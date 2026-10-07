@@ -14,5 +14,7 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key><string>BetterWispr records your microphone when you start dictation. Audio is transcribed on this Mac and temporary recordings are deleted afterwards.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>BetterWispr uses Apple's on-device speech recognition only when you choose the Apple model. Cloud recognition is never enabled.</string>
+    <key>SUFeedURL</key><string>https://github.com/KartikLabhshetwar/betterwispr/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>QAcU47kj1MAVrne6SZCZ9c8XhIE0pOP/v3dCIEn+wH0=</string>
 </dict>
 </plist>

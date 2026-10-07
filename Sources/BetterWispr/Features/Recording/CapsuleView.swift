@@ -1,3 +1,4 @@
+import BetterWisprCore
 import SwiftUI
 
 struct CapsuleView: View {
@@ -122,7 +123,7 @@ struct CapsuleView: View {
                 Waveform(mode: waveformMode, animated: !reduceMotion)
                     .transition(.scale(scale: 0.4).combined(with: .opacity))
                     .accessibilityLabel(waveformLabel)
-                    .accessibilityValue(isRecording ? "\(Int(model.audioLevel * 100)) percent" : "")
+                    .accessibilityValue(isRecording ? "\(Int((model.voiceLevels.values.last ?? 0) * 100)) percent" : "")
                 if finishesOnClick {
                     stopMark
                 }
@@ -155,7 +156,7 @@ struct CapsuleView: View {
 
     private var waveformMode: Waveform.Mode {
         switch model.phase {
-        case .recording: .listening(CGFloat(model.audioLevel))
+        case .recording: .listening(model.voiceLevels)
         case .transcribing: .processing
         default: .waiting
         }
@@ -200,7 +201,7 @@ struct CapsuleView: View {
 private struct Waveform: View {
     enum Mode: Equatable {
         case waiting, processing
-        case listening(CGFloat)
+        case listening(VoiceLevels)
     }
 
     let mode: Mode
@@ -210,32 +211,34 @@ private struct Waveform: View {
     var body: some View {
         if animated && mode != .waiting {
             TimelineView(.animation) { context in
-                bars(at: context.date.timeIntervalSinceReferenceDate)
+                bars(at: context.date)
             }
         } else {
-            bars(at: 0)
+            bars(at: .now)
         }
     }
 
-    private func bars(at time: Double) -> some View {
+    private func bars(at date: Date) -> some View {
         HStack(spacing: 2.5) {
             ForEach(0..<Self.count, id: \.self) { index in
                 Capsule()
                     .fill(.white.opacity(mode == .waiting ? 0.4 : 0.95))
-                    .frame(width: 3, height: 3 + 15 * height(of: index, at: time))
+                    .frame(width: 3, height: 3 + 15 * height(of: index, at: date))
             }
         }
         .frame(height: 18)
     }
 
-    private func height(of index: Int, at time: Double) -> CGFloat {
+    private func height(of index: Int, at date: Date) -> CGFloat {
+        let time = date.timeIntervalSinceReferenceDate
         let position = Double(index)
         let middle = Double(Self.count - 1) / 2
         let distance = abs(position - middle) / middle
         switch mode {
         case .waiting:
             return 0
-        case .listening(let level):
+        case .listening(let levels):
+            let level = CGFloat(levels.value(at: date))
             let envelope = 1 - 0.5 * distance * distance
             let motion = animated ? 0.75 + 0.125 * (sin(time * 9.1 + position * 1.7) + sin(time * 5.3 + position * 0.8) + 2) / 2 : 1
             return level * envelope * motion

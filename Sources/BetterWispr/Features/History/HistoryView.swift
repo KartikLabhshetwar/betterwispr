@@ -39,11 +39,6 @@ struct HistoryView: View {
             }
         }
         .searchable(text: $query, prompt: "Search dictations")
-        .toolbar {
-            Button(action: model.exportHistory) { Label("Export", systemImage: "square.and.arrow.up") }
-                .help("Export history")
-                .disabled(model.history.isEmpty)
-        }
         .alert("Delete this dictation?", isPresented: Binding(
             get: { transcriptToDelete != nil },
             set: { if !$0 { transcriptToDelete = nil } }

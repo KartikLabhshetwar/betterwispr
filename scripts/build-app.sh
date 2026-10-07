@@ -9,13 +9,13 @@ fi
 swift build -c "$configuration" --product BetterWispr
 binary_dir="$(swift build -c "$configuration" --show-bin-path)"
 app="$PWD/.build/$configuration/BetterWispr.app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 # SwiftPM checkout licenses/resources can be read-only after the first copy.
 chmod -R u+w "$app"
 cp "$binary_dir/BetterWispr" "$app/Contents/MacOS/BetterWispr"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 version="$(tr -d '[:space:]' < VERSION)"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" "$app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $version" -c "Set :CFBundleVersion $version" "$app/Contents/Info.plist"
 icon_sources=(Sources/BetterWispr/Design/BrandMark.swift scripts/render-app-icon.swift)
 icon=.build/AppIcon.icns
 if [[ ! -f "$icon" || "${icon_sources[0]}" -nt "$icon" || "${icon_sources[1]}" -nt "$icon" ]]; then
@@ -25,13 +25,16 @@ if [[ ! -f "$icon" || "${icon_sources[0]}" -nt "$icon" || "${icon_sources[1]}" -
     iconutil -c icns "$iconset" -o "$icon"
 fi
 cp "$icon" "$app/Contents/Resources/AppIcon.icns"
-rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle"
+rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle" "$app/Contents/Frameworks/Sparkle.framework"
+ditto "$binary_dir/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
+rm -rf "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$app/Contents/Frameworks/Sparkle.framework/XPCServices"
 mkdir -p "$app/Contents/Resources/Licenses"
 cp LICENSE "$app/Contents/Resources/Licenses/BetterWispr-Apache-2.0.txt"
 cp .build/checkouts/argmax-oss-swift/LICENSE "$app/Contents/Resources/Licenses/Argmax-MIT.txt"
 cp .build/checkouts/argmax-oss-swift/NOTICES "$app/Contents/Resources/Licenses/Argmax-NOTICES.txt"
 cp .build/checkouts/FluidAudio/LICENSE "$app/Contents/Resources/Licenses/FluidAudio-Apache-2.0.txt"
 cp .build/checkouts/swift-argument-parser/LICENSE.txt "$app/Contents/Resources/Licenses/Swift-Argument-Parser-Apache-2.0.txt"
+cp .build/checkouts/Sparkle/LICENSE "$app/Contents/Resources/Licenses/Sparkle-MIT.txt"
 # SwiftPM resources from speech/tokenizer dependencies must travel with the app.
 for resource in "$binary_dir"/*.bundle; do
     [[ -d "$resource" ]] || continue

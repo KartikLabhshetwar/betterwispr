@@ -20,6 +20,15 @@ struct BetterWisprApp: App {
         }
         .defaultSize(width: 920, height: 680)
         .commands {
+            SidebarCommands()
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { delegate.model.updater.checkForUpdates() }
+                    .disabled(!delegate.model.updater.canCheckForUpdates)
+            }
+            CommandGroup(after: .saveItem) {
+                Button("Export History…") { delegate.model.exportHistory() }
+                    .disabled(delegate.model.history.isEmpty)
+            }
             CommandGroup(after: .newItem) {
                 Button(delegate.model.phase == .recording ? "Finish dictation" : "Start dictation") {
                     delegate.model.toggleRecording()

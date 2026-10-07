@@ -1,0 +1,74 @@
+import Foundation
+import NaturalLanguage
+
+public enum TranscriptCleaner {
+    private struct Token {
+        var word: String
+        var trailing: String
+    }
+
+    private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm"]
+    private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "bye", "no", "ha"]
+    private static let numberWords: Set<String> = ["zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+    private static let sentenceEnders: Set<Character> = [".", "?", "!"]
+    private static let terminators = sentenceEnders.union(["…"])
+
+    /// Removes English filled pauses and unpunctuated stutters; other languages are only trimmed.
+    public static func clean(_ text: String, language: String?) -> String {
+        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
+            ?? NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+        guard code == nil || code == "en" else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let ranges = text.ranges(of: /[\p{L}\p{M}\p{N}_'’-]+/)
+        let ends = ranges.dropFirst().map(\.lowerBound) + [text.endIndex]
+        let tokens = zip(ranges, ends).map { Token(word: String(text[$0]), trailing: String(text[$0.upperBound..<$1])) }
+        let leading = text[..<(ranges.first?.lowerBound ?? text.endIndex)]
+        let rebuilt = String(leading) + destutter(dropFillers(tokens)).map { $0.word + $0.trailing }.joined()
+        var result = rebuilt.replacing(/\ {2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        if result.hasSuffix(",") { result.removeLast() }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func dropFillers(_ tokens: [Token]) -> [Token] {
+        var kept: [Token] = []
+        var capitalizeNext = false
+        for var token in tokens {
+            if fillers.contains(token.word.lowercased()) {
+                guard let previous = kept.last?.trailing else { capitalizeNext = true; continue }
+                capitalizeNext = previous.contains(where: sentenceEnders.contains)
+                if token.trailing.contains(where: terminators.contains), !previous.contains(where: terminators.contains) {
+                    kept[kept.count - 1].trailing = token.trailing
+                }
+                continue
+            }
+            if capitalizeNext, token.word == token.word.lowercased() {
+                token.word = token.word.prefix(1).uppercased() + token.word.dropFirst()
+            }
+            capitalizeNext = false
+            kept.append(token)
+        }
+        return kept
+    }
+
+    private static func destutter(_ tokens: [Token]) -> [Token] {
+        var tokens = tokens
+        var i = 0
+        while i < tokens.count {
+            guard let n = [3, 2, 1].first(where: { repeats(tokens, at: i, length: $0) }) else { i += 1; continue }
+            tokens[i + n - 1].trailing = tokens[i + 2 * n - 1].trailing
+            tokens.removeSubrange(i + n..<i + 2 * n)
+        }
+        return tokens
+    }
+
+    private static func repeats(_ tokens: [Token], at i: Int, length n: Int) -> Bool {
+        guard i + 2 * n <= tokens.count else { return false }
+        let span = tokens[i..<i + 2 * n]
+        return (0..<n).allSatisfy { tokens[i + $0].word.lowercased() == tokens[i + n + $0].word.lowercased() }
+            && span.dropLast().allSatisfy { $0.trailing.allSatisfy(\.isWhitespace) }
+            && !span.contains { isProtected($0.word.lowercased(), single: n == 1) }
+    }
+
+    private static func isProtected(_ word: String, single: Bool) -> Bool {
+        word.contains(where: \.isNumber) || numberWords.contains(word) || (single && keptDoubles.contains(word))
+    }
+}

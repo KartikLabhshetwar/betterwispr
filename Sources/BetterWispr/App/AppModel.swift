@@ -179,7 +179,7 @@ final class AppModel {
                 let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints)
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
-                let text = VocabularyProcessor.apply(entries, to: raw)
+                let text = VocabularyProcessor.apply(entries, to: TranscriptCleaner.clean(raw, language: language))
                 guard !text.isEmpty else { self.fail(.noSpeech); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,

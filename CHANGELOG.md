@@ -18,6 +18,7 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Fixed
 - Paste into other apps stopped after every rebuild because ad-hoc signing changed the app's code requirement and macOS revoked Accessibility. `scripts/build-app.sh` now signs with a stable identity, and a blocked paste shows an Allow button instead of silently copying.
+- Dictation no longer pastes filler words or stutters. English "uh", "um", "er" and "hmm" and back-to-back repeats such as "which you which you" are removed before vocabulary replacements. Comma-separated repeats, numbers and common doubles such as "that that" and "long long" are kept, other languages are left as spoken, and history keeps the raw recognizer output.
 
 ## [0.1.0] - 2026-10-08
 

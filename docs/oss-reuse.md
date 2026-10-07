@@ -37,6 +37,11 @@ Labhshetwar, the same author as BetterWispr. Changes take a typed `Toast`, ignor
 mouse events, announce the toast to VoiceOver and use an opaque surface before
 macOS 26.
 
+`betterwispr-frontend/apps/web/src/components/apple-logo.tsx` copies the Apple
+logo path from [Simple Icons](https://github.com/simple-icons/simple-icons)
+16.34.0 (CC0-1.0). The logo is a trademark of Apple Inc. and only labels the
+Download for macOS buttons.
+
 ## Runtime engines and alternatives reviewed
 
 | Project | Upstream terms | Use in this project / useful pattern |

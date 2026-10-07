@@ -1,6 +1,7 @@
-import { AppleLogoIcon, GithubLogoIcon } from "@phosphor-icons/react";
+import { GithubLogoIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 
+import AppleLogo from "@/components/apple-logo";
 import BrandMark from "@/components/brand-mark";
 import { DOWNLOAD_URL, GITHUB_URL } from "@/lib/links";
 
@@ -31,7 +32,7 @@ export default function Header() {
             href={DOWNLOAD_URL}
             className="ml-2 flex items-center gap-2 rounded-lg bg-ink px-3 py-2 text-sm font-semibold text-white transition-all duration-700 ease-fluid hover:bg-zinc-700 active:scale-[0.98]"
           >
-            <AppleLogoIcon weight="fill" className="size-4" />
+            <AppleLogo className="size-4" />
             Download
           </a>
         </div>

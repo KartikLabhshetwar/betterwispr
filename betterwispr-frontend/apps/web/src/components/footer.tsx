@@ -52,10 +52,10 @@ export default function Footer() {
             GitHub
           </a>
         </FooterColumn>
-        <FooterColumn title="Compare">
+        <FooterColumn title="Blog">
           {comparisons.map((item) => (
             <Link
-              to="/compare/$slug"
+              to="/blog/$slug"
               params={{ slug: item.slug }}
               key={item.slug}
               className={LINK}
@@ -63,6 +63,9 @@ export default function Footer() {
               vs {item.name}
             </Link>
           ))}
+          <Link to="/blog" className={LINK}>
+            All posts
+          </Link>
         </FooterColumn>
         <FooterColumn title="About">
           <Link to="/privacy" className={LINK}>
@@ -74,9 +77,6 @@ export default function Footer() {
           <a href={`${GITHUB_URL}/issues`} className={LINK}>
             Report an issue
           </a>
-          <Link to="/compare" className={LINK}>
-            Comparison guide
-          </Link>
         </FooterColumn>
       </div>
     </footer>

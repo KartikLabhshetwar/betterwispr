@@ -6,12 +6,14 @@ import {
 import { renderToString } from "react-dom/server";
 import Document from "./components/document";
 import { routeTree } from "./routeTree.gen";
+import { articles } from "./lib/blog";
 import { comparisons } from "./lib/comparisons";
 
 export const paths = [
   "/",
-  "/compare",
-  ...comparisons.map((item) => `/compare/${item.slug}`),
+  "/blog",
+  ...articles.map((item) => `/blog/${item.slug}`),
+  ...comparisons.map((item) => `/blog/${item.slug}`),
   "/changelog",
   "/privacy",
   "/terms",

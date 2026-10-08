@@ -38,7 +38,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       {
         property: "og:image:alt",
         content:
-          "BetterWispr. Hold to talk. Release to type. Local dictation for Mac.",
+          "BetterWispr. Speak it messy. Send it clean. Open source dictation for Mac, with speech that stays on your Mac.",
       },
       {
         name: "twitter:image",

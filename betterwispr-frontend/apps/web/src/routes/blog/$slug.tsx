@@ -1,41 +1,64 @@
 import { ArrowLeftIcon, ArrowRightIcon } from "@phosphor-icons/react";
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
+import Article from "@/components/article";
 import DownloadCTA, { ClosingCTA } from "@/components/download-cta";
-import { BETTERWISPR_FACTS, comparisons, REVIEWED_ON } from "@/lib/comparisons";
+import { articles } from "@/lib/blog";
+import {
+  BETTERWISPR_FACTS,
+  type Comparison,
+  comparisons,
+  REVIEWED_ON,
+} from "@/lib/comparisons";
 import { pageHead } from "@/lib/seo";
 
-export const Route = createFileRoute("/compare/$slug")({
+export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
+    const article = articles.find((item) => item.slug === params.slug);
+    if (article) return { article };
     const comparison = comparisons.find((item) => item.slug === params.slug);
     if (!comparison) throw notFound();
-    return comparison;
+    return { comparison };
   },
   head: ({ loaderData }) =>
-    loaderData
+    loaderData?.article
       ? pageHead(
-          `BetterWispr vs ${loaderData.name} | Mac dictation compared`,
-          loaderData.intro,
-          `/compare/${loaderData.slug}`,
+          `${loaderData.article.title} | BetterWispr`,
+          loaderData.article.description,
+          `/blog/${loaderData.article.slug}`,
         )
-      : {
-          meta: [
-            { title: "Comparison not found | BetterWispr" },
-            { name: "robots", content: "noindex" },
-          ],
-        },
-  component: ComparisonPage,
+      : loaderData?.comparison
+        ? pageHead(
+            `BetterWispr vs ${loaderData.comparison.name} | Mac dictation compared`,
+            loaderData.comparison.intro,
+            `/blog/${loaderData.comparison.slug}`,
+          )
+        : {
+            meta: [
+              { title: "Post not found | BetterWispr" },
+              { name: "robots", content: "noindex" },
+            ],
+          },
+  component: BlogPost,
 });
 
-function ComparisonPage() {
-  const item = Route.useLoaderData();
+function BlogPost() {
+  const post = Route.useLoaderData();
+  return post.article ? (
+    <Article article={post.article} />
+  ) : (
+    <ComparisonPage item={post.comparison} />
+  );
+}
+
+function ComparisonPage({ item }: { item: Comparison }) {
   return (
     <>
       <article className="page-shell py-16 sm:py-20">
         <Link
-          to="/compare"
+          to="/blog"
           className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900"
         >
-          <ArrowLeftIcon /> All comparisons
+          <ArrowLeftIcon /> All posts
         </Link>
         <p className="eyebrow mt-12">{item.category}</p>
         <h1 className="mt-4 max-w-[880px] text-4xl tracking-tight sm:text-6xl">
@@ -161,14 +184,14 @@ function ComparisonPage() {
           className="mt-16 border-t border-zinc-200 pt-8"
           aria-label="Other comparisons"
         >
-          <h2 className="text-lg font-semibold">Keep comparing</h2>
+          <h2 className="text-lg font-semibold">More comparisons</h2>
           <div className="mt-4 flex flex-wrap gap-x-8 gap-y-4">
             {comparisons
               .filter((other) => other.slug !== item.slug)
               .map((other) => (
                 <Link
                   key={other.slug}
-                  to="/compare/$slug"
+                  to="/blog/$slug"
                   params={{ slug: other.slug }}
                   className="inline-flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-900"
                 >

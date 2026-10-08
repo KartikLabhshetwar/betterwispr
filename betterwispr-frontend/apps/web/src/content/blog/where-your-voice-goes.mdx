@@ -1,0 +1,54 @@
+export const meta = {
+  title: "Where your voice goes when you dictate with BetterWispr",
+  description:
+    "A plain account of what stays on your Mac, what can reach the network, and the choices that decide it: speech models, cleanup, notes models and API connections.",
+  date: "2026-10-08",
+};
+
+Dictation apps hear everything you say to them. Before you hand one your voice, you should know where that audio and text end up. This post walks through BetterWispr from the moment you hold the shortcut to the moment text lands in another app, and names every point where something can leave your Mac.
+
+## The default stays on your Mac
+
+A fresh install uses local speech recognition. You choose a model in Models: Apple on device recognition through a macOS language pack, NVIDIA Parakeet models, or Whisper models. Parakeet and Whisper run on your Mac after you install them.
+
+BetterWispr has no account and no cloud transcription fallback. If a local model is missing or fails, the app tells you so. It does not quietly send the recording somewhere else to get a result.
+
+## Downloads happen only when you ask
+
+Parakeet and Whisper models download only when you press install in Models. Loading a model you already installed never reaches the network, and starting a dictation never downloads anything. If a model is missing, BetterWispr asks you to install it first.
+
+Apple on device recognition is managed by macOS. It needs a supported language and the matching system assets, and it never falls back to Apple's server recognition.
+
+## Cleanup you control
+
+After recognition, Auto cleanup can tidy the text. You pick the level:
+
+- **None** keeps every word you said.
+- **Light**, the default, removes English filler words, repeats and false starts with rules that run on your Mac.
+- **Medium** also edits English for clarity with the notes model you chose in Models.
+
+Medium is the one setting where your notes model matters. Apple Intelligence and Ollama run on your Mac. BetterWispr talks to Ollama at `127.0.0.1`, the local address of your own machine. Claude Code, Codex and API connections send the dictation to that provider, and only if you pick one of them. History keeps the raw transcript next to the cleaned one, so Use Original can always bring back what you actually said.
+
+## API connections are opt in
+
+You can add a speech API connection for Sarvam AI, Smallest AI or any OpenAI compatible endpoint. When you select one, your recordings go to that service. BetterWispr never uses a connection as a fallback for a local model, so audio leaves your Mac only after you choose that connection.
+
+API keys are stored in your login Keychain, not in the app's settings file. Each key is tied to the exact endpoint it was saved for, so editing a connection's URL cannot forward an old key to a new server. Endpoints must use HTTPS. Plain HTTP is allowed only for addresses on your own Mac, such as `localhost`.
+
+## What stays on disk
+
+Settings, vocabulary and dictation history live in your Mac's Application Support folder. History is on by default and stores both the raw and the corrected text. You can turn it off for future dictations. The app does not encrypt this local data, so treat it like any other document on your Mac.
+
+Temporary recordings are deleted after a dictation completes or is cancelled. A force quit or a crash can interrupt that cleanup. Meeting recordings are a separate feature and keep their own saved files.
+
+## Typing into other apps
+
+BetterWispr needs Accessibility access to type into the app you were using. Automatic insertion can use the clipboard. Once the text lands, the destination app handles it under its own privacy practices.
+
+## Updates
+
+BetterWispr checks for updates through the release feed on GitHub. That check uses the network. Your recordings and transcripts are never part of it.
+
+## Check it yourself
+
+BetterWispr is open source. Every claim in this post maps to code you can read in the [GitHub repository](https://github.com/opennookorg/betterwispr), and the [privacy page](/privacy) covers the same ground in short form.

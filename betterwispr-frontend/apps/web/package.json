@@ -11,6 +11,8 @@
     "dev:bare": "vite dev",
     "env:generate": "varlock codegen",
     "test": "node scripts/check-site.mjs",
+    "new-post": "node scripts/new-post.mjs",
+    "og-image": "node scripts/og-image/render.mjs",
     "deploy": "pnpm run build && pnpm run test && pnpm dlx wrangler@4.148.0 deploy"
   },
   "dependencies": {

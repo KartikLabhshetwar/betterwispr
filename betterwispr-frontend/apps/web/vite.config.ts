@@ -10,7 +10,8 @@ const repoRoot = path.resolve(import.meta.dirname, "../../..");
 
 /** Drops the changelog preamble so rendering starts at the first release heading. */
 function startAtFirstRelease() {
-  return (tree: { children: { type: string; depth?: number }[] }) => {
+  return (tree: { children: { type: string; depth?: number }[] }, file: { path?: string }) => {
+    if (!file.path?.endsWith("CHANGELOG.md")) return;
     tree.children.splice(
       0,
       tree.children.findIndex((node) => node.type === "heading" && node.depth === 2),

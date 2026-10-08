@@ -5,83 +5,108 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
 
 const origin = "https://betterwispr.com";
-const sitemap = await readFile("dist/sitemap.xml", "utf8");
-const paths = [
-  ...sitemap.matchAll(/<loc>https:\/\/betterwispr.com([^<]*)<\/loc>/g),
-].map((match) => match[1]);
-assert.equal(
-  paths.length,
-  12,
-  "Expected homepage, comparison hub, seven comparisons and three information pages",
-);
-const titles = new Set();
-for (const path of paths) {
-  const html = await readFile(
-    path === "/" ? "dist/index.html" : `dist${path}.html`,
-    "utf8",
-  );
-  const head = html.slice(0, html.indexOf("</head>"));
-  const title = head.match(/<title>(.*?)<\/title>/)?.[1];
-  assert.ok(title && !titles.has(title), `${path}: unique static title`);
-  titles.add(title);
-  assert.equal(
-    (html.match(/<h1\b/g) ?? []).length,
-    1,
-    `${path}: one rendered heading`,
-  );
-  assert.ok(
-    head.includes(`rel="canonical" href="${origin}${path}"`),
-    `${path}: canonical URL`,
-  );
-  assert.ok(
-    head.includes(
-      'property="og:image" content="https://betterwispr.com/og-image.png"',
-    ),
-    `${path}: static OG image`,
-  );
-  assert.ok(
-    head.includes('name="twitter:card" content="summary_large_image"'),
-    `${path}: large social card`,
-  );
-  assert.ok(
-    /<button\b[^>]*aria-haspopup="menu"[^>]*class="download-cta\b/.test(html),
-    `${path}: header download menu`,
-  );
-  for (const arch of ["arm64", "x86_64"]) {
-    assert.ok(
-      html.includes(`href="https://github.com/opennookorg/betterwispr/releases/latest/download/BetterWispr-${arch}.dmg"`),
-      `${path}: ${arch} download available`,
-    );
-  }
-  for (const [, href] of html.matchAll(/href="(\/[^"#]*)/g)) {
-    assert.ok(
-      paths.includes(href) ||
-        href.startsWith("/assets/") ||
-        href === "/favicon.svg",
-      `${path}: unknown internal link ${href}`,
-    );
-  }
-  if (path.startsWith("/compare/")) {
-    assert.ok(
-      html.includes("<table") && html.includes("Sources and scope"),
-      `${path}: prerendered comparison content`,
-    );
-  }
-}
-assert.ok(
-  (await readFile("dist/404.html", "utf8")).includes("Nothing was said here"),
-  "Branded 404",
-);
-const png = await readFile("dist/og-image.png");
-assert.equal(png.subarray(1, 4).toString(), "PNG");
-assert.equal(png.readUInt32BE(16), 1730);
-assert.equal(png.readUInt32BE(20), 909);
-
 const vite = await createServer({
   server: { middlewareMode: true },
   appType: "custom",
 });
 try {
+  const { articles } = await vite.ssrLoadModule("/src/lib/blog.ts");
+  const { comparisons } = await vite.ssrLoadModule("/src/lib/comparisons.ts");
+  const sitemap = await readFile("dist/sitemap.xml", "utf8");
+  const paths = [
+    ...sitemap.matchAll(/<loc>https:\/\/betterwispr.com([^<]*)<\/loc>/g),
+  ].map((match) => match[1]);
+  assert.deepEqual(
+    [...paths].sort(),
+    [
+      "/",
+      "/blog",
+      ...articles.map((item) => `/blog/${item.slug}`),
+      ...comparisons.map((item) => `/blog/${item.slug}`),
+      "/changelog",
+      "/privacy",
+      "/terms",
+    ].sort(),
+    "Sitemap lists the homepage, blog index, every article and comparison, and the information pages",
+  );
+  assert.equal(new Set(paths).size, paths.length, "Every blog slug is unique");
+  const titles = new Set();
+  for (const path of paths) {
+    const html = await readFile(
+      path === "/" ? "dist/index.html" : `dist${path}.html`,
+      "utf8",
+    );
+    const head = html.slice(0, html.indexOf("</head>"));
+    const title = head.match(/<title>(.*?)<\/title>/)?.[1];
+    assert.ok(title && !titles.has(title), `${path}: unique static title`);
+    titles.add(title);
+    assert.equal(
+      (html.match(/<h1\b/g) ?? []).length,
+      1,
+      `${path}: one rendered heading`,
+    );
+    assert.ok(
+      head.includes(`rel="canonical" href="${origin}${path}"`),
+      `${path}: canonical URL`,
+    );
+    assert.ok(
+      head.includes(
+        'property="og:image" content="https://betterwispr.com/og-image.png"',
+      ),
+      `${path}: static OG image`,
+    );
+    assert.ok(
+      head.includes('name="twitter:card" content="summary_large_image"'),
+      `${path}: large social card`,
+    );
+    assert.ok(
+      /<button\b[^>]*aria-haspopup="menu"[^>]*class="download-cta\b/.test(html),
+      `${path}: header download menu`,
+    );
+    for (const arch of ["arm64", "x86_64"]) {
+      assert.ok(
+        html.includes(`href="https://github.com/opennookorg/betterwispr/releases/latest/download/BetterWispr-${arch}.dmg"`),
+        `${path}: ${arch} download available`,
+      );
+    }
+    for (const [, href] of html.matchAll(/href="(\/[^"#]*)/g)) {
+      assert.ok(
+        paths.includes(href) ||
+          href.startsWith("/assets/") ||
+          href === "/favicon.svg",
+        `${path}: unknown internal link ${href}`,
+      );
+    }
+    const article = articles.find((item) => path === `/blog/${item.slug}`);
+    if (article) {
+      assert.ok(
+        html.toLowerCase().includes(`<time datetime="${article.date}"`) &&
+          html.includes("By the BetterWispr team") &&
+          /<h2\b/.test(html.slice(html.indexOf("By the BetterWispr team"))),
+        `${path}: prerendered article content`,
+      );
+    }
+    if (comparisons.some((item) => path === `/blog/${item.slug}`)) {
+      assert.ok(
+        html.includes("<table") && html.includes("Sources and scope"),
+        `${path}: prerendered comparison content`,
+      );
+    }
+  }
+  assert.ok(
+    (await readFile("dist/404.html", "utf8")).includes("Nothing was said here"),
+    "Branded 404",
+  );
+  assert.match(
+    await readFile("dist/_redirects", "utf8"),
+    /^\/compare\/\* \/blog\/:splat 301$/m,
+    "Old comparison URLs redirect to the blog",
+  );
+  const png = await readFile("dist/og-image.png");
+  assert.equal(png.subarray(1, 4).toString(), "PNG");
+  assert.equal(png.readUInt32BE(16), 1730);
+  assert.equal(png.readUInt32BE(20), 909);
+
   const { GitHubStars } = await vite.ssrLoadModule(
     "/src/components/github-stars.tsx",
   );
@@ -194,9 +219,9 @@ try {
     ],
     "The hero offers separate Apple Silicon and Intel downloads",
   );
+  console.log(
+    `Passed: ${paths.length} static pages, metadata, internal links, CTAs, ${articles.length + comparisons.length} blog posts, redirects, 404, OG image, GitHub stars and testimonials.`,
+  );
 } finally {
   await vite.close();
 }
-console.log(
-  `Passed: ${paths.length} static pages, metadata, internal links, CTAs, comparison content, 404, OG image, GitHub stars and testimonials.`,
-);

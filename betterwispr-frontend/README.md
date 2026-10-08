@@ -116,19 +116,47 @@ wrangler@4.148.0 login`) or `CLOUDFLARE_API_TOKEN` from the environment. Never
 commit credentials. Custom domain, worker name and account must match the
 existing production site.
 
-The web build prerenders all public routes, including comparison pages, so
+The web build prerenders all public routes, including the blog, so
 search engines and social previews receive complete HTML and page metadata.
 It also generates `sitemap.xml` and a branded `404.html`. Unknown paths return
 404 instead of silently serving the homepage. The client hydrates the same
 React routes for navigation and interactions.
 
-Comparison content and dated official sources live in
-`apps/web/src/lib/comparisons.ts`. Recheck sources when updating claims.
+Blog posts live under `/blog`. Articles are MDX files in
+`apps/web/src/content/blog`. Comparison posts and their dated official sources
+live in `apps/web/src/lib/comparisons.ts`; recheck sources when updating
+claims. `apps/web/public/_redirects` sends old `/compare` URLs to `/blog` with
+a 301.
 The download destination stays in `apps/web/src/lib/links.ts`.
-`apps/web/public/og-image.png` is the product social image, generated with the
-built-in image tool: “BetterWispr; Hold to talk. Release to type.; Local
-dictation for Mac.; warm off-white, near-black typography, recording capsule
-and Option/Space keys.” Its dimensions are declared in the root route metadata.
+`apps/web/public/og-image.png` is the product social image. It is rendered from
+`apps/web/scripts/og-image/template.html`, which reuses the hero statue and
+Geist, by running `pnpm --filter web og-image` (needs Google Chrome, or set
+`CHROME` to another Chromium binary). Keep it 1730x909; the size is declared in
+the root route metadata and checked by `pnpm --filter web test`.
+
+### Writing a blog post
+
+```bash
+pnpm new-post "How I dictate code reviews"
+```
+
+1. The command creates `apps/web/src/content/blog/<slug>.mdx` with today's date.
+   The file name is the URL, so this post is served at
+   `/blog/how-i-dictate-code-reviews`.
+2. Fill in `meta.description` (at least 50 characters). It is the search
+   snippet and the social preview text. The build fails with the file name
+   until the title, description and `YYYY-MM-DD` date are valid.
+3. Write the post in Markdown. Use `##` for sections and link to the code or
+   official docs behind each claim. Do not publish accuracy or speed numbers
+   that nobody measured.
+4. Preview with `pnpm run dev:web` at `http://localhost:3001/blog/<slug>`.
+5. Run `pnpm --filter web run build && pnpm --filter web test`. The test checks
+   that every post is prerendered, listed in the sitemap, linked correctly and
+   has a unique title and slug.
+6. Commit the `.mdx` file and run `pnpm run deploy`.
+
+New posts appear at the top of `/blog`, newest first. Comparisons are added in
+`comparisons.ts` instead and appear in their own list below the articles.
 
 ### Local preview
 
@@ -157,3 +185,5 @@ betterwispr-frontend/
 - `pnpm run dev:web`: Start only the web application
 - `pnpm run dev:server`: Start only the server
 - `pnpm run check-types`: Check TypeScript types across all apps
+- `pnpm new-post "Title"`: Start a new blog post
+- `pnpm run deploy`: Build, verify and deploy the website

@@ -13,8 +13,9 @@ export const Route = createFileRoute("/privacy")({
       <p className="eyebrow">Your data</p>
       <h1>Privacy</h1>
       <p>
-        BetterWispr’s dictation is processed on your Mac. The app has no account
-        or cloud transcription fallback.
+        BetterWispr’s built in speech models process dictation on your Mac.
+        The app has no account and never falls back to cloud transcription.
+        Audio or text leaves your Mac only through a provider you select.
       </p>
       <h2>Speech and model downloads</h2>
       <p>
@@ -22,6 +23,14 @@ export const Route = createFileRoute("/privacy")({
         Downloadable models and tokenizers require an explicit installation
         action. Apple speech requires a supported on device language and OS
         assets. Downloads and app update checks use an internet connection.
+      </p>
+      <p>
+        You can select a speech API connection, such as Sarvam AI, Smallest AI
+        or an OpenAI compatible endpoint, or a notes model from Claude Code,
+        Codex or an API connection. That provider then receives your recordings
+        or text for transcription, meeting notes or Medium cleanup, under its
+        own privacy practices. API keys are stored in your login Keychain.
+        Apple Intelligence and Ollama notes models run on your Mac.
       </p>
       <h2>History and recordings</h2>
       <p>

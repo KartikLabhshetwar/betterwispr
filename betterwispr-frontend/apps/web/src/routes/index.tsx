@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
   head: () =>
     pageHead(
       "BetterWispr: local dictation for macOS",
-      "Hold a shortcut, speak, and BetterWispr types into your Mac apps. Local speech models, vocabulary and history. Free, with no account required.",
+      "Hold a shortcut, speak, and BetterWispr types clean text into any Mac app. Local speech models, a style for each app, meeting notes and insights. Free and open source, with no account required.",
       "/",
     ),
 });
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
 const FAQS = [
   [
     "Is BetterWispr free?",
-    "Yes. BetterWispr has no dictation subscription, account or API key requirement. Model files use storage on your Mac.",
+    "Yes. BetterWispr is free and open source under Apache 2.0, with no dictation subscription, account or API key requirement. Model files use storage on your Mac.",
   ],
   [
     "Which Macs does it support?",
@@ -32,7 +32,7 @@ const FAQS = [
   ],
   [
     "How do I dictate?",
-    "Focus a text field, hold Option + Space, speak, and release to transcribe. You can switch to press to toggle in Settings. Transcription begins after recording stops, rather than appearing word by word while you talk.",
+    "Focus a text field, hold Option + Space, speak, and release to transcribe. You can switch to press to toggle or choose a different shortcut in Settings. Transcription begins after recording stops, rather than appearing word by word while you talk.",
   ],
   [
     "Why does it need permissions?",
@@ -44,11 +44,19 @@ const FAQS = [
   ],
   [
     "Which languages are supported?",
-    "Language support depends on the selected model. Parakeet TDT v3 covers 25 European languages; Whisper offers broader multilingual recognition. Apple speech depends on your locale and installed assets. Test your chosen model with your own speech.",
+    "Language support depends on the selected model. Parakeet TDT v3 covers 25 European languages, Parakeet Japanese covers Japanese, and Whisper offers broader multilingual recognition. Apple speech depends on your locale and installed assets. Filler cleanup, styles and voice commands work in English. Test your chosen model with your own speech.",
   ],
   [
     "Does it rewrite everything I say?",
-    "BetterWispr applies local transcript cleanup and your configured replacements. It keeps raw and corrected text distinct in history. It does not send your words to a cloud writing service.",
+    "Only as much as you choose. Auto cleanup starts at Light, which removes English filler words, repeats and false starts. Choose None to keep every word, or Medium to also edit English for clarity with the notes model you chose in Models. Apple Intelligence and Ollama do that on your Mac. Claude Code, Codex and API connections send the dictation to that provider, and only if you pick one. Styles adjust punctuation and capitalization for each kind of app. History keeps the raw transcript, and Use Original restores it.",
+  ],
+  [
+    "Can it take meeting notes?",
+    "Yes. Notetaker transcribes your microphone as Me and, on macOS 14.2 or later, other apps’ audio as Them, while you write your own notes. Afterwards, Apple Intelligence on supported Macs running macOS 26 or a local Ollama model writes the summary, decisions and action items on your Mac. Claude Code, Codex and OpenAI compatible endpoints are optional and send the transcript to that provider. Without a notes model, the transcript and your notes are still saved.",
+  ],
+  [
+    "Does it learn my words?",
+    "Yes. Add names and terms in Vocabulary, or fix a misheard word in History or right after it is pasted. BetterWispr adds the correction to Vocabulary and spells it your way next time. You can turn learning off in Settings.",
   ],
 ];
 
@@ -62,23 +70,24 @@ function HomeComponent() {
         <div className="page-shell relative z-10 pt-10 pb-6 text-center sm:pt-14 sm:pb-8 lg:flex lg:min-h-[640px] lg:items-center lg:py-20 lg:text-left">
           <div className="mx-auto max-w-xl lg:mx-0 lg:w-1/2">
             <p className="eyebrow text-white/75">
-              A little less typing. A little more thinking.
+              Open source dictation for Mac
             </p>
             <h1
               id="hero-title"
               className="mt-5 text-[clamp(2.125rem,10vw,3.5rem)] leading-[1.08] tracking-tight lg:mt-6 lg:text-6xl xl:text-7xl"
             >
-              Hold to talk.
+              Speak it messy.
               <br />
-              Release to type.
+              Send it clean.
             </h1>
             <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-white/85 sm:text-lg lg:mx-0 lg:mt-6">
-              Your thoughts, in the app you’re already using. Hold{" "}
+              Hold{" "}
               <kbd className="whitespace-nowrap font-medium text-white">
                 ⌥ Space
-              </kbd>
-              , speak naturally, and let BetterWispr do the typing. Speech stays on
-              your Mac.
+              </kbd>{" "}
+              in any app and just talk. BetterWispr drops the ums and false
+              starts, spells names your way and writes in the style you set for
+              each app. Speech stays on your Mac.
             </p>
             <div className="mt-6 lg:mt-8">
               <DownloadCTA />
@@ -94,7 +103,7 @@ function HomeComponent() {
               className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-white/85 sm:text-sm lg:mt-8 lg:justify-start lg:gap-x-6"
               aria-label="Product essentials"
             >
-              {["No account", "Local speech models", "Your vocabulary"].map(
+              {["No account", "Local speech models", "Meeting notes built in"].map(
                 (text) => (
                   <li key={text} className="flex items-center gap-2">
                     <CheckIcon className="size-4" />
@@ -123,7 +132,7 @@ function HomeComponent() {
           id="features"
           className="mx-auto max-w-[680px] text-center text-3xl tracking-tight text-zinc-900"
         >
-          Speak instead of typing, in any app on your Mac
+          Speak in any app. BetterWispr handles the rest.
         </h2>
         <FeatureBento />
       </section>
@@ -146,7 +155,7 @@ function HomeComponent() {
             {[
               [
                 "Set up once",
-                "Install BetterWispr, allow the needed permissions, and choose a local speech model.",
+                "Install BetterWispr and follow the welcome guide through permissions and your first local speech model.",
               ],
               [
                 "Hold and speak",
@@ -154,7 +163,7 @@ function HomeComponent() {
               ],
               [
                 "Release to type",
-                "Let go to transcribe. Your words arrive in the app you were using, ready to review.",
+                "Let go to transcribe. Clean text arrives in the app you were using, in the style you set for it.",
               ],
             ].map(([title, body], index) => (
               <li key={title}>
@@ -192,26 +201,27 @@ function HomeComponent() {
         </div>
       </section>
 
-      <section className="page-shell py-24" aria-labelledby="compare-title">
+      <section className="page-shell py-24" aria-labelledby="blog-title">
         <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
           <div>
-            <p className="eyebrow">Choose with context</p>
+            <p className="eyebrow">From the blog</p>
             <h2
-              id="compare-title"
+              id="blog-title"
               className="mt-4 text-3xl tracking-tight sm:text-4xl"
             >
               Your voice. Your call.
             </h2>
             <p className="mt-4 max-w-xl text-base text-zinc-600">
-              There’s more than one good dictation app. Compare local
-              processing, offline use and writing workflows before you choose.
+              There’s more than one good dictation app. Our comparisons cover
+              local processing, offline use and writing workflows, with
+              official sources.
             </p>
           </div>
           <Link
-            to="/compare"
+            to="/blog"
             className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold hover:text-zinc-600"
           >
-            All comparisons
+            All posts
             <ArrowRightIcon />
           </Link>
         </div>
@@ -219,7 +229,7 @@ function HomeComponent() {
           {comparisons.slice(0, 4).map((item) => (
             <Link
               key={item.slug}
-              to="/compare/$slug"
+              to="/blog/$slug"
               params={{ slug: item.slug }}
               className="group flex items-center justify-between gap-4 border-b border-zinc-200 py-6 transition-colors duration-700 ease-fluid hover:bg-zinc-50"
             >

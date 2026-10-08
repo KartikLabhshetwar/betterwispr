@@ -63,13 +63,13 @@ export default function Header() {
           className={`${menuOpen ? "flex" : "hidden"} basis-full flex-col items-stretch gap-1 border-t border-zinc-200 pt-3 pb-1 sm:flex sm:basis-auto sm:flex-row sm:items-center sm:gap-4 sm:border-0 sm:p-0`}
         >
           <Link
-            to="/compare"
+            to="/blog"
             activeProps={{
               className: "text-zinc-950 underline underline-offset-4",
             }}
             className="rounded-lg px-3 py-3 text-base text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 sm:px-0 sm:py-2 sm:text-sm sm:hover:bg-transparent"
           >
-            Compare
+            Blog
           </Link>
           <Link
             to="/changelog"

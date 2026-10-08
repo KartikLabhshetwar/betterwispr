@@ -8,7 +8,7 @@ export const BETTERWISPR_FACTS = [
   ["Price model", "Free; no dictation subscription"],
   [
     "Text cleanup",
-    "Local filler cleanup, vocabulary hints and phrase replacements",
+    "Local cleanup levels, per app styles, vocabulary and learned corrections",
   ],
 ] as const;
 

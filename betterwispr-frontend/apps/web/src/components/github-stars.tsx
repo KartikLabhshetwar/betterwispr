@@ -33,8 +33,8 @@ import {
 export type GitHubStarsProps = {
   /** GitHub repository in `owner/repo` format. */
   repo: string;
-  /** Number of stars to display. */
-  stargazersCount: number;
+  /** Number of stars to display, or undefined while unknown. */
+  stargazersCount?: number;
   /**
    * Optional locales for number formatting.
    * See [MDN - Intl - locales argument](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl#locales_argument).
@@ -48,7 +48,10 @@ export function GitHubStars({
   stargazersCount,
   locales = "en-US",
 }: GitHubStarsProps) {
-  const starLabel = `${new Intl.NumberFormat(locales).format(stargazersCount)} ${stargazersCount === 1 ? "star" : "stars"}`;
+  const starLabel =
+    stargazersCount === undefined
+      ? undefined
+      : `${new Intl.NumberFormat(locales).format(stargazersCount)} ${stargazersCount === 1 ? "star" : "stars"}`;
 
   return (
     <TooltipProvider>
@@ -65,7 +68,11 @@ export function GitHubStars({
                   href={`https://github.com/${repo}`}
                   target="_blank"
                   rel="noopener"
-                  aria-label={`Star ${repo} on GitHub (${starLabel})`}
+                  aria-label={
+                    starLabel
+                      ? `Star ${repo} on GitHub (${starLabel})`
+                      : `Star ${repo} on GitHub`
+                  }
                 />
               }
             >
@@ -80,18 +87,21 @@ export function GitHubStars({
                 className="text-[0.8125rem]/none text-muted-foreground tabular-nums"
                 style={{ textBox: "trim-end cap alphabetic" }}
               >
-                {new Intl.NumberFormat(locales, {
-                  notation: "compact",
-                  compactDisplay: "short",
-                })
-                  .format(stargazersCount)
-                  .toLowerCase()}
+                {stargazersCount !== undefined &&
+                  new Intl.NumberFormat(locales, {
+                    notation: "compact",
+                    compactDisplay: "short",
+                  })
+                    .format(stargazersCount)
+                    .toLowerCase()}
               </span>
             </Button>
           }
         />
 
-        <TooltipContent className="tabular-nums">{starLabel}</TooltipContent>
+        <TooltipContent className="tabular-nums">
+          {starLabel ?? "Star on GitHub"}
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

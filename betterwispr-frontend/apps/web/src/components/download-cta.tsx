@@ -1,27 +1,71 @@
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLinkItem,
+  DropdownMenuTrigger,
+} from "@betterwispr-frontend/ui/components/dropdown-menu";
 import { track } from "@databuddy/sdk";
+import { CaretDownIcon, DownloadSimpleIcon } from "@phosphor-icons/react";
 
 import AppleLogo from "@/components/apple-logo";
-import { DOWNLOAD_URL, GITHUB_URL, INTEL_DOWNLOAD_URL } from "@/lib/links";
+import { DOWNLOAD_URL, INTEL_DOWNLOAD_URL } from "@/lib/links";
+
+const DOWNLOADS = [
+  { href: DOWNLOAD_URL, chip: "Apple Silicon", macs: "M1 or newer" },
+  { href: INTEL_DOWNLOAD_URL, chip: "Intel", macs: "Intel-based Macs" },
+];
 
 export default function DownloadCTA({
   compact = false,
 }: {
   compact?: boolean;
 }) {
-  const primary = (
-    <a
-      href={compact ? `${GITHUB_URL}/releases/latest` : DOWNLOAD_URL}
-      onClick={() => track("download_started")}
-      className={`download-cta ${compact ? "text-sm" : "text-base"}`}
-    >
-      <AppleLogo className={compact ? "size-4" : "size-5"} />
-      {compact ? "Download" : "Download for Apple Silicon"}
-    </a>
-  );
-  if (compact) return primary;
+  if (compact) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger className="download-cta group cursor-pointer text-sm">
+          <AppleLogo className="size-4" />
+          Download
+          <CaretDownIcon
+            weight="bold"
+            className="size-3.5 transition-transform duration-300 ease-fluid group-data-popup-open:rotate-180"
+            aria-hidden="true"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          className="w-60 rounded-xl bg-white p-1 text-zinc-900 shadow-lg ring-zinc-200"
+        >
+          {DOWNLOADS.map(({ href, chip, macs }) => (
+            <DropdownMenuLinkItem
+              key={href}
+              href={href}
+              closeOnClick
+              onClick={() => track("download_started")}
+              className="cursor-pointer gap-3 rounded-lg px-3 py-2 text-sm focus:bg-zinc-100 focus:text-zinc-900"
+            >
+              <span className="flex-1">
+                <span className="block font-semibold">{chip}</span>
+                <span className="block text-xs text-zinc-600">{macs}</span>
+              </span>
+              <DownloadSimpleIcon className="text-zinc-500" />
+            </DropdownMenuLinkItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
   return (
     <div className="inline-flex flex-col items-center gap-3">
-      {primary}
+      <a
+        href={DOWNLOAD_URL}
+        onClick={() => track("download_started")}
+        className="download-cta text-base"
+      >
+        <AppleLogo className="size-5" />
+        Download for Apple Silicon
+      </a>
       <a
         href={INTEL_DOWNLOAD_URL}
         onClick={() => track("download_started")}

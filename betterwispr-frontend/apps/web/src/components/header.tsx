@@ -89,7 +89,12 @@ export default function Header() {
           <div className="hidden sm:block">
             <StarOnGithub compact />
           </div>
-          <DownloadCTA compact />
+          <div className="flex justify-center pt-3 sm:hidden">
+            <DownloadCTA />
+          </div>
+          <div className="hidden sm:block">
+            <DownloadCTA compact />
+          </div>
         </div>
       </nav>
     </header>

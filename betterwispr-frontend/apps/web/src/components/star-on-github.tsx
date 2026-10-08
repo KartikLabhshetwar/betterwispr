@@ -1,4 +1,4 @@
-import { GithubLogoIcon, SparkleIcon, StarIcon } from "@phosphor-icons/react";
+import { SparkleIcon, StarIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
 import { GitHubStars } from "@/components/github-stars";
@@ -72,19 +72,11 @@ export default function StarOnGithub({
   }, [stars, compact]);
 
   if (compact) {
-    return stars.status === "ready" ? (
-      <GitHubStars repo={GITHUB_REPO} stargazersCount={stars.count} />
-    ) : (
-      <a
-        href={GITHUB_URL}
-        aria-label="BetterWispr on GitHub"
-        aria-busy={stars.status === "loading"}
-        className="block rounded-lg p-2 text-zinc-600 hover:text-zinc-900"
-        target="_blank"
-        rel="noopener"
-      >
-        <GithubLogoIcon className="size-5" aria-hidden="true" />
-      </a>
+    return (
+      <GitHubStars
+        repo={GITHUB_REPO}
+        stargazersCount={stars.status === "ready" ? stars.count : undefined}
+      />
     );
   }
 

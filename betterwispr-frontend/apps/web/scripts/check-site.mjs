@@ -44,10 +44,8 @@ for (const path of paths) {
     `${path}: large social card`,
   );
   assert.ok(
-    html.includes(
-      'href="https://github.com/opennookorg/betterwispr/releases/latest"',
-    ),
-    `${path}: working CTA destination configuration`,
+    /<button\b[^>]*aria-haspopup="menu"[^>]*class="download-cta\b/.test(html),
+    `${path}: header download menu`,
   );
   for (const arch of ["arm64", "x86_64"]) {
     assert.ok(
@@ -129,9 +127,19 @@ try {
   const fallback = renderToStaticMarkup(
     createElement(StarOnGithub, { compact: true }),
   );
+  const loaded = renderToStaticMarkup(
+    createElement(GitHubStars, {
+      repo: "opennookorg/betterwispr",
+      stargazersCount: 12,
+    }),
+  );
+  const mark = (markup) => markup.match(/<svg[\s\S]*?<\/svg>/)?.[0];
   assert.ok(
-    fallback.includes('aria-busy="true"') &&
-      fallback.includes('aria-label="BetterWispr on GitHub"'),
+    mark(fallback) && mark(fallback) === mark(loaded),
+    "Loading shows the same GitHub mark as the loaded count",
+  );
+  assert.ok(
+    fallback.includes('aria-label="Star opennookorg/betterwispr on GitHub"'),
     "Loading keeps a usable GitHub link without a fabricated count",
   );
   const homepage = await readFile("dist/index.html", "utf8");

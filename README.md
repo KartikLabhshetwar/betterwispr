@@ -1,11 +1,14 @@
+<div align="center">
+
+![BetterWispr: hold to talk, release to type](docs/assets/hero.png)
+
 # BetterWispr
 
-Local-first dictation for macOS. Hold **⌥ Space**, speak, release, and the text
-lands in whatever app you were typing in. Speech is transcribed on your Mac by
-default; nothing is sent anywhere unless you add an API connection yourself.
+Local-first dictation for macOS. Hold **⌥ Space**, speak, release, and the text lands in whatever app you were typing in. Speech is transcribed on your Mac by default; nothing is sent anywhere unless you add an API connection yourself.
 
-[Download the latest release](https://github.com/KartikLabhshetwar/betterwispr/releases/latest) ·
-[Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
+[Download the latest release](https://github.com/KartikLabhshetwar/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
+
+</div>
 
 ## Features
 
@@ -69,4 +72,3 @@ Build instructions, project layout and guidelines are in [CONTRIBUTING.md](CONTR
 ## License
 
 [Apache-2.0](LICENSE). Third-party code and model weights keep their own terms;
-see [docs/oss-reuse.md](docs/oss-reuse.md).

@@ -32,12 +32,17 @@ public final class MeetingRecorder {
     public var onChunk: (@MainActor (MeetingAudioChunk) -> Void)?
     public var onLevels: (@MainActor ((me: Float, them: Float)) -> Void)?
     public var onError: (@MainActor (any Error) -> Void)?
+    public var onMicrophone: (@MainActor (AudioInputDevice?) -> Void)?
     public private(set) var systemAudioIssue: String?
+    public private(set) var microphone: AudioInputDevice?
     private let policy: ChunkPolicy
     private var session: UUID?
     private var origin = Date()
+    private var threshold: Float = 0.002
+    private var choice: AudioInputDevice?
     private var engine: AVAudioEngine?
-    private var microphoneObserver: (any NSObjectProtocol)?
+    private var engineObserver: (any NSObjectProtocol)?
+    private var inputObserver: AudioInputObserver?
     private var writers: [Speaker: MeetingChunkWriter] = [:]
     private var stopSystemAudio: (() -> Void)?
     private var meters: [Speaker: VoiceLevelMeter] = [:]
@@ -47,19 +52,28 @@ public final class MeetingRecorder {
         self.policy = policy
     }
 
-    public func start(silenceThreshold: Float) async throws {
+    /// Nil microphone follows the macOS default input.
+    public func start(silenceThreshold: Float, microphone choice: AudioInputDevice?) async throws {
         guard session == nil else { throw AudioRecordingError.alreadyRecording }
         let id = UUID()
         session = id
         systemAudioIssue = nil
+        threshold = silenceThreshold
+        self.choice = choice
         do {
-            try await startMicrophone(session: id, threshold: silenceThreshold)
+            try await startMicrophone(session: id)
             await startSystemAudio(session: id, threshold: silenceThreshold)
             guard session == id else { throw CancellationError() }
         } catch {
             if session == id { cancel() }
             throw error
         }
+    }
+
+    /// Switches the live recording to another microphone; nil follows the macOS default input.
+    public func use(_ choice: AudioInputDevice?) {
+        self.choice = choice
+        if let session { followMicrophone(session: session) }
     }
 
     public func stop() {
@@ -82,7 +96,7 @@ public final class MeetingRecorder {
         reset()
     }
 
-    private func startMicrophone(session id: UUID, threshold: Float) async throws {
+    private func startMicrophone(session id: UUID) async throws {
         let allowed: Bool
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: allowed = true
@@ -92,17 +106,15 @@ public final class MeetingRecorder {
         try Task.checkCancellation()
         guard session == id else { throw CancellationError() }
         guard allowed else { throw AudioRecordingError.permissionDenied }
-        let engine = AVAudioEngine()
-        try installMicrophone(on: engine, session: id, threshold: threshold, startOffset: 0)
-        self.engine = engine
         origin = Date()
-        microphoneObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
-                                                                    queue: .main) { @Sendable [weak self] _ in
-            Task { @MainActor [weak self] in self?.restartMicrophone(session: id, threshold: threshold) }
-        }
+        try runMicrophone(session: id, startOffset: 0)
+        inputObserver = AudioInputObserver { [weak self] in self?.followMicrophone(session: id) }
     }
 
-    private func installMicrophone(on engine: AVAudioEngine, session id: UUID, threshold: Float, startOffset: TimeInterval) throws {
+    /// Records from a fresh engine, because an engine that already ran keeps its old input device.
+    private func runMicrophone(session id: UUID, startOffset: TimeInterval) throws {
+        let engine = AVAudioEngine()
+        let device = try AudioInputs.route(engine, to: choice)
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw AudioRecordingError.unavailable }
@@ -120,22 +132,46 @@ public final class MeetingRecorder {
             writer.cancel()
             throw error
         }
+        self.engine = engine
         writers[.me] = writer
+        engineObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
+                                                                queue: .main) { @Sendable [weak self] _ in
+            Task { @MainActor [weak self] in self?.restartMicrophone(session: id) }
+        }
+        microphone = device
+        onMicrophone?(device)
     }
 
-    /// Picks the microphone back up after AVAudioEngine stops itself for an input device or format change.
-    private func restartMicrophone(session id: UUID, threshold: Float) {
-        guard session == id, let engine else { return }
-        engine.inputNode.removeTap(onBus: 0)
+    private func followMicrophone(session id: UUID) {
+        guard engine == nil || AudioInputs.resolve(choice) != microphone else { return }
+        restartMicrophone(session: id)
+    }
+
+    /// Hands off the chunk recorded so far, then picks the microphone back up on whichever input now resolves.
+    private func restartMicrophone(session id: UUID) {
+        guard session == id else { return }
+        haltMicrophone()
         if let writer = writers.removeValue(forKey: .me) {
             writer.finish()
             hand(writer.takeReady())
         }
         do {
-            try installMicrophone(on: engine, session: id, threshold: threshold, startOffset: Date().timeIntervalSince(origin))
+            try runMicrophone(session: id, startOffset: Date().timeIntervalSince(origin))
         } catch {
+            microphone = nil
+            onMicrophone?(nil)
+            levels.me = 0
+            onLevels?(levels)
             onError?(error)
         }
+    }
+
+    private func haltMicrophone() {
+        if let engineObserver { NotificationCenter.default.removeObserver(engineObserver) }
+        engineObserver = nil
+        engine?.stop()
+        engine?.inputNode.removeTap(onBus: 0)
+        engine = nil
     }
 
     private func startSystemAudio(session id: UUID, threshold: Float) async {
@@ -180,21 +216,21 @@ public final class MeetingRecorder {
     }
 
     private func haltInputs() {
-        if let microphoneObserver { NotificationCenter.default.removeObserver(microphoneObserver) }
-        microphoneObserver = nil
-        engine?.stop()
-        engine?.inputNode.removeTap(onBus: 0)
+        inputObserver?.cancel()
+        inputObserver = nil
+        haltMicrophone()
         stopSystemAudio?()
     }
 
     private func reset() {
-        engine = nil
         writers = [:]
         stopSystemAudio = nil
         session = nil
         meters = [:]
         levels = (0, 0)
         onLevels?(levels)
+        microphone = nil
+        onMicrophone?(nil)
     }
 }
 

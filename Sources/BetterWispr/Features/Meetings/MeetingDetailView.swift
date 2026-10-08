@@ -3,11 +3,12 @@ import BetterWisprCore
 import SwiftUI
 
 struct MeetingDetailView: View {
-    @Bindable var meetings: MeetingModel
+    let model: AppModel
     let id: UUID
     @State private var tab = Tab.transcript
     @State private var transcriptQuery = ""
     @State private var showsSearch = false
+    @State private var showsModelNote = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Tab: String, CaseIterable {
@@ -46,9 +47,8 @@ struct MeetingDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .onChange(of: meeting.segments.count) {
-                        guard tab == .transcript, isRecording, transcriptQuery.isEmpty,
-                              let last = meetings.meeting(id)?.segments.last?.id else { return }
-                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { proxy.scrollTo(last, anchor: .bottom) }
+                        guard tab == .transcript, isRecording, transcriptQuery.isEmpty else { return }
+                        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { proxy.scrollTo(Self.listeningAnchor, anchor: .bottom) }
                     }
                 }
                 footer(meeting)
@@ -60,6 +60,7 @@ struct MeetingDetailView: View {
         }
     }
 
+    private var meetings: MeetingModel { model.meetings }
     private var isRecording: Bool { meetings.activity.capturingID == id }
     private var isActive: Bool { meetings.isActive(id) }
 
@@ -143,19 +144,36 @@ struct MeetingDetailView: View {
                     Button("Cancel", action: meetings.stop)
                 }
             case .recording(let active) where active == id:
-                HStack(spacing: 12) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.red)
-                        .accessibilityHidden(true)
-                    Text(durationLabel(meetings.elapsed)).monospacedDigit()
-                        .accessibilityLabel("Recording time")
-                    Spacer(minLength: 4)
-                    LevelMeter(label: "Me", level: meetings.levels.me, reduceMotion: reduceMotion)
-                    LevelMeter(label: "Them", level: meetings.levels.them, reduceMotion: reduceMotion)
-                    Button(action: meetings.stop) { Label("Stop", systemImage: "stop.fill") }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.red)
+                VStack(spacing: 12) {
+                    Text("Always get consent when transcribing others.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                    HStack(spacing: 10) {
+                        Button(action: meetings.stop) {
+                            Label {
+                                Text("Stop")
+                            } icon: {
+                                RoundedRectangle(cornerRadius: 3).fill(.green).frame(width: 12, height: 12)
+                            }
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(.horizontal, 16)
+                            .frame(height: 38)
+                            .overlay(Capsule().strokeBorder(.quaternary))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Stop meeting")
+                        HStack(spacing: 12) {
+                            microphoneMenu
+                            Spacer(minLength: 0)
+                            LevelMeter(label: "Me", level: meetings.levels.me, reduceMotion: reduceMotion)
+                            LevelMeter(label: "Them", level: meetings.levels.them, reduceMotion: reduceMotion)
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(height: 38)
+                        .overlay(Capsule().strokeBorder(.quaternary))
+                    }
                 }
                 .accessibilityElement(children: .contain)
             case .finishing(let active) where active == id:
@@ -180,6 +198,20 @@ struct MeetingDetailView: View {
         .padding(.vertical, 14)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+    }
+
+    private var microphoneMenu: some View {
+        Menu {
+            MicrophonePicker(model: model) { Text("Microphone") }
+                .pickerStyle(.inline)
+        } label: {
+            Label(meetings.microphone?.name ?? "No microphone", systemImage: meetings.microphone == nil ? "mic.slash" : "mic")
+        }
+        .menuStyle(.borderlessButton)
+        .lineLimit(1)
+        .help("Choose the microphone for this meeting")
+        .accessibilityLabel("Microphone")
+        .accessibilityValue(meetings.microphone?.name ?? "None")
     }
 
     private func progress(_ title: String) -> some View {
@@ -325,24 +357,30 @@ struct MeetingDetailView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 14)
             }
-            if isRecording {
-                Text("Transcribing with \(meeting.modelName).")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quaternary.opacity(0.4))
+            if isRecording, showsModelNote {
+                HStack(spacing: 8) {
+                    Text("Transcribing with \(meeting.modelName).")
+                    Spacer(minLength: 0)
+                    Button { showsModelNote = false } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.borderless)
+                        .help("Dismiss")
+                        .accessibilityLabel("Dismiss")
+                }
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.quaternary.opacity(0.4))
             }
         }
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
         .clipShape(RoundedRectangle(cornerRadius: 12))
 
-        if meeting.segments.isEmpty {
+        if meeting.segments.isEmpty, !isRecording {
             VStack(spacing: 10) {
-                Text(isRecording ? "Listening…" : "No transcript yet")
+                Text("No transcript yet")
                     .font(.system(size: 21, design: .serif)).italic()
-                Text(isRecording ? "Words appear as each audio segment is transcribed." : "Your own thoughts are saved in My thoughts.")
+                Text("Your own thoughts are saved in My thoughts.")
                     .font(.callout)
             }
             .foregroundStyle(.secondary)
@@ -350,16 +388,35 @@ struct MeetingDetailView: View {
             .padding(.vertical, 44)
         } else {
             let segments = meeting.segments.filter { transcriptQuery.isEmpty || $0.text.localizedStandardContains(transcriptQuery) }
-            if segments.isEmpty {
+            if segments.isEmpty, !meeting.segments.isEmpty {
                 Text("No matching words").foregroundStyle(.secondary)
             }
-            LazyVStack(alignment: .leading, spacing: 24) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 ForEach(segments) { segment in
                     SegmentRow(segment: segment).id(segment.id)
                 }
             }
+            if isRecording { listening(meeting) }
         }
-        if isActive, meetings.pendingChunks > 0 { progress("Transcribing…") }
+        if isActive, !isRecording, meetings.pendingChunks > 0 { progress("Transcribing…") }
+    }
+
+    private func listening(_ meeting: Meeting) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("Listening…").font(.system(size: 14, weight: .semibold))
+                if meetings.pendingChunks > 0 {
+                    ProgressView().controlSize(.mini).accessibilityLabel("Transcribing")
+                }
+            }
+            if meeting.segments.isEmpty {
+                Text("Words appear here a few seconds after they’re spoken.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.tertiary)
+                    .bubble()
+            }
+        }
+        .id(Self.listeningAnchor)
     }
 
     private func text(_ field: WritableKeyPath<Meeting, String>) -> Binding<String> {
@@ -369,6 +426,7 @@ struct MeetingDetailView: View {
         )
     }
 
+    private static let listeningAnchor = "listening"
     private static let callAudioHint = "BetterWispr hasn’t heard the other side of the call yet. Allow it under Screen & System Audio Recording, and make sure call audio plays on this Mac."
     private static let audioSettings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
 }
@@ -401,19 +459,28 @@ private struct SegmentRow: View {
     let segment: MeetingSegment
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
                 Circle().fill(segment.speaker == .me ? Color.green : .blue).frame(width: 6, height: 6)
                     .accessibilityHidden(true)
                 Text(segment.speaker.label).fontWeight(.semibold)
                 Text(segment.timestamp).foregroundStyle(.secondary).monospacedDigit()
             }
-            .font(.callout)
+            .font(.caption)
             Text(segment.text)
                 .font(.system(size: 15))
-                .lineSpacing(5)
+                .lineSpacing(4)
                 .textSelection(.enabled)
+                .bubble()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private extension View {
+    func bubble() -> some View {
+        padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

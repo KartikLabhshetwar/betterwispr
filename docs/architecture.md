@@ -86,6 +86,28 @@ generated summary have separate tabs backed by the existing meeting fields.
 A session token guards every continuation, so a stopped or quit meeting never
 receives a late segment or summary.
 
+Starting a meeting from the capsule or the menu bar docks a floating card
+(`NotetakerController`) to the right edge of the screen under the pointer. It
+hosts the same `MeetingDetailView` as the dashboard, closes when its meeting is
+deleted, and its expand button opens the meeting in the dashboard instead.
+
+## Microphone selection
+
+`AudioInputs` lists Core Audio devices with an input stream, keyed by UID, and
+skips private aggregate devices (Core Audio's per-process default aggregate and
+BetterWispr's system audio tap). `AppSettings.microphone` is the saved choice;
+nil means Automatic and follows the macOS default input. A chosen microphone is
+used only while it is connected, otherwise the macOS default is used; there is
+no other fallback. Dictation and meetings both route a fresh `AVAudioEngine`
+input to the resolved device before reading its format.
+
+`AudioInputObserver` reports connects, disconnects and default-input changes,
+debounced on the main actor. The settings picker and the meeting card's
+microphone menu refresh from it. During a meeting, `MeetingRecorder` rebuilds
+its microphone engine when the resolved device changes or the engine reports a
+configuration change, closing the current "Me" chunk first so offsets stay
+continuous. A dictation already in progress keeps its device until it ends.
+
 ## Add a model
 
 Add an entry to `SpeechModel.catalog` in

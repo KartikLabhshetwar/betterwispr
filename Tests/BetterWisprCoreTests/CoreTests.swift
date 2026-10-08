@@ -33,10 +33,23 @@ import Testing
     #expect(settings.dictationMode == .hold)
     #expect(settings.copyToClipboard)
     #expect(settings.shortcut == .optionSpace)
+    #expect(settings.microphone == nil)
     var toggled = settings
     toggled.dictationMode = .toggle
     toggled.copyToClipboard = false
+    toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
+}
+
+@Test func chosenMicrophoneIsUsedOnlyWhileConnected() {
+    let builtIn = AudioInputDevice(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
+    let airPods = AudioInputDevice(id: "AA-BB-CC:input", name: "AirPods Pro")
+    let renamed = AudioInputDevice(id: airPods.id, name: "Kartik’s AirPods")
+    #expect(AudioInputs.resolve(nil, available: [builtIn, airPods], systemDefault: airPods) == airPods)
+    #expect(AudioInputs.resolve(builtIn, available: [builtIn, airPods], systemDefault: airPods) == builtIn)
+    #expect(AudioInputs.resolve(airPods, available: [builtIn], systemDefault: builtIn) == builtIn)
+    #expect(AudioInputs.resolve(airPods, available: [builtIn, renamed], systemDefault: builtIn) == renamed)
+    #expect(AudioInputs.resolve(airPods, available: [], systemDefault: nil) == nil)
 }
 
 @Test func shortcutsValidateKeysAndRoundTripThroughSettings() throws {
@@ -145,4 +158,36 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("Uh, um.", language: nil) == "")
     #expect(TranscriptCleaner.clean("Wir treffen uns um acht Uhr", language: nil) == "Wir treffen uns um acht Uhr")
     #expect(TranscriptCleaner.clean("", language: "en") == "")
+}
+
+@Test func voiceCommandsInsertPunctuationAndBacktrack() {
+    #expect(VoiceCommands.apply("hello comma world") == "hello, world")
+    #expect(VoiceCommands.apply("Hello, comma, how are you") == "Hello, how are you")
+    #expect(VoiceCommands.apply("thanks add a comma see you soon") == "thanks, see you soon")
+    #expect(VoiceCommands.apply("is it done question mark") == "is it done?")
+    #expect(VoiceCommands.apply("first new line second") == "first\nSecond")
+    #expect(VoiceCommands.apply("Send it Monday. Sorry, remove that. Send it Tuesday.") == "Send it Tuesday.")
+    #expect(VoiceCommands.apply("Let's meet at 5, sorry, remove that, let's meet at 6") == "Let's meet at 6")
+    #expect(VoiceCommands.apply("Hi team. Ship it today scratch that tomorrow") == "Hi team. Tomorrow")
+    #expect(VoiceCommands.apply("Please remove that file") == "Please remove that file")
+    #expect(VoiceCommands.apply("I love the Oxford comma") == "I love the Oxford comma")
+    #expect(VoiceCommands.apply("the period ended") == "the period ended")
+}
+
+@Test func voiceCommandsTurnAtTheRateIntoMentions() {
+    #expect(VoiceCommands.apply("ping at the rate KV about it") == "ping @KV about it")
+    #expect(VoiceCommands.apply("ask at sign Sam") == "ask @Sam")
+    #expect(VoiceCommands.apply("growing at the rate of 5 percent") == "growing at the rate of 5 percent")
+}
+
+@Test func correctionLearnerKeepsVocabularyFixesOnly() {
+    #expect(CorrectionLearner.corrections(from: "Thanks kumr, see you", to: "Thanks Kumar, see you")
+            == [LearnedCorrection(heard: "kumr", corrected: "Kumar")])
+    #expect(CorrectionLearner.corrections(from: "try assist able today", to: "try Assistable today")
+            == [LearnedCorrection(heard: "assist able", corrected: "Assistable")])
+    #expect(CorrectionLearner.corrections(from: "ask kv about it", to: "ask KV about it")
+            == [LearnedCorrection(heard: "kv", corrected: "KV")])
+    #expect(CorrectionLearner.corrections(from: "why is it late", to: "what is it late").isEmpty)
+    #expect(CorrectionLearner.corrections(from: "hello there", to: "hello there!").isEmpty)
+    #expect(CorrectionLearner.corrections(from: "send the report today", to: "please call me tomorrow instead").isEmpty)
 }

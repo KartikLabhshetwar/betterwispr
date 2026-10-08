@@ -47,13 +47,17 @@ final class AppModel {
     var phraseBoosterInstalled = false
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     var accessibilityGranted = AXIsProcessTrusted()
+    var microphones: [AudioInputDevice] = []
+    var defaultMicrophone: AudioInputDevice?
     var onPresentationChange: (() -> Void)?
     var onShowCapsule: (() -> Void)?
     var onShowDashboard: (() -> Void)?
+    var onShowNotetaker: ((UUID) -> Void)?
 
     @ObservationIgnored private let store = LocalStore()
     @ObservationIgnored private let recorder = AudioRecorder()
     @ObservationIgnored private let globalShortcut = GlobalShortcut()
+    @ObservationIgnored private var microphoneObserver: AudioInputObserver?
     @ObservationIgnored private var shortcutWarning: String?
     @ObservationIgnored private var provider: (any SpeechProvider)?
     @ObservationIgnored private var preparedModelID: String?
@@ -75,6 +79,12 @@ final class AppModel {
     var totalWords: Int { history.reduce(0) { $0 + $1.wordCount } }
     var totalDuration: TimeInterval { history.reduce(0) { $0 + $1.duration } }
 
+    /// Connected microphones, plus the saved one while it is unplugged so pickers can still show it.
+    var microphoneChoices: [AudioInputDevice] {
+        guard let saved = settings.microphone, !microphones.contains(where: { $0.id == saved.id }) else { return microphones }
+        return microphones + [saved]
+    }
+
     init() {
         do {
             let state = try store.load()
@@ -89,6 +99,8 @@ final class AppModel {
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         refreshModels()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
+        refreshMicrophones()
+        microphoneObserver = AudioInputObserver { [weak self] in self?.refreshMicrophones() }
         globalShortcut.onPress = { [weak self] in self?.shortcutPressed() }
         globalShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
         warmUpSelectedModel()
@@ -164,6 +176,7 @@ final class AppModel {
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
                 self.recorder.silenceThreshold = self.settings.silenceThreshold
+                self.recorder.microphone = self.settings.microphone
                 try await self.recorder.start()
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
@@ -586,6 +599,17 @@ final class AppModel {
         let previouslyGranted = accessibilityGranted
         accessibilityGranted = AXIsProcessTrusted()
         if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly, !isBusy { registerShortcut() }
+    }
+
+    func selectMicrophone(_ choice: AudioInputDevice?) {
+        settings.microphone = choice
+        saveSettings()
+        meetings.useMicrophone(choice)
+    }
+
+    private func refreshMicrophones() {
+        microphones = AudioInputs.available()
+        defaultMicrophone = AudioInputs.systemDefault()
     }
 
     func showCapsule() { onShowCapsule?() }

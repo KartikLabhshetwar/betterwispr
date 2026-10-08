@@ -256,7 +256,7 @@ were not exercised in this UI pass.
 - [ ] Close the dashboard and hover over the floating capsule. The meeting button
   appears in its own capsule beside the microphone, with "Start notetaker" on hover.
   Its chevron opens Meetings without starting a recording. Click the record icon: the
-  dashboard reopens to Meetings and recording starts. Move the pointer away: the
+  meeting card docks on the right and recording starts. Move the pointer away: the
   single waveform/stop capsule stays visible and stops capture when clicked;
   the microphone and chevron are hidden throughout notetaker capture.
   The green outline appears only during notetaker recording, never during dictation
@@ -275,6 +275,20 @@ were not exercised in this UI pass.
 - [ ] Start a meeting on the built-in microphone, then connect AirPods or another
   headset mid-meeting. Both meters keep moving and new Me and Them entries keep
   appearing after the switch.
+- [ ] With Microphone set to Automatic, connect and disconnect AirPods and a USB
+  mic during a meeting. The card's microphone label follows the macOS default
+  input each time, and Me entries keep appearing. Pick a specific mic from the
+  card menu mid-meeting; capture switches to it without stopping the meeting.
+- [ ] Choose a USB mic in Settings, unplug it, and dictate. Dictation uses the
+  macOS default; the picker shows the mic as "(not connected)". Plug it back in
+  and it is used again without reselecting.
+- [ ] The microphone list in Settings and in the card matches System Settings,
+  Sound, Input, and never lists "CADefaultDeviceAggregate" or
+  "BetterWispr Meeting Audio", including while a meeting is recording.
+- [ ] Start notetaker from the capsule and from the menu bar with another app
+  focused. A card docks to the right edge of the current screen without stealing
+  focus. The expand button opens the meeting in the dashboard and closes the
+  card; deleting the meeting closes the card.
 - [ ] Record a meeting of 30 minutes or more. The transcript keeps up within a
   few chunks, memory stays bounded, notes are written, and the meeting file
   reopens after relaunch.

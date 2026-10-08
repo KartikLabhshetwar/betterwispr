@@ -9,6 +9,10 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Dictation") {
+                MicrophonePicker(model: model) {
+                    Text("Microphone")
+                    Text("Used for dictation and meeting notes. A chosen mic is used whenever it’s connected; otherwise BetterWispr follows Sound settings.")
+                }
                 ShortcutRecorder(model: model)
                 Picker(selection: setting(\.dictationMode)) {
                     Text("Hold to talk").tag(DictationMode.hold)
@@ -210,4 +214,23 @@ private struct ShortcutRecorder: View {
         kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12", kVK_F13: "F13", kVK_F14: "F14",
         kVK_F15: "F15", kVK_F16: "F16", kVK_F17: "F17", kVK_F18: "F18", kVK_F19: "F19", kVK_F20: "F20"
     ]
+}
+
+/// Picks the input for dictation and meetings; switching applies to a running meeting immediately.
+struct MicrophonePicker<Label: View>: View {
+    let model: AppModel
+    @ViewBuilder let label: Label
+
+    var body: some View {
+        Picker(selection: Binding(get: { model.settings.microphone?.id },
+                                  set: { id in model.selectMicrophone(model.microphoneChoices.first { $0.id == id }) })) {
+            Text(model.defaultMicrophone.map { "Automatic (\($0.name))" } ?? "Automatic").tag(String?.none)
+            ForEach(model.microphoneChoices) { device in
+                Text(model.microphones.contains { $0.id == device.id } ? device.name : "\(device.name) (not connected)")
+                    .tag(Optional(device.id))
+            }
+        } label: {
+            label
+        }
+    }
 }

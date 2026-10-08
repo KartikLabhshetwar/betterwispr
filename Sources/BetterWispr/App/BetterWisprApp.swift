@@ -64,9 +64,7 @@ private struct MenuContents: View {
         if model.isBusy { Button("Cancel") { model.cancelRecording() } }
         Button(model.meetings.activity.capturingID == nil ? "Start meeting notes" : "Stop meeting") {
             guard model.meetings.activity.capturingID == nil else { return model.meetings.stop() }
-            model.startMeeting()
-            openWindow(id: "dashboard")
-            NSApplication.shared.activate(ignoringOtherApps: true)
+            model.startNotetaker()
         }
         .disabled(model.meetings.activity != .idle && model.meetings.activity.capturingID == nil)
         Divider()
@@ -90,6 +88,7 @@ private struct MenuContents: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var capsule: CapsuleController?
+    private var notetaker: NotetakerController?
     private var started = false
 
     func start() {
@@ -98,6 +97,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capsule = CapsuleController(model: model)
         model.onPresentationChange = { [weak self] in self?.capsule?.update() }
         model.onShowCapsule = { [weak self] in self?.capsule?.show() }
+        notetaker = NotetakerController(model: model)
+        model.onShowNotetaker = { [weak self] in self?.notetaker?.show($0) }
         model.registerShortcut()
         capsule?.update()
     }
@@ -107,5 +108,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.cancelRecording()
         model.meetings.endForQuit()
         capsule?.close()
+        notetaker?.close()
     }
 }

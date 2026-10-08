@@ -16,6 +16,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var silenceThreshold: Float = 0.002
     public var dictationMode: DictationMode = .hold
     public var shortcut: DictationShortcut = .optionSpace
+    /// Nil follows the macOS default input.
+    public var microphone: AudioInputDevice?
 
     public init() {}
 
@@ -32,5 +34,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         silenceThreshold = try container.decode(Float.self, forKey: .silenceThreshold)
         dictationMode = try container.decodeIfPresent(DictationMode.self, forKey: .dictationMode) ?? .hold
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
+        microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
     }
 }

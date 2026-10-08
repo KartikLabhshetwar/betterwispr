@@ -31,6 +31,7 @@ final class MeetingModel {
     var generationStep: (Int, Int)?
     var message: String?
     var systemAudioIssue: String?
+    var microphone: AudioInputDevice?
     var showsCallAudioHint = false
     var notesAvailability = MeetingNotesGenerator.availability
 
@@ -59,6 +60,7 @@ final class MeetingModel {
         }
         recorder.onChunk = { [weak self] in self?.enqueue($0) }
         recorder.onLevels = { [weak self] in self?.receive($0) }
+        recorder.onMicrophone = { [weak self] in self?.microphone = $0 }
         recorder.onError = { [weak self] in self?.message = "Part of the recording couldn’t be saved: \($0.localizedDescription)" }
     }
 
@@ -68,7 +70,7 @@ final class MeetingModel {
 
     func isActive(_ id: UUID) -> Bool { activity.meetingID == id }
 
-    func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], silenceThreshold: Float) {
+    func start(model: SpeechModel, language: String?, vocabulary: [VocabularyEntry], silenceThreshold: Float, microphone: AudioInputDevice?) {
         guard activity == .idle else { return }
         let token = UUID()
         let meeting = Meeting(modelName: model.name, language: language ?? "auto")
@@ -94,7 +96,7 @@ final class MeetingModel {
                 try Task.checkCancellation()
                 guard let self, self.session == token else { return }
                 self.provider = provider
-                try await self.recorder.start(silenceThreshold: silenceThreshold)
+                try await self.recorder.start(silenceThreshold: silenceThreshold, microphone: microphone)
                 guard self.session == token else { return }
                 self.systemAudioIssue = self.recorder.systemAudioIssue
                 self.startedAt = Date()
@@ -141,6 +143,8 @@ final class MeetingModel {
             }
         }
     }
+
+    func useMicrophone(_ choice: AudioInputDevice?) { recorder.use(choice) }
 
     func generateNotes(_ id: UUID) {
         guard activity == .idle else { return }

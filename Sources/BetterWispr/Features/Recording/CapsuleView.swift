@@ -226,10 +226,7 @@ struct CapsuleView: View {
 
     private var meetingButton: some View {
         HStack(spacing: 0) {
-            Button {
-                model.startMeeting()
-                model.onShowDashboard?()
-            } label: {
+            Button(action: model.startNotetaker) {
                 Image(systemName: "record.circle")
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)
@@ -241,8 +238,12 @@ struct CapsuleView: View {
             .disabled(model.meetings.activity != .idle)
             .capsuleRegion(.notetaker)
             Button {
-                model.selectedPage = .meetings
-                model.onShowDashboard?()
+                if let id = model.meetings.activity.meetingID {
+                    model.onShowNotetaker?(id)
+                } else {
+                    model.selectedPage = .meetings
+                    model.onShowDashboard?()
+                }
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 8, weight: .semibold))

@@ -26,6 +26,8 @@ public final class AudioRecorder {
     public var onLevel: (@MainActor @Sendable (VoiceLevels) -> Void)?
     /// RMS amplitude gate, not a semantic speech detector. Lower this for quiet microphones.
     public var silenceThreshold: Float = 0.002
+    /// Nil follows the macOS default input.
+    public var microphone: AudioInputDevice?
     private var engine: AVAudioEngine?
     private var writer: RecordingWriter?
     private var recordingURL: URL?
@@ -48,6 +50,7 @@ public final class AudioRecorder {
         try Task.checkCancellation()
         guard allowed else { throw AudioRecordingError.permissionDenied }
         let engine = AVAudioEngine()
+        try AudioInputs.route(engine, to: microphone)
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw AudioRecordingError.unavailable }

@@ -23,7 +23,7 @@ struct MeetingsView: View {
                 .background(.orange.opacity(0.1))
             }
             if let id = meetings.selectedID, meetings.meeting(id) != nil {
-                MeetingDetailView(meetings: meetings, id: id).id(id)
+                MeetingDetailView(model: model, id: id).id(id)
             } else {
                 emptyState
             }
@@ -266,6 +266,12 @@ extension AppModel {
         }
         selectedPage = .meetings
         meetings.start(model: speechModel, language: settings.language == "auto" ? nil : settings.language,
-                       vocabulary: vocabulary, silenceThreshold: settings.silenceThreshold)
+                       vocabulary: vocabulary, silenceThreshold: settings.silenceThreshold, microphone: settings.microphone)
+    }
+
+    /// Starts a meeting from outside the dashboard and docks its card beside the call.
+    func startNotetaker() {
+        startMeeting()
+        if let id = meetings.activity.meetingID { onShowNotetaker?(id) } else { onShowDashboard?() }
     }
 }

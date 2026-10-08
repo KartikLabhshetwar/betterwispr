@@ -39,6 +39,8 @@ final class AppModel {
     let meetings = MeetingModel()
     var preparingModelID: String?
     var downloadProgress: Double = 0
+    var isInstallingPhraseBooster = false
+    var phraseBoosterInstalled = false
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     var accessibilityGranted = AXIsProcessTrusted()
     var onPresentationChange: (() -> Void)?
@@ -226,11 +228,12 @@ final class AppModel {
         if let activeAudioURL { try? FileManager.default.removeItem(at: activeAudioURL) }
         activeAudioURL = nil
         // A cancelled preparation may leave a partially loaded provider; load cleanly next time.
-        if phase == .transcribing || (preparedModelID == nil && loading == nil) {
+        if phase == .transcribing || isInstallingPhraseBooster || (preparedModelID == nil && loading == nil) {
             provider = nil
             preparedModelID = nil
         }
         preparingModelID = nil
+        isInstallingPhraseBooster = false
         voiceLevels = VoiceLevels()
         partialTranscript = ""
         phase = .idle
@@ -330,6 +333,34 @@ final class AppModel {
         }
     }
 
+    func installPhraseBooster() {
+        guard !isBusy, selectedModel.engine == .parakeet else { return }
+        let token = UUID()
+        generation = token
+        isInstallingPhraseBooster = true
+        downloadProgress = 0
+        phase = .preparing
+        statusMessage = "Downloading the phrase booster…"
+        operation = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try? await self.loading?.task.value
+                let booster = self.provider as? ParakeetProvider ?? ParakeetProvider()
+                self.observe(booster, token: token)
+                try await booster.installPhraseBooster()
+                guard self.generation == token else { return }
+                self.isInstallingPhraseBooster = false
+                self.refreshModels()
+                self.phase = .idle
+                self.statusMessage = "Parakeet now uses your vocabulary to spell names and terms."
+            } catch {
+                guard self.generation == token else { return }
+                self.isInstallingPhraseBooster = false
+                self.fail(DictationFailure(title: "Couldn’t download the phrase booster.", message: error.localizedDescription))
+            }
+        }
+    }
+
     func selectModel(_ model: SpeechModel) {
         guard !isBusy else { return }
         settings.selectedModelID = model.id
@@ -347,6 +378,7 @@ final class AppModel {
 
     private func refreshModels() {
         installedModelIDs = Set(models.filter { WhisperKitProvider.isInstalled($0) || ParakeetProvider.isInstalled($0) }.map(\.id))
+        phraseBoosterInstalled = ParakeetProvider.isPhraseBoosterInstalled()
         modelRevision += 1
     }
 

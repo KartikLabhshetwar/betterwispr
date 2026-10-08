@@ -26,6 +26,10 @@ struct VocabularyView: View {
             }
             .onSubmit { if canAdd { addEntry() } }
 
+            if model.selectedModel.engine == .parakeet {
+                phraseBoosterSection
+            }
+
             Section {
                 if model.vocabulary.isEmpty {
                     Text("Add a name that often gets misspelled, a technical term or a phrase you use every day.")
@@ -55,6 +59,31 @@ struct VocabularyView: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var phraseBoosterSection: some View {
+        Section {
+            if model.phraseBoosterInstalled {
+                Label("Phrase booster is on. Parakeet checks the spelling of these words on this Mac.", systemImage: "checkmark.circle")
+                    .foregroundStyle(.secondary)
+            } else {
+                LabeledContent {
+                    if !model.isInstallingPhraseBooster {
+                        Button("Download") { model.installPhraseBooster() }
+                            .disabled(model.isBusy)
+                    }
+                } label: {
+                    Text("Phrase booster")
+                    Text("Helps Parakeet spell the words in this list. About 100 MB, downloads once and runs on this Mac.")
+                }
+                if model.isInstallingPhraseBooster {
+                    ProgressView().progressViewStyle(.linear)
+                    Text("Downloading the phrase booster…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     private func addEntry() {

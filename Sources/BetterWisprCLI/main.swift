@@ -17,9 +17,10 @@ func run() async throws {
 
           --list-models
           --download-model MODEL_ID
-          --transcribe-file PATH [--model MODEL_ID] [--language en]
+          --download-phrase-booster
+          --transcribe-file PATH [--model MODEL_ID] [--language en] [--vocabulary "Term,Other term"]
 
-        Default model: parakeet-v3. Downloads only run with --download-model.
+        Default model: parakeet-v3. Downloads only run with --download-model or --download-phrase-booster.
         Audio transcription loads existing local assets and never downloads them.
         """)
         return
@@ -30,11 +31,16 @@ func run() async throws {
         }
         return
     }
+    if arguments == ["--download-phrase-booster"] {
+        try await ParakeetProvider().installPhraseBooster()
+        print("Installed the Parakeet phrase booster at \(ParakeetProvider.phraseBoosterDirectory.path).")
+        return
+    }
     var options: [String: String] = [:]
     var index = 0
     while index < arguments.count {
         let option = arguments[index]
-        guard ["--download-model", "--transcribe-file", "--model", "--language"].contains(option),
+        guard ["--download-model", "--transcribe-file", "--model", "--language", "--vocabulary"].contains(option),
               index + 1 < arguments.count, !arguments[index + 1].hasPrefix("--"), options[option] == nil else {
             throw CLIError.usage("Invalid or repeated argument: \(option). Run --help for usage.")
         }
@@ -63,7 +69,8 @@ func run() async throws {
     if let path = options["--transcribe-file"] {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let language = options["--language"].flatMap { $0 == "auto" ? nil : $0 }
-        let transcript = try await provider.transcribe(audioURL: url, language: language, vocabulary: [])
+        let vocabulary = options["--vocabulary"].map { $0.split(separator: ",").map(String.init) } ?? []
+        let transcript = try await provider.transcribe(audioURL: url, language: language, vocabulary: vocabulary)
         print(transcript)
         FileHandle.standardError.write(Data("Completed in \(started.duration(to: clock.now)).\n".utf8))
     } else {

@@ -123,6 +123,16 @@ when no language is supplied. WhisperKit uses locally loaded Core ML weights and
 tokenizers. Its tokenizer adapter exists because the upstream public loader can
 fall back to the network; see [source attribution](oss-reuse.md).
 
+Parakeet's optional phrase booster is FluidAudio's CTC word-spotting model. It
+downloads only from the Vocabulary page or `--download-phrase-booster`, into
+FluidAudio's shared cache (`CtcModels.defaultCacheDirectory(for: .ctc110m)`),
+because FluidAudio reads the booster's tokenizer from that fixed folder. A
+`.betterwispr-installed` marker is written after the files load. `prepare`
+loads an installed booster with `CtcModels.loadDirect` and never downloads it;
+a missing or broken booster leaves plain Parakeet transcription unchanged.
+`transcribe` boosts only English or automatic-language dictation with a
+non-empty vocabulary and keeps the decoder's text when rescoring changes nothing.
+
 ## Add an integration
 
 Put OS/application delivery behavior in `Integrations/` and implement the

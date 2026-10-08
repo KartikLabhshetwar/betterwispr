@@ -29,6 +29,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Insights counts the words the Parakeet phrase booster spells from your Vocabulary while it recognizes speech. Before, those dictations came out right but counted no vocabulary fixes.
 - A dictation you switch away from before it finishes is no longer easy to miss. When BetterWispr can't paste into the app you started in, because you moved to another app or it quit, the capsule opens a card with your text and a Copy button at the top right. A ring around the button counts down five seconds, then the card closes itself. The text is also on the clipboard, so ⌘V works too. Before, only a brief "Copied" toast at the top of the screen said where it went.
 - Learn from corrections catches a fix you send right away, as in chat apps that clear the field on send. BetterWispr now checks the field every half second and learns from text that stayed unchanged for half a second before the field emptied. A fix you leave in place is still learned after two seconds without changes.
+- Learn from corrections works in Electron apps such as Claude and T3 Code. These apps hide their text fields from Accessibility until an assistive app asks for them, so BetterWispr could never see your fix there. When learning is on and the field isn't readable after a paste, BetterWispr turns on that app's Accessibility support and checks again for up to five seconds.
 
 ## [0.1.0] - 2026-10-08
 

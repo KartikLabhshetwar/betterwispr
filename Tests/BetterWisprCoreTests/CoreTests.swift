@@ -214,6 +214,16 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(CorrectionLearner.corrections(from: "send the report today", to: "please call me tomorrow instead").isEmpty)
 }
 
+@Test func oneFixToRealParakeetOutputCorrectsTheNextDictation() {
+    let heard = "I dictate with better whisper and then paste it into cloud code. Open the superbase dashboard and check the post hog events."
+    let fixed = "I dictate with BetterWispr and then paste it into Claude Code. Open the Supabase dashboard and check the PostHog events."
+    let learned = CorrectionLearner.corrections(from: heard, to: fixed)
+    #expect(learned.map(\.corrected) == ["BetterWispr", "Claude Code", "Supabase", "PostHog"])
+    let entries = learned.map { VocabularyEntry(phrase: $0.heard, replacement: $0.corrected, learned: true) }
+    #expect(VocabularyProcessor.corrected(entries, in: heard) == (fixed, 4))
+    #expect(VocabularyProcessor.apply(entries, to: "Store it in the cloud and review the code.") == "Store it in the cloud and review the code.")
+}
+
 @Test func olderWorkspaceDecodesLearningFieldsWithDefaults() throws {
     let entry = try JSONDecoder().decode(VocabularyEntry.self, from: Data(#"{"id":"\#(UUID().uuidString)","phrase":"kv","replacement":"KV"}"#.utf8))
     #expect(entry.learned == false)

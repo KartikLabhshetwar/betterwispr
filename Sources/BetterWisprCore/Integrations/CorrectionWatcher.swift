@@ -14,8 +14,7 @@ public final class CorrectionWatcher {
         guard AXIsProcessTrusted(), !inserted.isEmpty else { return }
         let pid = app.processIdentifier
         task = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard let field = Self.focusedField(pid: pid) else { return }
+            guard let field = await Self.focusedField(pid: pid) else { return }
             var inserted = inserted
             var baseline: String?
             var settled = SettledText("")
@@ -59,16 +58,25 @@ public final class CorrectionWatcher {
         return String(local[..<(prefix - start)]) + String(new[prefix..<(new.count - suffix)]) + String(local[(old.count - suffix - start)...])
     }
 
-    private static func focusedField(pid: pid_t) -> AXUIElement? {
+    /// Electron apps expose their text fields only after an assistive app sets AXManualAccessibility, which takes a moment.
+    private static func focusedField(pid: pid_t) async -> AXUIElement? {
         let app = AXUIElementCreateApplication(pid)
         AXUIElementSetMessagingTimeout(app, 0.5)
-        var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
-              let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
-        let field = focused as! AXUIElement
-        var subrole: CFTypeRef?
-        AXUIElementCopyAttributeValue(field, kAXSubroleAttribute as CFString, &subrole)
-        return subrole as? String == kAXSecureTextFieldSubrole ? nil : field
+        for attempt in 0..<10 {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return nil }
+            var focused: CFTypeRef?
+            if AXUIElementCopyAttributeValue(app, kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID() {
+                let field = focused as! AXUIElement
+                var subrole: CFTypeRef?
+                AXUIElementCopyAttributeValue(field, kAXSubroleAttribute as CFString, &subrole)
+                if subrole as? String == kAXSecureTextFieldSubrole { return nil }
+                if value(of: field) != nil { return field }
+            }
+            if attempt == 0 { AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue) }
+        }
+        return nil
     }
 
     private static func value(of field: AXUIElement) -> String? {

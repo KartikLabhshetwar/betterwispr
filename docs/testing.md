@@ -292,8 +292,8 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   opens its mention picker is Slack's behavior; record what happens.
 - [ ] Dictate a name into TextEdit, fix the spelling within 30 seconds and wait
   about 4 seconds. Expect a "Learned" toast and a Learned entry in Vocabulary.
-  Repeat in Slack and Notes and record whether the app exposes its text field to
-  Accessibility (Electron apps may not).
+  Repeat in Notes and in a freshly launched Electron app such as Claude or
+  Slack. The Electron field becomes readable about two seconds after the paste.
 - [ ] Dictate into a chat field such as Messages or Slack, fix a word, wait about
   a second and press Return. Expect a "Learned" toast. Fixing and sending
   within a fraction of a second learns nothing, by design.

@@ -152,7 +152,7 @@ public struct VoiceLevelMeter: Sendable {
             let decibels = max(-60, 20 * log10(rms))
             let floor = min((self.floor ?? decibels) + Self.floorRise * ticks, decibels)
             peak = max(decibels, peak - Self.peakFall * ticks, floor + Self.minimumRange)
-            let span = peak - floor - Self.gate - Self.headroom
+            let span = peak - floor - Self.gate
             target = pow(min(1, max(0, (decibels - floor - Self.gate) / span)), Self.curve)
             self.floor = floor
         }
@@ -166,10 +166,9 @@ public struct VoiceLevelMeter: Sendable {
     private static let peakFall: Float = 0.12
     private static let minimumRange: Float = 15
     private static let gate: Float = 3
-    private static let headroom: Float = 3
     private static let curve: Float = 0.7
-    private static let attack: Float = 0.6
-    private static let release: Float = 0.18
+    private static let attack: Float = 0.8
+    private static let release: Float = 0.6
 }
 
 /// AVAudioEngine invokes its tap on the audio thread. The lock protects writes and

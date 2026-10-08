@@ -81,9 +81,6 @@ struct SettingsView: View {
                 Label("Speech is processed on this Mac. Audio is not kept after dictation. Downloading a model is the only time Whisper needs the internet.", systemImage: "lock.shield")
                     .foregroundStyle(.secondary)
             }
-
-            UpdatesSection(updater: model.updater)
-            AboutSection()
         }
         .formStyle(.grouped)
         .toggleStyle(.switch)
@@ -94,54 +91,5 @@ struct SettingsView: View {
             get: { model.settings[keyPath: keyPath] },
             set: { model.settings[keyPath: keyPath] = $0; model.saveSettings() }
         )
-    }
-}
-
-private struct UpdatesSection: View {
-    @Bindable var updater: AppUpdater
-
-    var body: some View {
-        Section {
-            Toggle(isOn: $updater.automaticallyChecksForUpdates) {
-                Text("Check for updates automatically")
-                Text("Looks for a new release on GitHub once a day.")
-            }
-            Toggle(isOn: $updater.automaticallyDownloadsUpdates) {
-                Text("Download and install automatically")
-                Text("New versions install the next time BetterWispr quits.")
-            }
-            .disabled(!updater.automaticallyChecksForUpdates)
-            Button("Check for Updates…", action: updater.checkForUpdates)
-                .disabled(!updater.canCheckForUpdates)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        } header: {
-            Text("Updates")
-        } footer: {
-            Text("Update checks contact GitHub only. They never include your audio or text.")
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
-private struct AboutSection: View {
-    private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
-
-    var body: some View {
-        Section("About") {
-            HStack(spacing: 14) {
-                BrandMark(size: 52)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("BetterWispr").font(.title2.weight(.semibold))
-                    Text("Version \(version)").foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 6)
-            LabeledContent("Source code") {
-                Link("GitHub", destination: URL(string: "https://github.com/KartikLabhshetwar/betterwispr")!)
-            }
-            LabeledContent("Made by") {
-                Link("@code_kartik on X", destination: URL(string: "https://x.com/code_kartik")!)
-            }
-        }
     }
 }

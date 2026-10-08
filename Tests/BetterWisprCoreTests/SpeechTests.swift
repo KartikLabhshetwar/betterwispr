@@ -43,12 +43,11 @@ import Testing
     let speech: [Float] = Array(repeating: -60, count: 10) + Array(repeating: -35, count: 3) + Array(repeating: -60, count: 4)
     var buffers = VoiceLevelMeter()
     var slices = VoiceLevelMeter()
-    for decibels in speech {
-        let buffered = buffers.update(rms: amplitude(decibels), over: 0.1)
-        let sliced = (0..<5).map { _ in slices.update(rms: amplitude(decibels), over: 0.02) }.last!
-        #expect(abs(buffered - sliced) < 0.02)
-    }
-    #expect(buffers.level > 0.2)
+    let buffered = speech.map { buffers.update(rms: amplitude($0), over: 0.1) }
+    let sliced = speech.map { decibels in (0..<5).map { _ in slices.update(rms: amplitude(decibels), over: 0.02) }.last! }
+    #expect(buffered.max()! > 0.9)
+    #expect(buffered.last! < 0.05)
+    #expect(zip(buffered, sliced).allSatisfy { abs($0 - $1) < 0.03 })
 }
 
 @Test func waveformPlaysBufferSlicesAcrossTheirDuration() {

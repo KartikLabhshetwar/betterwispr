@@ -37,6 +37,21 @@ Labhshetwar, the same author as BetterWispr. Changes take a typed `Toast`, ignor
 mouse events, announce the toast to VoiceOver and use an opaque surface before
 macOS 26.
 
+`Sources/BetterWisprCore/Audio/SystemAudioTap.swift` adapts the Core Audio
+process tap from Muesli's
+[`CoreAudioSystemRecorder.swift`](https://github.com/Muesli-HQ/muesli/blob/d9ef2ace6f0eca41dd76302a32ea57d4ca65a4ce/native/MuesliNative/Sources/MuesliNativeApp/CoreAudioSystemRecorder.swift)
+(MIT, copyright 2026 Pranav Hari) and AudioCap's
+[`AudioCap/ProcessTap/ProcessTap.swift`](https://github.com/insidegui/AudioCap/blob/6f609e8ad1b1e11fa0e8edbe91864cb099f00de3/AudioCap/ProcessTap/ProcessTap.swift)
+(BSD-2-Clause, copyright 2024 Guilherme Rambo), revision
+`6f609e8ad1b1e11fa0e8edbe91864cb099f00de3`. Both notices are retained in the
+adapted source. The adapted parts are the global tap description, the private
+aggregate device that carries the tap, reading `kAudioTapPropertyFormat`, the
+IOProc block and the teardown order. The tap excludes BetterWispr's own process
+and leaves other apps audible. The tap and the aggregate device are private, and
+the device gets a fresh UID for each meeting. Reading the tap format retries
+briefly, the IOProc hands each buffer to the meeting chunk writer without
+copying, and a tap failure leaves the meeting recording the microphone only.
+
 `betterwispr-frontend/apps/web/src/components/apple-logo.tsx` copies the Apple
 logo path from [Simple Icons](https://github.com/simple-icons/simple-icons)
 16.34.0 (CC0-1.0). The logo is a trademark of Apple Inc. and only labels the
@@ -51,6 +66,12 @@ Download for macOS buttons.
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | [MIT](https://github.com/ggml-org/whisper.cpp/blob/master/LICENSE) | Local C/C++ inference and CLI integration; useful for a separately installed local engine and GGML models. |
 | [Handy](https://github.com/cjpais/Handy) | [MIT](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/LICENSE) | Reviewed its separation of recording, model management and transcription. Its [VAD smoother](https://github.com/cjpais/Handy/blob/afe5a6310534ffb178794365f31abb8b9fd435a7/src-tauri/src/audio_toolkit/vad/smoothed.rs) buffers speech onset and trailing frames. No Handy source is vendored by this research task. |
 | [VoiceInk](https://github.com/Beingpax/VoiceInk) | [GPL-3.0](https://github.com/Beingpax/VoiceInk/blob/main/LICENSE) | Product/reference research only. No source copied into this Apache-2.0 application. |
+| [Muesli](https://github.com/Muesli-HQ/muesli) | MIT | Native meeting recorder. Its Core Audio system recorder is adapted for meeting notes, as described above. |
+| [AudioCap](https://github.com/insidegui/AudioCap) | BSD-2-Clause | Minimal process tap sample. Its tap and aggregate device setup is adapted for meeting notes, as described above. |
+| [OpenOats](https://github.com/yazinsai/OpenOats) | MIT | Reviewed for labelling the microphone as Me and system audio as Them. No source copied. |
+| [Recap](https://github.com/RecapAI/Recap) | MIT | Native meeting summaries reviewed for product shape. No source copied. |
+| [anarlog (formerly Hyprnote)](https://github.com/fastrepl/anarlog) | MIT | Rust meeting notes app, reference only. No source copied. |
+| [Meetily](https://github.com/Zackriya-Solutions/meetily) | MIT | Rust meeting minutes app, reference only. No source copied. |
 
 The research table is not the dependency lock file: the actual compiled versions
 are recorded in `Package.swift` and `Package.resolved`, and a separately installed

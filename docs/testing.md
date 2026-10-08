@@ -166,6 +166,36 @@ CLI. Neither recognizes microphone audio.
 - [ ] Turn off automatic checks and relaunch. A network monitor shows no request
   for the appcast until you choose "Check for Updates…".
 
+## Meeting notes
+
+None of these have been run yet.
+
+- [ ] Start the first meeting on macOS 14.2 or later. macOS asks for system audio
+  access with the `NSAudioCaptureUsageDescription` text. Allow it, play a video
+  call or any audio, and confirm "Them" bubbles appear and the Them meter moves.
+- [ ] Deny system audio access, start a meeting and talk for 20 seconds. The
+  banner shows the call audio hint, and Open Settings opens Screen & System
+  Audio Recording. Me bubbles still appear.
+- [ ] Hold a call through headphones, then through the built-in speakers. With
+  speakers, note how often the other side's words also appear as "Me" through
+  the microphone. Record the result; do not assume either way.
+- [ ] Start a meeting on the built-in microphone, then connect AirPods or another
+  headset mid-meeting. Both meters keep moving and new Me and Them bubbles keep
+  appearing after the switch.
+- [ ] Record a meeting of 30 minutes or more. The transcript keeps up within a
+  few chunks, memory stays bounded, notes are written, and the meeting file
+  reopens after relaunch.
+- [ ] Quit BetterWispr from the menu bar mid-meeting. The meeting is kept with
+  the segments transcribed so far and a duration, and no
+  `betterwispr-meeting-*.caf` files remain in the temporary folder.
+- [ ] With Apple Intelligence on, stop a meeting and confirm the summary, key
+  points, decisions and action items. Ticking an action item survives relaunch.
+  A title you typed before the notes were written is kept.
+- [ ] With Apple Intelligence off or unsupported, stop a meeting. The transcript
+  and notes are saved, and Write Notes is disabled with the reason shown.
+- [ ] Disconnect networking, then start, record, stop and summarize a meeting with
+  an installed model. Everything works and a network monitor shows no requests.
+
 ## Accuracy
 
 - [ ] Follow [the corpus and scoring protocol](accuracy.md). Use consented natural

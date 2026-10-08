@@ -2,26 +2,30 @@ import BetterWisprCore
 import SwiftUI
 
 enum AppPage: String, CaseIterable, Identifiable {
-    case overview, history, models, vocabulary, settings
+    case overview, meetings, history, models, vocabulary, settings, about
 
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
     var symbol: String {
         switch self {
         case .overview: "square.grid.2x2.fill"
+        case .meetings: "note.text"
         case .history: "clock.fill"
         case .models: "cpu.fill"
         case .vocabulary: "character.book.closed.fill"
         case .settings: "gearshape.fill"
+        case .about: "info"
         }
     }
     var color: Color {
         switch self {
         case .overview: .blue
+        case .meetings: .yellow
         case .history: .orange
         case .models: .purple
         case .vocabulary: .green
         case .settings: .gray
+        case .about: .indigo
         }
     }
 }
@@ -50,10 +54,12 @@ struct DashboardView: View {
             Group {
                 switch model.selectedPage {
                 case .overview: OverviewView(model: model)
+                case .meetings: MeetingsView(model: model)
                 case .history: HistoryView(model: model)
                 case .models: ModelsView(model: model)
                 case .vocabulary: VocabularyView(model: model)
                 case .settings: SettingsView(model: model)
+                case .about: AboutView(updater: model.updater)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

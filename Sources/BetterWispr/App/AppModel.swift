@@ -36,6 +36,7 @@ final class AppModel {
     var settings = AppSettings()
     let models = SpeechModel.catalog
     let updater = AppUpdater()
+    let meetings = MeetingModel()
     var preparingModelID: String?
     var downloadProgress: Double = 0
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -47,6 +48,7 @@ final class AppModel {
     @ObservationIgnored private let recorder = AudioRecorder()
     @ObservationIgnored private var provider: (any SpeechProvider)?
     @ObservationIgnored private var preparedModelID: String?
+    @ObservationIgnored private var loading: (id: String, task: Task<Void, any Error>)?
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var failureDismissal: Task<Void, Never>?
@@ -78,6 +80,7 @@ final class AppModel {
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         refreshModels()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
+        warmUpSelectedModel()
     }
 
     func shortcutPressed() {
@@ -223,7 +226,7 @@ final class AppModel {
         if let activeAudioURL { try? FileManager.default.removeItem(at: activeAudioURL) }
         activeAudioURL = nil
         // A cancelled preparation may leave a partially loaded provider; load cleanly next time.
-        if preparedModelID == nil || phase == .transcribing {
+        if phase == .transcribing || (preparedModelID == nil && loading == nil) {
             provider = nil
             preparedModelID = nil
         }
@@ -239,31 +242,65 @@ final class AppModel {
         if model.engine == .apple {
             try AppleSpeechProvider.checkAvailability(language: settings.language == "auto" ? nil : settings.language)
         }
-        let reuse = preparedModelID == model.id && provider != nil && !download
-        let next: any SpeechProvider = if reuse, let provider { provider }
-            else {
-                switch model.engine {
-                case .apple: AppleSpeechProvider()
-                case .whisperKit: WhisperKitProvider()
-                case .parakeet: ParakeetProvider()
-                }
-            }
         let token = generation
-        next.onProgress = { [weak self] progress in
-            guard let self, self.generation == token else { return }
-            self.downloadProgress = progress
+        guard download else {
+            if preparedModelID != model.id || provider == nil { try await load(model).value }
+            try Task.checkCancellation()
+            guard generation == token, let provider else { throw CancellationError() }
+            observe(provider, token: token)
+            return
         }
-        next.onPartialTranscript = { [weak self] text in
-            guard let self, self.generation == token, self.phase == .transcribing else { return }
-            self.partialTranscript = text
-        }
-        if reuse { return }
+        let next = Self.makeProvider(for: model)
+        observe(next, token: token)
+        loading = nil
         preparedModelID = nil
         provider = next
-        try await next.prepare(model: model, download: download)
+        try await next.prepare(model: model, download: true)
         try Task.checkCancellation()
         guard generation == token else { throw CancellationError() }
         preparedModelID = model.id
+    }
+
+    /// Loads an installed model once, sharing the in-flight load so a cancelled dictation never discards it.
+    @discardableResult
+    private func load(_ model: SpeechModel) -> Task<Void, any Error> {
+        if let loading, loading.id == model.id { return loading.task }
+        let next = Self.makeProvider(for: model)
+        preparedModelID = nil
+        provider = next
+        let task = Task { [weak self] in
+            defer { if self?.provider === next { self?.loading = nil } }
+            try await next.prepare(model: model, download: false)
+            guard let self, self.provider === next else { throw CancellationError() }
+            self.preparedModelID = model.id
+        }
+        loading = (model.id, task)
+        return task
+    }
+
+    private func warmUpSelectedModel() {
+        let model = selectedModel
+        guard model.engine != .apple, isModelInstalled(model), preparedModelID != model.id else { return }
+        load(model)
+    }
+
+    private func observe(_ provider: any SpeechProvider, token: UUID) {
+        provider.onProgress = { [weak self] progress in
+            guard let self, self.generation == token else { return }
+            self.downloadProgress = progress
+        }
+        provider.onPartialTranscript = { [weak self] text in
+            guard let self, self.generation == token, self.phase == .transcribing else { return }
+            self.partialTranscript = text
+        }
+    }
+
+    private static func makeProvider(for model: SpeechModel) -> any SpeechProvider {
+        switch model.engine {
+        case .apple: AppleSpeechProvider()
+        case .whisperKit: WhisperKitProvider()
+        case .parakeet: ParakeetProvider()
+        }
     }
 
     func installModel(_ model: SpeechModel) {
@@ -298,7 +335,9 @@ final class AppModel {
         settings.selectedModelID = model.id
         provider = nil
         preparedModelID = nil
+        loading = nil
         saveSettings()
+        warmUpSelectedModel()
     }
 
     func isModelInstalled(_ model: SpeechModel) -> Bool {

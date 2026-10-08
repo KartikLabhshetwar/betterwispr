@@ -63,6 +63,10 @@ import Testing
 @MainActor
 @Test func parakeetRejectsMissingAssetsWithoutDownloading() async throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: "betterwispr-parakeet-test-\(UUID().uuidString)")
+    func phraseBoosterFiles() -> Set<String>? {
+        (try? FileManager.default.contentsOfDirectory(atPath: ParakeetProvider.phraseBoosterDirectory.path)).map(Set.init)
+    }
+    let boosterFilesBefore = phraseBoosterFiles()
     for model in SpeechModel.catalog where model.engine == .parakeet {
         #expect(ParakeetProvider.version(for: model) != nil)
         #expect(!ParakeetProvider.isInstalled(model, modelsDirectory: directory))
@@ -73,4 +77,58 @@ import Testing
             #expect(!FileManager.default.fileExists(atPath: directory.path))
         }
     }
+    #expect(phraseBoosterFiles() == boosterFilesBefore)
+}
+
+@Test func phraseBoosterCountsAsInstalledOnlyAfterACompletedInstall() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(path: "betterwispr-booster-test-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: directory) }
+    #expect(!ParakeetProvider.isPhraseBoosterInstalled(at: directory))
+
+    for bundle in ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc"] {
+        try FileManager.default.createDirectory(at: directory.appending(path: bundle), withIntermediateDirectories: true)
+    }
+    try Data("{}".utf8).write(to: directory.appending(path: "vocab.json"))
+    #expect(!ParakeetProvider.isPhraseBoosterInstalled(at: directory))
+
+    try Data().write(to: directory.appending(path: ".betterwispr-installed"))
+    #expect(ParakeetProvider.isPhraseBoosterInstalled(at: directory))
+
+    try FileManager.default.removeItem(at: directory.appending(path: "vocab.json"))
+    #expect(!ParakeetProvider.isPhraseBoosterInstalled(at: directory))
+}
+
+@Test func boostingTermsAreTrimmedDedupedAndCapped() {
+    let terms = ParakeetProvider.boostingTerms(["  Kartik ", "ab", "MDX", "kartik", "", "   ", "BetterWispr\n", "KARTIK"])
+    #expect(terms == ["Kartik", "MDX", "BetterWispr"])
+
+    let limit = ParakeetProvider.maximumBoostingTerms
+    let many = ParakeetProvider.boostingTerms((0..<limit + 5).map { "Term \($0)" })
+    #expect(many.count == limit)
+    #expect(many.first == "Term 0")
+    #expect(many.last == "Term \(limit - 1)")
+    #expect(ParakeetProvider.boostingTerms([]).isEmpty)
+}
+
+@Test func boostedReplacementsKeepTheOriginalPunctuation() {
+    #expect(ParakeetProvider.restoringPunctuation(
+        original: "Hey, this is Karthik. Please ping Lubshetvur about it.",
+        rescored: "Hey, this is Kartik Please ping Labhshetwar about it.",
+        replacements: [(original: "Karthik.", replacement: "Kartik"), (original: "Lubshetvur", replacement: "Labhshetwar")]
+    ) == "Hey, this is Kartik. Please ping Labhshetwar about it.")
+    #expect(ParakeetProvider.restoringPunctuation(
+        original: "Deploy to (Super base), then ship.",
+        rescored: "Deploy to Supabase then ship.",
+        replacements: [(original: "(Super base),", replacement: "Supabase")]
+    ) == "Deploy to (Supabase), then ship.")
+    #expect(ParakeetProvider.restoringPunctuation(
+        original: "Kartik met Karthik.",
+        rescored: "Kartik met Kartik",
+        replacements: [(original: "Karthik.", replacement: "Kartik")]
+    ) == "Kartik met Kartik.")
+    #expect(ParakeetProvider.restoringPunctuation(
+        original: "one two three",
+        rescored: "four five",
+        replacements: []
+    ) == "four five")
 }

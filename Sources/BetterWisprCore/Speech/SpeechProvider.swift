@@ -86,6 +86,7 @@ public enum SpeechError: LocalizedError, Sendable {
     case timedOut
     case emptyAudio
     case audioUnavailable
+    case downloadFailed
 
     public var errorDescription: String? {
         switch self {
@@ -98,6 +99,7 @@ public enum SpeechError: LocalizedError, Sendable {
         case .timedOut: "On-device speech recognition timed out. Try a shorter recording or a Whisper model."
         case .emptyAudio: "The recording contains no audio."
         case .audioUnavailable: "Select an existing local audio file."
+        case .downloadFailed: "Hugging Face didn’t send the model files. Check your internet connection and try again."
         }
     }
 }

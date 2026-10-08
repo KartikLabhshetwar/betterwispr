@@ -33,6 +33,13 @@ public final class WhisperKitProvider: SpeechProvider {
         }
     }
 
+    /// Replaces a downloader error that carries no description, such as a failed Hugging Face request, with a readable one.
+    nonisolated static func readableDownloadError(_ error: any Error) -> any Error {
+        let undescribed = !(error is LocalizedError || error is CancellationError)
+            && (error as NSError).domain == String(reflecting: type(of: error))
+        return undescribed ? SpeechError.downloadFailed : error
+    }
+
     public func prepare(model: SpeechModel, download: Bool) async throws {
         guard model.engine == .whisperKit, let tokenizerName = model.tokenizerName else { throw SpeechError.invalidModel }
         guard !preparing, transcriptionTask == nil else { throw SpeechError.busy }
@@ -47,12 +54,16 @@ public final class WhisperKitProvider: SpeechProvider {
             try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
             onProgress?(0)
             let progress = onProgress
-            modelFolder = try await WhisperKit.download(variant: model.modelName, downloadBase: modelsDirectory) { value in
-                let fraction = value.fractionCompleted * 0.9
-                Task { @MainActor in progress?(fraction) }
+            do {
+                modelFolder = try await WhisperKit.download(variant: model.modelName, downloadBase: modelsDirectory) { value in
+                    let fraction = value.fractionCompleted * 0.9
+                    Task { @MainActor in progress?(fraction) }
+                }
+                try Task.checkCancellation()
+                tokenizerFolder = try await hub.snapshot(from: .init(id: tokenizerName), matching: ["tokenizer.json", "tokenizer_config.json", "config.json"])
+            } catch {
+                throw Self.readableDownloadError(error)
             }
-            try Task.checkCancellation()
-            tokenizerFolder = try await hub.snapshot(from: .init(id: tokenizerName), matching: ["tokenizer.json", "tokenizer_config.json", "config.json"])
         }
         guard download || Self.isInstalled(model, modelsDirectory: modelsDirectory) else { throw SpeechError.modelNotInstalled(model.name) }
         onProgress?(0.95)

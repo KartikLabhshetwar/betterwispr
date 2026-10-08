@@ -167,3 +167,17 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
     #expect(reported == [0.4, 0.4, 0.6])
     #expect(DownloadShares(megabytes: [100, 0]) { _ in }.total == 0)
 }
+
+private enum Downloader { enum DownloadError: Error { case invalidDownloadLocation, unexpectedError } }
+
+@Test func whisperDownloadFailuresWithoutADescriptionBecomeReadable() {
+    let failure = WhisperKitProvider.readableDownloadError(Downloader.DownloadError.unexpectedError)
+    #expect(failure.localizedDescription == SpeechError.downloadFailed.errorDescription)
+    let described: [any Error] = [
+        CocoaError(.fileWriteOutOfSpace), URLError(.notConnectedToInternet), CancellationError(), SpeechError.busy,
+        NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [NSLocalizedDescriptionKey: "The request timed out."]),
+    ]
+    for error in described {
+        #expect(WhisperKitProvider.readableDownloadError(error).localizedDescription == error.localizedDescription)
+    }
+}

@@ -8,6 +8,10 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Fixed
 - Downloading a speech model or the phrase booster no longer quits BetterWispr. In 0.1.1, every Parakeet and Whisper download, from Models, the welcome guide or Vocabulary, closed the app as soon as it started, so no model could be installed.
+- Your Mac no longer falls asleep from inactivity partway through a model download.
+- If the phrase booster fails to download alongside a Parakeet model, the progress bar still reaches 100% instead of stopping short and jumping to "Setting up on this Mac".
+- Cancelling a download and choosing Download again right away waits for the cancelled one to stop, instead of loading the same model twice at once.
+- A Whisper download that Hugging Face refuses now says so in plain words instead of showing "ArgmaxCore.Downloader.DownloadError error 1".
 
 ## [0.1.1] - 2026-10-08
 

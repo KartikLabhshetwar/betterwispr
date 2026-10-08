@@ -12,12 +12,15 @@ CLI          = $(DERIVED_DIR)/debug/BetterWisprCLI
 NO_NET       = sandbox-exec -p '(version 1) (allow default) (deny network*)'
 SAMPLES      = $(DERIVED_DIR)/samples
 
-.PHONY: build release run dev clean lint test offline-test dmg version ship help
+.PHONY: build release run dev clean lint test offline-test dmg version setup-notary ship help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 dev: test run ## Local testing: build, run all checks, then launch the debug app
+
+setup-notary: ## Save BetterWispr notarization credentials in Keychain (once)
+	@bash scripts/release.sh --setup-notary
 
 ship: ## Notarized release: build, sign, notarize, staple DMG (Apple Silicon)
 	@bash scripts/release.sh
@@ -36,10 +39,11 @@ run: build ## Build and launch (debug)
 	@sleep 1
 	@open -n "$(abspath $(APP_DEBUG))"
 
-test: ## Unit tests and evaluator checks
+test: ## Unit tests, evaluator and release script checks
 	@swift build 2>&1 | tail -1
 	@swift test 2>&1 | tail -1
 	@python3 Tests/evaluate_check.py
+	@python3 Tests/release_check.py
 
 lint: ## Check for compiler warnings
 	@echo "==> Checking for warnings..."

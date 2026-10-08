@@ -5,15 +5,33 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
+NOTARY_PROFILE="${NOTARY_PROFILE:-betterwispr-notary}"
+if [[ "${1:-}" == --setup-notary ]]; then
+    read -r -p "Apple ID email: " apple_id
+    if [[ -z "$apple_id" ]]; then
+        echo "Apple ID email is required." >&2
+        exit 1
+    fi
+    # notarytool prompts securely for the app-specific password and validates it.
+    exec xcrun notarytool store-credentials "$NOTARY_PROFILE" \
+        --apple-id "$apple_id" --team-id 8JL39GK2DC
+fi
+
 VERSION="${1:-$(tr -d '[:space:]' < VERSION)}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-Developer ID Application: Kartik Labhshetwar (8JL39GK2DC)}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-bettershot-notary}"
 ENTITLEMENTS="Resources/BetterWispr.entitlements"
 RELEASE_DIR="$PROJECT_DIR/release"
 APP_PATH="$PROJECT_DIR/.build/release/BetterWispr.app"
 DMG_PATH="$RELEASE_DIR/BetterWispr.dmg"
 
 echo "=== BetterWispr v$VERSION Release Build ==="
+echo "Checking notarization access ($NOTARY_PROFILE)..."
+if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null; then
+    echo "Notarization is unavailable. Run make setup-notary to save or update credentials." >&2
+    echo "If Apple reports a missing/expired agreement, review it at https://developer.apple.com/account/." >&2
+    exit 1
+fi
+
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 

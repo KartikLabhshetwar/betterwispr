@@ -80,7 +80,29 @@ provider or integration.
 
 ## Releases (maintainers)
 
+One-time setup, following BetterShot's Developer ID and Keychain workflow:
+
+1. Make sure the **Developer ID Application** certificate and its private key
+   are installed in Keychain for team `8JL39GK2DC`.
+2. At [Apple Account](https://account.apple.com), open **Sign-In and Security →
+   App-Specific Passwords**, generate a password and label it **BetterWispr**.
+   See [Apple's instructions](https://support.apple.com/en-us/102654).
+3. Run `make setup-notary`. Enter your Apple ID email, then paste that password
+   into `notarytool`'s hidden prompt. Apple validates it before saving it in
+   Keychain as `betterwispr-notary`. Keep the password out of source files,
+   `.env` files and shell commands. Rerun this target to replace a revoked password.
+4. Review any pending agreements in your
+   [Apple Developer account](https://developer.apple.com/account/). An HTTP 403
+   reporting a missing or expired agreement requires the account holder to
+   resolve that agreement; generating a new password does not fix it.
+
+For each release, update `VERSION`, run `make test`, then run `make ship`.
+Shipping checks notarization access before rebuilding or replacing existing
+release artifacts. Both setup and shipping accept a `NOTARY_PROFILE` environment
+override if you deliberately use a different Keychain profile.
+
 `make ship` builds, signs with Developer ID, notarizes and staples
-`release/BetterWispr-<version>_arm64.dmg`, signs it for Sparkle and writes
-`release/appcast.xml`. Publish both on a GitHub release tagged `v<version>`
-using the `gh release create` command the script prints.
+`release/BetterWispr.dmg`, checks Gatekeeper, signs it for Sparkle and writes
+`release/appcast.xml`. Wait for **Release Complete**, then publish both on a
+GitHub release tagged `v<version>` using the `gh release create` command the
+script prints. `make ship` prepares the files; it does not publish them.

@@ -99,6 +99,7 @@ app's runtime sandbox or a cross-platform test dependency.
 swift build
 swift test
 python3 Tests/evaluate_check.py
+python3 Tests/release_check.py
 ./scripts/build-app.sh
 ```
 
@@ -106,6 +107,10 @@ Inspect failures and preserve exact commands/results. Swift tests cover only the
 behaviors asserted in `Tests/BetterWisprCoreTests/`; the Python check covers
 scoring, Unicode normalization, empty references, invalid input and the evaluator
 CLI. Neither recognizes microphone audio.
+
+Release script checks use stub tools to exercise Keychain setup arguments,
+credential preflight, notarization failure handling and bounded Finder-busy
+retries. They do not access Keychain, mount disk images or submit to Apple.
 
 ## First launch and permissions
 

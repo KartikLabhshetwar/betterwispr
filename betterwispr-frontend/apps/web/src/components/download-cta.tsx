@@ -1,3 +1,5 @@
+import { track } from "@databuddy/sdk";
+
 import AppleLogo from "@/components/apple-logo";
 import { DOWNLOAD_URL } from "@/lib/links";
 
@@ -9,6 +11,7 @@ export default function DownloadCTA({
   return (
     <a
       href={DOWNLOAD_URL}
+      onClick={() => track("download_started")}
       className={`download-cta ${compact ? "text-sm" : "text-base"}`}
     >
       <AppleLogo className={compact ? "size-4" : "size-5"} />

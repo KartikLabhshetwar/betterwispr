@@ -4,6 +4,7 @@ import {
   Outlet,
   createRootRouteWithContext,
 } from "@tanstack/react-router";
+import { Databuddy } from "@databuddy/sdk/react";
 
 import Footer from "@/components/footer";
 import Header from "@/components/header";
@@ -65,6 +66,12 @@ function RootComponent() {
         </main>
         <Footer />
       </div>
+      <Databuddy
+        clientId={import.meta.env.VITE_DATABUDDY_CLIENT_ID}
+        trackWebVitals={true}
+        trackErrors={true}
+        trackOutgoingLinks={true}
+      />
     </>
   );
 }

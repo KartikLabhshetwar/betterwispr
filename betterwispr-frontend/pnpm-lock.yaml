@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@cloudflare/workers-types':
+      specifier: ^5.20260906.1
+      version: 5.20261007.1
     '@types/node':
       specifier: ^26.4.1
       version: 26.6.4
@@ -18,12 +21,18 @@ catalogs:
     lucide-react:
       specifier: ^1.41.0
       version: 1.52.0
+    next-themes:
+      specifier: ^0.4.6
+      version: 0.4.6
     react:
       specifier: ^19.2.8
       version: 19.3.0
     react-dom:
       specifier: ^19.2.8
       version: 19.3.0
+    sonner:
+      specifier: ^2.0.8
+      version: 2.0.8
     tailwindcss:
       specifier: ^4.3.3
       version: 4.3.3
@@ -97,6 +106,9 @@ importers:
       '@betterwispr-frontend/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@databuddy/sdk':
+        specifier: ^3.2.1
+        version: 3.2.1(react@19.3.0)
       '@fontsource-variable/geist':
         specifier: ^5.3.0
         version: 5.3.0
@@ -508,6 +520,17 @@ packages:
 
   '@cloudflare/workers-types@5.20261007.1':
     resolution: {integrity: sha512-NUzZ+p0tDFK6RXbJ/pa7sTG93y5zoK34gIV2PGvUMA+pwoKBBAeTlnvrLaQsDWswYW5gQA/b124+XZc0tn8Ihg==}
+
+  '@databuddy/sdk@3.2.1':
+    resolution: {integrity: sha512-/j2KPAkguKPcTJPA7Ql4xqPGsMnhumcngEAwqbrdlAffIQohkTbNUO8hU4bIc3BistLPsgS4vVKI+1xn8WNPdg==}
+    peerDependencies:
+      react: '>=18'
+      vue: '>=3'
+    peerDependenciesMeta:
+      react:
+        optional: true
+      vue:
+        optional: true
 
   '@distilled.cloud/acme@1.0.0-rc.13':
     resolution: {integrity: sha512-3rmzH125jQxk0zpCvXGNEybSaqpAolyCX+8LWDDrXf+wIKs67GflkJyQLjOOh0lKARe29hdUZGgqEbbvpp0LNA==}
@@ -4201,6 +4224,10 @@ snapshots:
     optional: true
 
   '@cloudflare/workers-types@5.20261007.1': {}
+
+  '@databuddy/sdk@3.2.1(react@19.3.0)':
+    optionalDependencies:
+      react: 19.3.0
 
   '@distilled.cloud/acme@1.0.0-rc.13(effect@4.0.0)':
     dependencies:

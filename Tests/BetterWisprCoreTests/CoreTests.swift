@@ -57,6 +57,32 @@ import Testing
     #expect(TranscriptCleaner.clean("Is the build ready um?", language: "en") == "Is the build ready?")
 }
 
+@Test func cleanerDropsMmFillers() {
+    #expect(TranscriptCleaner.clean("mm I think so", language: "en") == "I think so")
+    #expect(TranscriptCleaner.clean("Mm, that works.", language: "en") == "That works.")
+    #expect(TranscriptCleaner.clean("We could, mmm, try it", language: "en") == "We could, try it")
+    #expect(TranscriptCleaner.clean("mm-hmm, that sounds right", language: "en") == "mm-hmm, that sounds right")
+}
+
+@Test func cleanerDropsYouKnowOnlyWhenSetOffOnBothSides() {
+    #expect(TranscriptCleaner.clean("It was, you know, fine.", language: "en") == "It was fine.")
+    #expect(TranscriptCleaner.clean("You know, I think so.", language: "en") == "I think so.")
+    #expect(TranscriptCleaner.clean("That is what I want, you know.", language: "en") == "That is what I want.")
+    #expect(TranscriptCleaner.clean("It works. You know, it is fast.", language: "en") == "It works. It is fast.")
+    #expect(TranscriptCleaner.clean("That is what I want, you know", language: "en") == "That is what I want")
+}
+
+@Test func cleanerKeepsYouKnowThatIsNotSetOff() {
+    #expect(TranscriptCleaner.clean("You know the answer.", language: "en") == "You know the answer.")
+    #expect(TranscriptCleaner.clean("Do you know, honestly?", language: "en") == "Do you know, honestly?")
+    #expect(TranscriptCleaner.clean("If you know, tell me.", language: "en") == "If you know, tell me.")
+    #expect(TranscriptCleaner.clean("Well, you know what I mean.", language: "en") == "Well, you know what I mean.")
+    #expect(TranscriptCleaner.clean("It is hard, you know?", language: "en") == "It is hard, you know?")
+    #expect(TranscriptCleaner.clean("Do you know?", language: "en") == "Do you know?")
+    #expect(TranscriptCleaner.clean("Tuesday, I mean, Wednesday", language: "en") == "Tuesday, I mean, Wednesday")
+    #expect(TranscriptCleaner.clean("Du weißt, you know, es ist gut.", language: "de") == "Du weißt, you know, es ist gut.")
+}
+
 @Test func cleanerRemovesRepeatedPhrases() {
     #expect(TranscriptCleaner.clean("Then we can we can deploy the app", language: "en") == "Then we can deploy the app")
     #expect(TranscriptCleaner.clean("I want to I want to fix the login bug", language: nil) == "I want to fix the login bug")

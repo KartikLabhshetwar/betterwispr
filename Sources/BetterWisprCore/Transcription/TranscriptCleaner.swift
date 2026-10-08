@@ -7,13 +7,14 @@ public enum TranscriptCleaner {
         var trailing: String
     }
 
-    private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm"]
+    private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm", "mm", "mmm"]
     private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "long", "bye", "no", "ha"]
     private static let numberWords: Set<String> = ["zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
     private static let sentenceEnders: Set<Character> = [".", "?", "!"]
     private static let terminators = sentenceEnders.union(["…"])
+    private static let clauseBreaks = terminators.union([","])
 
-    /// Removes English filled pauses and unpunctuated stutters; other languages are only trimmed.
+    /// Removes English filled pauses, set-off "you know" and unpunctuated stutters; other languages are only trimmed.
     public static func clean(_ text: String, language: String?) -> String {
         let ranges = text.ranges(of: /[\p{L}\p{M}\p{N}_'’-]+/)
         let ends = ranges.dropFirst().map(\.lowerBound) + [text.endIndex]
@@ -32,12 +33,19 @@ public enum TranscriptCleaner {
     private static func dropFillers(_ tokens: [Token]) -> [Token] {
         var kept: [Token] = []
         var capitalizeNext = false
-        for var token in tokens {
-            if fillers.contains(token.word.lowercased()) {
+        var tokensToSkip = 0
+        for (index, var token) in tokens.enumerated() {
+            if tokensToSkip > 0 { tokensToSkip -= 1; continue }
+            let removedCount = fillerLength(tokens, at: index, after: kept.last?.trailing)
+            if removedCount > 0 {
+                tokensToSkip = removedCount - 1
+                let removedTrailing = tokens[index + tokensToSkip].trailing
                 guard let previous = kept.last?.trailing else { capitalizeNext = true; continue }
                 capitalizeNext = previous.contains(where: sentenceEnders.contains)
-                if token.trailing.contains(where: terminators.contains), !previous.contains(where: terminators.contains) {
-                    kept[kept.count - 1].trailing = token.trailing
+                if removedTrailing.contains(where: terminators.contains), !previous.contains(where: terminators.contains) {
+                    kept[kept.count - 1].trailing = removedTrailing
+                } else if removedCount > 1, previous.contains(","), removedTrailing.contains(",") {
+                    kept[kept.count - 1].trailing = previous.replacing(",", with: "")
                 }
                 continue
             }
@@ -48,6 +56,21 @@ public enum TranscriptCleaner {
             kept.append(token)
         }
         return kept
+    }
+
+    private static func fillerLength(_ tokens: [Token], at index: Int, after previous: String?) -> Int {
+        if fillers.contains(tokens[index].word.lowercased()) { return 1 }
+        return isSetOffYouKnow(tokens, at: index, after: previous) ? 2 : 0
+    }
+
+    private static func isSetOffYouKnow(_ tokens: [Token], at index: Int, after previous: String?) -> Bool {
+        guard index + 1 < tokens.count,
+              tokens[index].word.lowercased() == "you", tokens[index + 1].word.lowercased() == "know",
+              tokens[index].trailing.allSatisfy(\.isWhitespace) else { return false }
+        let following = tokens[index + 1].trailing
+        let setOffBefore = previous.map { $0.contains(where: clauseBreaks.contains) } ?? true
+        let setOffAfter = !following.contains("?") && (index + 2 == tokens.count || following.contains(where: clauseBreaks.contains))
+        return setOffBefore && setOffAfter
     }
 
     private static func destutter(_ tokens: [Token]) -> [Token] {

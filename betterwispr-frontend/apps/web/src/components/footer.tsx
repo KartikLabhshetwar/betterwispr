@@ -34,6 +34,20 @@ export default function Footer() {
             </a>
             .
           </p>
+          <a
+            href="https://usefulshelf.co/apps/betterwispr?utm_source=betterwispr.com&utm_medium=referral&utm_campaign=badge&utm_content=light"
+            target="_blank"
+            rel="noopener"
+            className="mt-6 block w-max"
+          >
+            <img
+              src="https://usefulshelf.co/badge/betterwispr.svg"
+              alt="Featured on UsefulShelf"
+              width={248}
+              height={66}
+              loading="lazy"
+            />
+          </a>
         </div>
         <FooterColumn title="Product">
           <a href={DOWNLOAD_URL} className={LINK}>

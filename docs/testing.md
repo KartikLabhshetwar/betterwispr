@@ -24,6 +24,13 @@ Environment: Apple M5, macOS 26.6.2 (25G83), development working tree.
   a single functional smoke test, not a general accuracy or latency benchmark.
 - A two-second digital-silence WAV produced an empty transcript with exit code 0
   under the same network restriction after the shared silence guard was added.
+- After `--download-phrase-booster` (99 MB), Parakeet v3 with networking denied
+  transcribed a `say`-synthesized clip with `--language en --vocabulary
+  "Granola,Vercel,Supabase,MDX"` and spelled all four terms as listed. Without
+  the vocabulary it wrote "granula", "Versal" and "Superbase". On a second clip,
+  `--language de` left the listed names misspelled, as intended for the
+  English-only booster. Single runs on synthetic audio, not an accuracy
+  measurement.
 - **Not exercised:** live microphone dictation, interactive permission prompts,
   automatic paste/clipboard restoration, and a representative accuracy corpus.
   The manual checks below remain pending even where a related file test passed.
@@ -135,6 +142,10 @@ CLI. Neither recognizes microphone audio.
   error instead of a stalled download or silent engine switch.
 - [ ] Using a disposable model copy, test a missing tokenizer file, truncated
   weights and failed/incomplete installation. Keep the working model untouched.
+- [ ] With Parakeet selected, download the phrase booster from Vocabulary. Verify
+  the progress state, the installed confirmation, and that a dictation with a
+  listed name uses the listed spelling without relaunching. Cancel a booster
+  download and confirm it is not reported as installed.
 - [ ] Compare Small, Turbo and Large v3 on the same clips; record peak memory,
   first load, warm inference and stop-to-final time. Test cancellation under load.
 

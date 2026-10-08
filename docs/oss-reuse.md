@@ -84,7 +84,10 @@ Whisper's released code and weights use [MIT](https://github.com/openai/whisper/
 and [v2](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2) weights use CC-BY-4.0
 according to the publisher's model cards. BetterWispr downloads the
 [FluidInference Core ML conversions](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v3-coreml),
-which keep that attribution obligation. Do not infer weight terms
+which keep that attribution obligation. The optional Parakeet phrase booster
+downloads [FluidInference/parakeet-ctc-110m-coreml](https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml),
+a conversion of [nvidia/parakeet-tdt_ctc-110m](https://huggingface.co/nvidia/parakeet-tdt_ctc-110m)
+that its model card lists as CC-BY-4.0. Do not infer weight terms
 from an ONNX/Core ML/MLX conversion library's license.
 
 The copied BetterShot development skills have separate provenance documented in

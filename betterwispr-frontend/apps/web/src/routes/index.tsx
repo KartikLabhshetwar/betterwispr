@@ -4,6 +4,7 @@ import {
   ClockCounterClockwiseIcon,
   CpuIcon,
   CursorTextIcon,
+  MicrophoneIcon,
   ShieldCheckIcon,
   TextAaIcon,
   type Icon,
@@ -28,28 +29,33 @@ export const Route = createFileRoute("/")({
 const FEATURES: { icon: Icon; title: string; body: string }[] = [
   {
     icon: ShieldCheckIcon,
-    title: "Your speech stays with you",
-    body: "Recognition runs on your Mac. No account, no API key and no cloud transcription fallback.",
+    title: "Stays on your Mac",
+    body: "Speech is transcribed by models running on your Mac. There is no account, no API key and no cloud fallback.",
+  },
+  {
+    icon: MicrophoneIcon,
+    title: "Hold to talk",
+    body: "Hold ⌥ Space while you speak and release to finish. Prefer a toggle? Switch to press to toggle in Settings.",
   },
   {
     icon: CursorTextIcon,
-    title: "Stay in the app you’re using",
-    body: "Dictate into a message, a document or a prompt. BetterWispr returns the text to the app you were using.",
+    title: "Types where you were",
+    body: "The text is pasted into the app you were using. If automatic paste is blocked, retrieve the transcript from the dashboard and copy it yourself.",
   },
   {
     icon: CpuIcon,
-    title: "Choose the model that fits",
-    body: "Use supported Apple speech, Parakeet or Whisper models. Install a model explicitly, then use it offline.",
+    title: "Models you choose",
+    body: "Apple speech, Parakeet TDT v3 for 25 European languages, or Whisper Large v3 Turbo. Download once, then work offline.",
   },
   {
     icon: TextAaIcon,
-    title: "Make room for your vocabulary",
-    body: "Add names and technical terms as hints. Set phrase replacements for words you want spelled a certain way.",
+    title: "Your vocabulary",
+    body: "Add names and terms as hints, and set replacements so the words you use come out the way you spell them.",
   },
   {
     icon: ClockCounterClockwiseIcon,
-    title: "Keep the original, too",
-    body: "Review raw and corrected text in local history. Turn history off when you don’t want new dictations saved.",
+    title: "History you control",
+    body: "Dictations are kept locally with both the raw and the corrected text. Turn history off whenever you like.",
   },
 ];
 
@@ -130,6 +136,26 @@ function HomeComponent() {
         <HeroDemo />
       </section>
 
+      <section aria-labelledby="features" className="page-shell pb-24">
+        <h2
+          id="features"
+          className="mx-auto max-w-[680px] text-center text-3xl tracking-tight text-zinc-900"
+        >
+          Speak instead of typing, in any app on your Mac
+        </h2>
+        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(({ icon: FeatureIcon, title, body }) => (
+            <div key={title} className="bg-white p-8">
+              <FeatureIcon className="size-5 text-zinc-900" />
+              <h3 className="mt-4 text-base font-medium text-zinc-900">
+                {title}
+              </h3>
+              <p className="mt-2 text-sm text-zinc-500">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section
         id="how-it-works"
         className="page-shell pb-24"
@@ -176,6 +202,8 @@ function HomeComponent() {
           <div>
             <p className="eyebrow">Local by design</p>
             <Tagline />
+          </div>
+          <div>
             <p className="mt-6 max-w-lg text-base text-zinc-600">
               Models run on your Mac. Downloads happen when you choose to
               install them. Your speech doesn’t need a round trip to a
@@ -188,17 +216,6 @@ function HomeComponent() {
               How your data is handled
               <ArrowRightIcon />
             </Link>
-          </div>
-          <div className="space-y-8">
-            {FEATURES.map(({ icon: FeatureIcon, title, body }) => (
-              <div key={title} className="flex gap-4">
-                <FeatureIcon className="mt-1 size-5 shrink-0" />
-                <div>
-                  <h3 className="text-base font-semibold">{title}</h3>
-                  <p className="mt-2 text-sm text-zinc-600">{body}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

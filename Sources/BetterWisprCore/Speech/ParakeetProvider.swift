@@ -152,7 +152,11 @@ public final class ParakeetProvider: SpeechProvider {
             }
             if withBooster {
                 group.addTask {
-                    try? await installPhraseBooster { fraction in Task { @MainActor in shares.update(1, to: fraction) } }
+                    do {
+                        try await installPhraseBooster { fraction in Task { @MainActor in shares.update(1, to: fraction) } }
+                    } catch {
+                        await shares.update(1, to: 1)
+                    }
                 }
             }
             try await group.waitForAll()

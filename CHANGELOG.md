@@ -21,6 +21,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Download progress only moves forward and covers the whole install, from the download to setup on this Mac. Models, the welcome guide and Vocabulary offer Cancel during a download and Retry after a failure.
 - The welcome guide's completion is saved with your workspace and versioned, so a reset workspace shows the guide again. Quitting midway reopens the guide on the same step. The 0.1.0 preference flag is migrated once and then removed.
 - New dictations save the app they were sent to and how many words Vocabulary respelled, for Insights. Dictations saved by 0.1.0 load unchanged and count toward every total except app usage.
+- Light cleanup also drops a spoken correction when the fix repeats a word you just said, so "I want to go to Pune, sorry, no, to Delhi" becomes "I want to go to Delhi". It needs "no" or "I mean" after a comma, so a plain "sorry" apology, "yes to this, no to that" and corrections that share no word ("Pune, sorry, no, Delhi") stay as you said them.
 
 ### Fixed
 - The welcome guide's speech model download no longer stops when Escape, the capsule, the menu or a shortcut release cancels dictation, and a failed download now shows its error in the guide.

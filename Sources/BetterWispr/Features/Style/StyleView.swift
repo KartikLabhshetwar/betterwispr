@@ -56,7 +56,7 @@ private extension CleanupLevel {
     var detail: String {
         switch self {
         case .none: "Keeps exactly what you said, including filler words."
-        case .light: "Removes filler words like “um” and “you know”, and stutters like “we we”."
+        case .light: "Removes filler words like “um” and “you know”, stutters like “we we”, and corrections like “at 5, no, at 6”."
         case .medium: "Also edits English dictation for clarity and conciseness with your notes model."
         }
     }

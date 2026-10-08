@@ -10,6 +10,10 @@ public enum TranscriptCleaner {
     private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm", "mm", "mmm"]
     private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "long", "bye", "no", "ha"]
     private static let numberWords: Set<String> = ["zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+    private static let repairCues: [[String]] = [["sorry"], ["no"], ["wait"], ["oops"], ["actually"], ["i", "mean"]]
+    private static let correctingCues: Set<[String]> = [["no"], ["i", "mean"]]
+    private static let subjectPronouns: Set<String> = ["i", "we", "you", "he", "she", "it", "they"]
+    private static let repairReach = 4
     private static let sentenceEnders: Set<Character> = [".", "?", "!"]
     private static let terminators = sentenceEnders.union(["…"])
     private static let clauseBreaks = terminators.union([","])
@@ -22,7 +26,7 @@ public enum TranscriptCleaner {
         let spoken = tokens.map(\.word).filter { !fillers.contains($0.lowercased()) }.joined(separator: " ")
         guard isEnglish(spoken, language: language) else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let leading = text[..<(ranges.first?.lowerBound ?? text.endIndex)]
-        let rebuilt = String(leading) + destutter(dropFillers(tokens)).map { $0.word + $0.trailing }.joined()
+        let rebuilt = String(leading) + destutter(dropRepairs(dropFillers(tokens))).map { $0.word + $0.trailing }.joined()
         var result = rebuilt.replacing(/\ {2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         if result.hasSuffix(",") { result.removeLast() }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -78,6 +82,40 @@ public enum TranscriptCleaner {
         let setOffBefore = previous.map { $0.contains(where: clauseBreaks.contains) } ?? true
         let setOffAfter = !following.contains("?") && (index + 2 == tokens.count || following.contains(where: clauseBreaks.contains))
         return setOffBefore && setOffAfter
+    }
+
+    /// Turns "to Pune, sorry, no, to Delhi" into "to Delhi" when the repair restarts on a recent non-pronoun word.
+    private static func dropRepairs(_ tokens: [Token]) -> [Token] {
+        var tokens = tokens
+        var i = 1
+        while i < tokens.count {
+            let window = max(0, i - repairReach)..<i
+            let sentenceStart = window.last { tokens[$0].trailing.contains(where: terminators.contains) }.map { $0 + 1 } ?? window.lowerBound
+            guard tokens[i - 1].trailing.contains(","), let onset = repairOnset(tokens, at: i),
+                  let anchor = (sentenceStart..<i).last(where: { tokens[$0].word.lowercased() == tokens[onset].word.lowercased() }),
+                  !subjectPronouns.contains(String(tokens[anchor].word.lowercased().prefix { $0 != "'" && $0 != "’" }))
+            else { i += 1; continue }
+            tokens[anchor].trailing = tokens[onset].trailing
+            tokens.removeSubrange(anchor + 1...onset)
+            i = anchor + 1
+        }
+        return tokens
+    }
+
+    /// The first repair word after a cue that says "no" or "I mean", set off by a comma unless the cue is compound.
+    private static func repairOnset(_ tokens: [Token], at start: Int) -> Int? {
+        var end = start
+        var cues: [[String]] = []
+        while let cue = repairCues.first(where: { cue in
+            end + cue.count <= tokens.count && cue.indices.allSatisfy { tokens[end + $0].word.lowercased() == cue[$0] }
+        }) {
+            cues.append(cue)
+            end += cue.count
+        }
+        guard end > start, end < tokens.count, cues.contains(where: correctingCues.contains),
+              cues.count > 1 || tokens[end - 1].trailing.contains(","),
+              !tokens[start..<end].contains(where: { $0.trailing.contains(where: terminators.contains) }) else { return nil }
+        return end
     }
 
     private static func destutter(_ tokens: [Token]) -> [Token] {

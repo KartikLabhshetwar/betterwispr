@@ -100,12 +100,21 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    a statement into a question. Digits, number words and a short list of
    grammatical or emphatic doubles ("that that", "had had", "long long") are
    kept. Language detection ignores the fillers, and non-English text is only
-   trimmed. "I mean", "like", "basically", "sort of", repairs and restarts are
-   left alone. A closed list covers fillers, but repairs need a trained model
-   and deleting hedges changes meaning ("it basically works"). History keeps
-   the raw output. On the 38 saved Parakeet transcripts available on 2026-10-08,
-   the cleaner removed all 47 uh/um and 4 mm tokens and otherwise only collapsed
-   four one-word stutters; no set-off "you know" occurred.
+   trimmed. It also resolves one narrow self-repair shape: after a comma, a cue
+   containing "no" or "I mean" ("sorry, no", "no wait", ", no,", ", I mean,"),
+   followed by a word that also appears in the last four words of the same
+   sentence and is not a subject pronoun. The cleaner deletes from that earlier
+   word through the cue, so "go to Pune, sorry, no, to Delhi" becomes "go to
+   Delhi". A lone "sorry" is an apology, "yes to X, no to Y" has no set-off cue,
+   and a repair that shares no word ("Pune, sorry, no, Delhi") or restarts on a
+   pronoun ("we go, no, we stay") is left alone. "Like", "basically", "sort of"
+   and other repairs and restarts are left alone too. A closed list covers
+   fillers, but general repairs need a trained model and deleting hedges changes
+   meaning ("it basically works"). History keeps the raw output. On the 38 saved
+   Parakeet transcripts available on 2026-10-08, the cleaner removed all 47
+   uh/um and 4 mm tokens and otherwise only collapsed four one-word stutters; no
+   set-off "you know" occurred. Adding the repair rule changed one of those 38
+   outputs, the "Mdabad, sorry, no to Dilli" dictation it was written for.
 6. **Measure streaming separately.** Partial text is provisional. Finalize with
    sufficient context, and measure final WER, first-text latency, stop-to-final
    latency and dropped/repeated boundary words. Re-transcribing the full growing

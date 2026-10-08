@@ -137,6 +137,24 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("Du weißt, you know, es ist gut.", language: "de") == "Du weißt, you know, es ist gut.")
 }
 
+@Test func cleanerResolvesSelfCorrectionsThatRepeatAWord() {
+    #expect(TranscriptCleaner.clean("So let's say I say this sentence uh I want to go to uh Mdabad, sorry, no to Dilli. Are we processing this properly", language: "en")
+            == "So let's say I say this sentence I want to go to Dilli. Are we processing this properly")
+    #expect(TranscriptCleaner.clean("I want to go to Ahmedabad, sorry, no, to Delhi.", language: "en") == "I want to go to Delhi.")
+    #expect(TranscriptCleaner.clean("Let's meet at 5, no wait, at 6", language: "en") == "Let's meet at 6")
+    #expect(TranscriptCleaner.clean("Send it to Sam, no, send it to Alex.", language: "en") == "Send it to Alex.")
+    #expect(TranscriptCleaner.clean("Book the window seat, I mean, the aisle seat", language: "en") == "Book the aisle seat")
+}
+
+@Test func cleanerKeepsCorrectionLookalikes() {
+    #expect(TranscriptCleaner.clean("I said yes to the plan, no to the budget.", language: "en") == "I said yes to the plan, no to the budget.")
+    #expect(TranscriptCleaner.clean("I can't make it, sorry, I have a meeting.", language: "en") == "I can't make it, sorry, I have a meeting.")
+    #expect(TranscriptCleaner.clean("Should we go, no, we should stay.", language: "en") == "Should we go, no, we should stay.")
+    #expect(TranscriptCleaner.clean("Is it at 5? No, at 6.", language: "en") == "Is it at 5? No, at 6.")
+    #expect(TranscriptCleaner.clean("Thanks for coming, sorry for the wait.", language: "en") == "Thanks for coming, sorry for the wait.")
+    #expect(TranscriptCleaner.clean("Go to Ahmedabad, sorry, no, Delhi", language: "en") == "Go to Ahmedabad, sorry, no, Delhi")
+}
+
 @Test func cleanerRemovesRepeatedPhrases() {
     #expect(TranscriptCleaner.clean("Then we can we can deploy the app", language: "en") == "Then we can deploy the app")
     #expect(TranscriptCleaner.clean("I want to I want to fix the login bug", language: nil) == "I want to fix the login bug")

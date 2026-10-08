@@ -14,6 +14,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var launchAtLogin: Bool = false
     public var silenceThreshold: Float = 0.002
     public var dictationMode: DictationMode = .hold
+    public var shortcut: DictationShortcut = .optionSpace
 
     public init() {}
 
@@ -28,5 +29,6 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         silenceThreshold = try container.decode(Float.self, forKey: .silenceThreshold)
         dictationMode = try container.decodeIfPresent(DictationMode.self, forKey: .dictationMode) ?? .hold
+        shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
     }
 }

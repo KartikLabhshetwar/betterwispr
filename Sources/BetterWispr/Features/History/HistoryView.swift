@@ -17,7 +17,7 @@ struct HistoryView: View {
                     ContentUnavailableView(
                         "No Dictations",
                         systemImage: "clock",
-                        description: Text("Your saved dictations will appear here. Start speaking with Option Space.")
+                        description: Text("Your saved dictations will appear here. Start speaking with \(model.settings.shortcut.displayName).")
                     )
                 } else {
                     ContentUnavailableView.search(text: query)

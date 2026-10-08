@@ -1,7 +1,9 @@
+import BetterWisprCore
 import SwiftUI
 
 struct AboutView: View {
     @Bindable var updater: AppUpdater
+    let shortcut: DictationShortcut
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
     private let repository = URL(string: "https://github.com/KartikLabhshetwar/betterwispr")!
 
@@ -14,7 +16,7 @@ struct AboutView: View {
                     Text("Version \(version)")
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    Text("Private dictation for your Mac. Press ⌥ Space in any app, speak, and your words appear where you’re typing. Speech is processed on this Mac.")
+                    Text("Private dictation for your Mac. Press \(shortcut.displayName) in any app, speak, and your words appear where you’re typing. Speech is processed on this Mac.")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: 480)

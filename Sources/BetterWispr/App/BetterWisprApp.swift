@@ -59,7 +59,7 @@ private struct MenuContents: View {
     @Environment(\.openWindow) private var openWindow
     @AppStorage("onboardingCompleted") private var onboardingCompleted = false
     var body: some View {
-        Button(model.phase == .recording ? "Finish dictation · ⌥ Space" : "Start dictation · ⌥ Space") { model.toggleRecording() }
+        Button("\(model.phase == .recording ? "Finish" : "Start") dictation · \(model.settings.shortcut.displayName)") { model.toggleRecording() }
             .disabled(model.phase == .preparing || model.phase == .transcribing)
         if model.isBusy { Button("Cancel") { model.cancelRecording() } }
         Button(model.meetings.activity.capturingID == nil ? "Start meeting notes" : "Stop meeting") {
@@ -90,7 +90,6 @@ private struct MenuContents: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var capsule: CapsuleController?
-    private let shortcut = GlobalShortcut()
     private var started = false
 
     func start() {
@@ -99,9 +98,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capsule = CapsuleController(model: model)
         model.onPresentationChange = { [weak self] in self?.capsule?.update() }
         model.onShowCapsule = { [weak self] in self?.capsule?.show() }
-        shortcut.onPress = { [weak self] in self?.model.shortcutPressed() }
-        shortcut.onRelease = { [weak self] in self?.model.shortcutReleased() }
-        do { try shortcut.register() } catch { model.statusMessage = error.localizedDescription }
+        model.registerShortcut()
         capsule?.update()
     }
 
@@ -109,7 +106,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         model.cancelRecording()
         model.meetings.endForQuit()
-        shortcut.unregister()
         capsule?.close()
     }
 }

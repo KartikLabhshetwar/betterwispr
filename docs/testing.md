@@ -98,6 +98,14 @@ CLI. Neither recognizes microphone audio.
 - [ ] Toggle mode: press ⌥ Space once and speak. The capsule shows cancel, the
   waveform and a red stop mark. Clicking anywhere on the capsule finishes, as does
   pressing ⌥ Space again. The cancel button discards the session and pastes nothing.
+- [ ] In Settings, click the keyboard shortcut and press a new combination such as
+  ⌃⌥D. ⌥ Space no longer starts dictation; the new shortcut works in hold and
+  toggle mode and is still set after relaunch. While recording a shortcut, Esc
+  cancels and keeps the old one. Held modifiers show on the button as you press
+  them. A letter alone or with only ⇧, Fn, or modifiers released without a key
+  beep, say why under the label and keep listening. An F-key alone such as F5 is
+  accepted. A shortcut another app holds shows a toast and the old one keeps
+  working. Reset restores ⌥ Space.
 - [ ] Disconnect the input device during capture; retry after reconnecting.
 - [ ] Move between Spaces, fullscreen windows and monitors. Confirm capsule
   positioning, keyboard controls, VoiceOver labels and reduced-motion behavior.

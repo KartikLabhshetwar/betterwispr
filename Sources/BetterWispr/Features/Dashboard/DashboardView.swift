@@ -59,7 +59,7 @@ struct DashboardView: View {
                 case .models: ModelsView(model: model)
                 case .vocabulary: VocabularyView(model: model)
                 case .settings: SettingsView(model: model)
-                case .about: AboutView(updater: model.updater)
+                case .about: AboutView(updater: model.updater, shortcut: model.settings.shortcut)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,7 +97,7 @@ private struct OverviewView: View {
                     BrandMark(size: 52)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("BetterWispr").font(.title2.weight(.semibold))
-                        Text("Press ⌥ Space in any app to turn your voice into text.")
+                        Text("Press \(model.settings.shortcut.displayName) in any app to turn your voice into text.")
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 12)

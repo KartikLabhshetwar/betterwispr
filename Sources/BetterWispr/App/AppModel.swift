@@ -425,8 +425,8 @@ final class AppModel {
         installation = next
         statusMessage = "Downloading \(name)…"
         let report: @MainActor @Sendable (Double) -> Void = { [weak self] progress in
-            guard let self, self.installation?.token == next.token else { return }
-            self.installation?.progress = max(self.installation?.progress ?? 0, min(1, progress))
+            guard let self, let current = self.installation, current.token == next.token else { return }
+            self.installation?.progress = max(current.progress, min(1, progress))
         }
         installTask = Task { [weak self] in
             do {

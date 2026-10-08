@@ -4,6 +4,11 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [0.1.2] - 2026-10-08
+
+### Fixed
+- Downloading a speech model or the phrase booster no longer quits BetterWispr. In 0.1.1, every Parakeet and Whisper download, from Models, the welcome guide or Vocabulary, closed the app as soon as it started, so no model could be installed.
+
 ## [0.1.1] - 2026-10-08
 
 ### Added

@@ -29,7 +29,7 @@ build: ## Debug app bundle
 	@echo "==> Building $(APP_NAME) (Debug)..."
 	@./scripts/build-app.sh debug | tail -1
 
-release: ## Release app bundle (ad-hoc signed)
+release: ## Release app bundle for this Mac
 	@echo "==> Building $(APP_NAME) (Release)..."
 	@./scripts/build-app.sh release | tail -1
 

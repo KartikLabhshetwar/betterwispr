@@ -285,8 +285,10 @@ limited to update checks and downloads. Automatic checks are opt-in: Sparkle
 asks on the second launch, and Settings can change automatic checks and
 automatic installs at any time. Update requests carry no audio, transcripts or
 vocabulary, and system profiling stays off. Sparkle keeps these preferences in
-its own user defaults, not in `SavedState`. `scripts/release.sh` signs the DMG
-with the private key in the login keychain and writes the appcast.
+its own user defaults, not in `SavedState`. `scripts/release.sh` signs both
+architecture-specific DMGs with the private key in the login keychain and writes
+the appcast. The Apple Silicon item comes first with Sparkle's `arm64` hardware
+requirement; Intel Macs skip that item and receive the Intel download.
 
 ## Persistence and boundaries
 

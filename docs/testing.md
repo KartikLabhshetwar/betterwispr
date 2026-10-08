@@ -72,6 +72,35 @@ completed successfully:
   `a5e6584c55491a04334c6b5bfdf8654fea4cc85fdb5c28d536e0fb56b6abd4f4`.
   These files are ready for publishing; no GitHub release was published.
 
+### Separate Apple Silicon and Intel releases — 2026-10-08
+
+`make ship` completed for both architectures using saved Keychain credentials.
+Both DMGs were notarized, stapled and accepted by Gatekeeper. Each was mounted
+read-only to check the packaged executable's architecture, version and code
+signature. Both appcast signatures were verified with CryptoKit against the
+public key embedded in their packaged app, without reading private signing keys.
+
+| Artifact | Apple submission | SHA-256 |
+| --- | --- | --- |
+| `release/BetterWispr-arm64.dmg` | `c2b32935-0d1b-4d79-8a2a-c34293bdde5b` | `750a5f3ee22fa8848f365e71bf4dfbbf674fff5d514a2324a251826f3f3fb174` |
+| `release/BetterWispr-x86_64.dmg` | `d9d9a12c-0e71-4bcf-bde3-2e6962ed6d6f` | `0b7adcb99fa69f58413e128ff06f7d73c893adf99036f88c04c57362c6bd0275` |
+
+- Native `make test` passed, including regression checks for architecture
+  selection, separate submissions, feed requirements and failures in either build.
+- The website's type checks, production build and all 12 static-page checks
+  passed with separate Apple Silicon and Intel download links.
+- The Intel CLI ran under Rosetta with networking denied. Parakeet v3 returned
+  the synthetic sentence "This is a local release test. The meeting is on Friday."
+  and an empty result for digital silence.
+- Intel unit tests compiled, but this Xcode installation has an ARM-only
+  `swiftpm-testing-helper`, so it cannot load the Intel test bundle. The Intel
+  unit suite did not run. Physical Intel hardware and minimum-macOS behavior
+  remain unverified; the Rosetta smoke tests do not establish those results.
+
+Logs: `.build/release-check/dual-arch-release.log`, `native-tests.log`,
+`intel-tests.log`, `intel-speech.log` and `intel-silence.log`. Neither the GitHub
+release nor the updated website has been published in this check.
+
 ## Validation record — 2026-10-08
 
 Environment: Apple M5, macOS 26.6.2 (25G83), development working tree.

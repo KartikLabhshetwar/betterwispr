@@ -1,0 +1,75 @@
+import Foundation
+
+/// Reuses the speech connection metadata, destination validation and Keychain implementation.
+final class APINotesModel: NotesLanguageModel {
+    let connection: SpeechConnection
+    private let keys: SpeechAPIKeyStore
+    private let session: URLSession
+
+    init(connection: SpeechConnection, keys: SpeechAPIKeyStore = .notes, configuration: URLSessionConfiguration = .ephemeral) {
+        self.connection = connection
+        self.keys = keys
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.httpShouldSetCookies = false
+        configuration.urlCredentialStorage = nil
+        configuration.timeoutIntervalForResource = 600
+        session = URLSession(configuration: configuration, delegate: SpeechAPIRedirectGuard(), delegateQueue: nil)
+    }
+
+    deinit { session.invalidateAndCancel() }
+
+    func respond(to prompt: String) async throws -> String {
+        try await chat(prompt, json: false)
+    }
+
+    private func chat(_ prompt: String, json: Bool) async throws -> String {
+        try Task.checkCancellation()
+        guard connection.api == .openAICompatible else {
+            throw MeetingNotesError.unavailable("Notes require an OpenAI-compatible chat completions endpoint.")
+        }
+        let key = try keys.read(for: connection) ?? ""
+        try connection.validateAPIKey(key)
+        var request = URLRequest(url: try connection.validatedURL(), timeoutInterval: 600)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
+        var body: [String: Any] = [
+            "model": connection.modelID, "stream": false,
+            "messages": [["role": "system", "content": NotesWriter.instructions], ["role": "user", "content": prompt]],
+        ]
+        if json { body["response_format"] = ["type": "json_object"] }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await session.data(for: request)
+        try Task.checkCancellation()
+        guard let http = response as? HTTPURLResponse else { throw MeetingNotesError.unavailable("The notes endpoint returned an invalid response.") }
+        guard (200..<300).contains(http.statusCode) else {
+            switch http.statusCode {
+            case 401, 403, 429: throw SpeechAPIError.http(http.statusCode)
+            case 300..<400: throw MeetingNotesError.unavailable("The notes endpoint redirected. Enter its final URL in Models; transcripts and keys are never forwarded to redirects.")
+            default: throw MeetingNotesError.unavailable("The notes endpoint returned HTTP \(http.statusCode). Check its URL and model ID in Models.")
+            }
+        }
+        guard let result = try? JSONDecoder().decode(Completion.self, from: data),
+              let choice = result.choices.first,
+              choice.finish_reason == nil || choice.finish_reason == "stop",
+              choice.message.refusal == nil,
+              let text = choice.message.content?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            throw MeetingNotesError.unavailable("The notes model returned an empty, incomplete or unsupported response. Try again or choose another model.")
+        }
+        return text
+    }
+
+    func draft(_ prompt: String) async throws -> NotesDraft {
+        try NotesDraft.decode(await chat("\(prompt)\n\n\(NotesDraft.fields)", json: true))
+    }
+
+    private struct Completion: Decodable {
+        struct Choice: Decodable {
+            struct Message: Decodable { var content: String?; var refusal: String? }
+            var message: Message
+            var finish_reason: String?
+        }
+        var choices: [Choice]
+    }
+}

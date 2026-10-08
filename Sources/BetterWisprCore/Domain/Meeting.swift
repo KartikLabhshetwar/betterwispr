@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 public enum Speaker: String, Codable, Sendable {
     case me, them
@@ -46,6 +47,8 @@ public struct MeetingSummary: Codable, Equatable, Sendable {
     public var keyPoints: [String]
     public var decisions: [String]
     public var actionItems: [ActionItem]
+    public var modelName: String?
+    public var sourceFingerprint: String?
     public var generatedAt: Date
 
     public init(overview: String, keyPoints: [String] = [], decisions: [String] = [], actionItems: [ActionItem] = [], generatedAt: Date = .now) {
@@ -101,7 +104,21 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
     }
 
     public var transcript: String {
-        segments.map { "[\($0.timestamp)] \($0.speaker.label): \($0.text)" }.joined(separator: "\n")
+        transcriptSegments.map { "[\($0.timestamp)] \($0.speaker.label): \($0.text)" }.joined(separator: "\n")
+    }
+
+    /// Keep the original segments on disk; hide speaker playback picked up again by the microphone.
+    public var transcriptSegments: [MeetingSegment] { MeetingTranscript.removingEchoes(from: segments) }
+
+    public var summarySourceFingerprint: String {
+        // Length-prefix each input so different transcript/thought pairs cannot share a boundary.
+        let transcript = transcript
+        let source = "\(transcript.utf8.count):\(transcript)\(notes.utf8.count):\(notes)"
+        return SHA256.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    public var summaryNeedsUpdate: Bool {
+        summary != nil && summary?.sourceFingerprint != summarySourceFingerprint
     }
 
     public var markdown: String {
@@ -120,6 +137,26 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
             blocks.append("## Transcript\n\n" + transcript)
         }
         return blocks.joined(separator: "\n\n") + "\n"
+    }
+}
+
+public enum MeetingTranscript {
+    public static func removingEchoes(from segments: [MeetingSegment]) -> [MeetingSegment] {
+        func words(_ text: String) -> [String] {
+            text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        }
+        var systemSpeech: [String: [TimeInterval]] = [:]
+        for segment in segments where segment.speaker == .them {
+            let words = words(segment.text)
+            if words.count >= 8 { systemSpeech[words.joined(separator: " "), default: []].append(segment.start) }
+        }
+        return segments.filter { segment in
+            guard segment.speaker == .me else { return true }
+            let normalized = words(segment.text).joined(separator: " ")
+            // ponytail: exact cross-channel matches within one 30 s capture chunk only;
+            // audio echo cancellation is needed for mixed speech or differently recognized echoes.
+            return !(systemSpeech[normalized]?.contains { abs($0 - segment.start) <= 30 } ?? false)
+        }
     }
 }
 

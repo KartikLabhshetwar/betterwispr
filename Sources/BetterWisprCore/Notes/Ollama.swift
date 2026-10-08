@@ -53,13 +53,6 @@ public enum Ollama {
 struct OllamaNotesModel: NotesLanguageModel {
     let name: String
 
-    private static let fields = """
-        Reply in JSON. "title" is a short, specific title for the meeting, at most eight words. \
-        "overview" is two or three sentences on what the meeting covered. "keyPoints" lists up to eight of the most important points. \
-        "decisions" lists up to six decisions that were explicitly made. \
-        "actionItems" lists up to eight concrete follow-up tasks, naming the owner only when the transcript does.
-        """
-
     private static var schema: [String: Any] {
         let list: [String: Any] = ["type": "array", "items": ["type": "string"]]
         return ["type": "object",
@@ -73,9 +66,7 @@ struct OllamaNotesModel: NotesLanguageModel {
     }
 
     func draft(_ prompt: String) async throws -> NotesDraft {
-        let reply = try await chat("\(prompt)\n\n\(Self.fields)", format: Self.schema)
-        do { return try JSONDecoder().decode(NotesDraft.self, from: Data(reply.utf8)) }
-        catch { throw MeetingNotesError.unavailable("\(name) returned notes BetterWispr couldn’t read. Try again or choose another model.") }
+        try NotesDraft.decode(await chat("\(prompt)\n\n\(NotesDraft.fields)", format: Self.schema))
     }
 
     private func chat(_ prompt: String, format: [String: Any]? = nil) async throws -> String {

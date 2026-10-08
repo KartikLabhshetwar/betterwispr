@@ -60,6 +60,41 @@ import Testing
     #expect(meeting.segments.map(\.start) == [5, 12, 20])
 }
 
+@Test func meetingHidesCrossChannelEchoesButPreservesRawCaptureAndLaterRepeats() {
+    let phrase = "This is a synthetic meeting test. We agreed to launch on Friday."
+    var meeting = Meeting(modelName: "Parakeet", language: "en")
+    for (speaker, start, text) in [(Speaker.me, 20.0, phrase.lowercased()), (.them, 0, phrase),
+                                   (.me, 75, phrase), (.me, 22, "Yes, agreed."), (.them, 23, "Yes, agreed.")] {
+        meeting.insert(MeetingSegment(speaker: speaker, start: start, duration: 12, text: text, rawText: text))
+    }
+    #expect(meeting.segments.count == 5)
+    #expect(meeting.transcriptSegments.count == 4)
+    #expect(!meeting.transcript.contains("[00:20] Me:"))
+    #expect(meeting.transcript.contains("[01:15] Me:"))
+    #expect(meeting.transcript.contains("[00:22] Me: Yes, agreed."))
+    #expect(meeting.segments.first { $0.start == 20 }?.rawText == phrase.lowercased())
+}
+
+@Test func summaryTracksTheCombinedTranscriptAndThoughtsAndLoadsLegacyNotes() throws {
+    var meeting = Meeting(notes: "Launch Friday.", modelName: "Parakeet", language: "en")
+    meeting.insert(MeetingSegment(speaker: .them, start: 0, duration: 2, text: "Budget is fixed.", rawText: "budget is fixed"))
+    meeting.summary = MeetingSummary(overview: "Launch plan")
+    let originalFingerprint = meeting.summarySourceFingerprint
+    meeting.summary?.sourceFingerprint = originalFingerprint
+    #expect(!meeting.summaryNeedsUpdate)
+    meeting.notes = "Correction: launch Monday, after QA."
+    #expect(meeting.summaryNeedsUpdate)
+    let updatedFingerprint = meeting.summarySourceFingerprint
+    meeting.summary?.sourceFingerprint = updatedFingerprint
+    #expect(!meeting.summaryNeedsUpdate)
+    meeting.segments[0].text = "Budget is five hundred dollars."
+    #expect(meeting.summaryNeedsUpdate)
+    let legacy = #"{"overview":"Old summary","keyPoints":[],"decisions":[],"actionItems":[],"generatedAt":0}"#
+    let summary = try JSONDecoder().decode(MeetingSummary.self, from: Data(legacy.utf8))
+    #expect(summary.sourceFingerprint == nil)
+    #expect(summary.modelName == nil)
+}
+
 @Test func transcriptChunkerKeepsOrderSpeakersAndBudget() throws {
     let segments = [
         MeetingSegment(speaker: .me, start: 0, duration: 2, text: "Can we ship on Friday?", rawText: ""),
@@ -133,12 +168,35 @@ import Testing
 
 @Test func notesWriterCondensesEachPartAndCleansTheDraft() async throws {
     let model = FakeNotesModel()
-    let notes = try await NotesWriter.write(parts: ["Me: one", "Them: two"], notes: "", model: model) { _, _ in }
+    let notes = try await NotesWriter.write(parts: ["Me: " + String(repeating: "one ", count: 1000), "Them: " + String(repeating: "two ", count: 1000)], notes: "", model: model) { _, _ in }
 
     #expect(await model.prompts.count == 3)
     #expect(notes.title == "Launch plan")
     #expect(notes.summary.keyPoints == ["Ship Friday"])
     #expect(notes.summary.actionItems.map(\.text) == ["Me: send the deck"])
+}
+
+@Test func notesWriterIncludesTheEndOfLongPersonalNotes() async throws {
+    let model = FakeNotesModel()
+    let thoughts = String(repeating: "Discuss the launch plan. ", count: 500) + "Final decision: ship next Monday."
+    _ = try await NotesWriter.write(parts: [], notes: thoughts, model: model) { _, _ in }
+    let prompts = await model.prompts
+    #expect(prompts.dropLast().contains { $0.contains("Final decision: ship next Monday.") })
+    #expect(prompts.count > 2)
+}
+
+@Test func notesWriterRefusesToSilentlyTruncateAnUncondensedMeeting() async {
+    await #expect(throws: MeetingNotesError.self) {
+        try await NotesWriter.write(parts: [String(repeating: "a", count: 6000), "Last decision"], notes: "", model: NonCondensingNotesModel()) { _, _ in }
+    }
+}
+
+private struct NonCondensingNotesModel: NotesLanguageModel {
+    func respond(to prompt: String) -> String { String(repeating: "still too long ", count: 500) }
+    func draft(_ prompt: String) -> NotesDraft {
+        Issue.record("Oversized source must not be truncated into a final draft")
+        return NotesDraft(title: "", overview: "", keyPoints: [], decisions: [], actionItems: [])
+    }
 }
 
 private actor FakeNotesModel: NotesLanguageModel {

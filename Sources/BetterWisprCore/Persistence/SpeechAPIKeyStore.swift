@@ -2,6 +2,7 @@ import Foundation
 import Security
 
 public struct SpeechAPIKeyStore: Sendable {
+    public static let notes = SpeechAPIKeyStore(service: "com.betterwispr.notes-api")
     private let service: String
 
     public init(service: String = "com.betterwispr.speech-api") { self.service = service }

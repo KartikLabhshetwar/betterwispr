@@ -34,12 +34,11 @@ final class MeetingModel {
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
     var showsCallAudioHint = false
-    /// The Ollama model that writes notes; nil uses Apple Intelligence.
-    var notesModel: String?
+    var notesSettings = AppSettings()
     var ollamaModels: [String] = []
-    var notesAvailability: NotesAvailability { MeetingNotesGenerator.availability(ollamaModel: notesModel) }
+    var notesAvailability: NotesAvailability { MeetingNotesGenerator.availability(settings: notesSettings) }
 
-    @ObservationIgnored private let store = MeetingStore()
+    @ObservationIgnored private let store: MeetingStore
     @ObservationIgnored private let recorder = MeetingRecorder()
     @ObservationIgnored private var provider: (any SpeechProvider)?
     @ObservationIgnored private var session = UUID()
@@ -53,13 +52,14 @@ final class MeetingModel {
     @ObservationIgnored private var saves: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var heard: (me: Bool, them: Bool) = (false, false)
 
-    init() {
-        Self.removeLeftoverAudio()
-        let loaded = store.load()
+    init(store: MeetingStore? = nil) {
+        self.store = store ?? MeetingStore()
+        if store == nil { Self.removeLeftoverAudio() }
+        let loaded = self.store.load()
         meetings = loaded.meetings
         if !loaded.unreadable.isEmpty {
             let count = loaded.unreadable.count
-            message = "\(count) meeting \(count == 1 ? "file" : "files") in \(store.directory.path) couldn’t be read and \(count == 1 ? "was" : "were") left untouched."
+            message = "\(count) meeting \(count == 1 ? "file" : "files") in \(self.store.directory.path) couldn’t be read and \(count == 1 ? "was" : "were") left untouched."
         }
         recorder.onChunk = { [weak self] in self?.enqueue($0) }
         recorder.onLevels = { [weak self] in self?.receive($0) }
@@ -154,7 +154,19 @@ final class MeetingModel {
         guard activity == .idle else { return }
         let token = UUID()
         session = token
+        activity = .generating(id)
+        message = nil
         work = Task { [weak self] in await self?.writeNotes(for: id, token: token) }
+    }
+
+    func cancelNotes() {
+        guard case .generating(let id) = activity else { return }
+        session = UUID()
+        work?.cancel()
+        generationStep = nil
+        activity = .idle
+        saveNow(id)
+        if selectedID == nil { selectedID = id }
     }
 
     func edit(_ id: UUID, save: Bool = true, _ change: (inout Meeting) -> Void) {
@@ -216,20 +228,26 @@ final class MeetingModel {
     }
 
     private func writeNotes(for id: UUID, token: UUID) async {
+        guard session == token, !Task.isCancelled else { return }
         guard let meeting = meeting(id) else {
             activity = .idle
             return
         }
         activity = .generating(id)
         generationStep = nil
+        let sourceFingerprint = meeting.summarySourceFingerprint
+        let modelName = notesSettings.notesModelName
         do {
-            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, userNotes: meeting.notes, ollamaModel: notesModel) { [weak self] step, total in
+            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, userNotes: meeting.notes, settings: notesSettings) { [weak self] step, total in
                 guard let self, self.session == token else { return }
                 self.generationStep = (step, total)
             }
+            try Task.checkCancellation()
             guard session == token else { return }
             edit(id, save: false) { meeting in
                 meeting.summary = notes.summary
+                if meeting.summary?.modelName == nil { meeting.summary?.modelName = modelName }
+                meeting.summary?.sourceFingerprint = sourceFingerprint
                 if meeting.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { meeting.title = notes.title }
             }
             saveNow(id)

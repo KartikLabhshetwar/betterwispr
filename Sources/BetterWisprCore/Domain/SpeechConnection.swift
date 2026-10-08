@@ -66,7 +66,7 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
               parts.port.map({ (1...65535).contains($0) }) ?? true,
               parts.scheme == "https" || (parts.scheme == "http" && Self.isLoopback(host)),
               api == .openAICompatible || endpoint == api.endpoint else {
-            throw SpeechAPIError.configuration("Use a full HTTPS transcription URL without credentials, query parameters or fragments. HTTP is allowed only for localhost, 127.0.0.1 or [::1].")
+            throw SpeechAPIError.configuration("Use a full HTTPS endpoint URL without credentials, query parameters or fragments. HTTP is allowed only for localhost, 127.0.0.1 or [::1].")
         }
         return url
     }

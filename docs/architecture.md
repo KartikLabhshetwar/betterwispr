@@ -23,7 +23,7 @@ Sources/
     Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
     Transcription/    Deterministic English filler/stutter cleanup and explicit vocabulary replacements
-    Notes/            On-device meeting notes with Foundation Models and transcript chunking
+    Notes/            Meeting notes with Apple Intelligence, Ollama, signed-in CLIs and explicit API connections
     Integrations/     Clipboard and guarded paste delivery
   BetterWisprCLI/      Developer entry point for model and file smoke tests
 ```
@@ -80,18 +80,69 @@ tabs backed by the existing meeting fields.
    vocabulary as dictation, keeps raw and final text, inserts the segment by start
    time and saves. A failed chunk shows a message and the meeting continues.
 4. Stopping closes both sources, transcribes the remaining chunks, then writes
-   notes with the chosen notes model: Apple Intelligence by default, or an Ollama
-   model the user picked (`AppSettings.notesModel`). Ollama is reached only on
-   `127.0.0.1:11434`, and the picker lists only local models that can write text.
-   One `NotesWriter` condenses long transcripts part by part before the final
-   summary for both engines. Without an available notes model the transcript and
-   the user's own notes are still saved.
+   notes with the explicitly chosen notes model: Apple Intelligence by default,
+   local Ollama, Claude Code, Codex, or an OpenAI-compatible chat API. Transcription
+   selection remains independent. `NotesWriter` combines the transcript and all
+   personal thoughts, condensing long inputs before the final structured summary.
+   If condensation still exceeds the budget it reports an error instead of
+   truncating the source. Provider failure never selects another engine; the
+   transcript, thoughts and previous summary remain saved.
 5. Each meeting is one JSON file in `Application Support/BetterWispr/Meetings`.
    Unreadable files are reported and left untouched. Chunk files are deleted after
    transcription, on cancel and at quit, and leftovers are removed at launch.
 
 A session token guards every continuation, so a stopped or quit meeting never
 receives a late segment or summary.
+
+`AppSettings.notesSelection` resolves the legacy Ollama choice plus the new optional
+CLI or notes-connection selection. Old workspaces decode without changing providers.
+`notesConnections` reuses `SpeechConnection` metadata and URL/key validation, with
+keys stored under a separate notes Keychain service. API generation uses ephemeral
+sessions, rejects redirects and checks both HTTP status and completion status.
+Any model ID is accepted if the selected server supports OpenAI-compatible chat
+completions and JSON-object output. Saving a connection makes no request; selecting
+it explicitly enables sending transcript and thoughts. Keys are never inferred
+from a speech connection or moved to an edited destination.
+
+Claude Code uses `claude --print` and its existing Claude subscription sign-in;
+Codex uses `codex exec` with ChatGPT authentication required. BetterWispr does not
+extract OAuth tokens. These CLI routes strip inherited provider/key environment
+variables, run in a private temporary directory, disable tools/customizations as
+supported by each CLI, and disable session persistence. Codex also uses read-only
+sandboxing. A timeout or cancellation terminates the child and removes temporary
+input/output files. Install/update and sign in to the CLIs separately. Subscription
+limits and model access remain the provider's responsibility. Models discovers
+Claude's model catalog through its stream-JSON initialize response and Codex's
+through app-server `model/list`, including pagination. Claude aliases resolve to
+exact IDs; an empty legacy choice is pinned to the reported account default.
+Refresh never replaces an explicit model choice. Users can also enter an exact ID
+when discovery fails or a new model is available. Generation passes that ID with
+`--model`, and Claude's reported model usage is recorded in the saved summary.
+Models also exposes notes API endpoints and a cancellable synthetic sample test.
+CLI flags were verified against the locally installed help and
+[Claude's CLI reference](https://code.claude.com/docs/en/cli-reference),
+[Codex non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode)
+and [Codex configuration](https://learn.chatgpt.com/docs/config-file/config-reference).
+Model discovery follows [Claude's model configuration](https://code.claude.com/docs/en/model-config)
+and [Codex's app-server protocol](https://learn.chatgpt.com/docs/app-server).
+The API format follows [Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
+
+Summaries record their provider label and a digest of the transcript plus thoughts
+used to generate them. Editing thoughts marks an existing summary as needing an
+update, including edits made while generation is running. “Update summary” on both
+My thoughts and Summary regenerates from both sources using the selected model.
+Older summaries without these optional fields remain readable and can be updated.
+
+`MeetingTranscript.removingEchoes` hides matching microphone/system-audio phrases
+of at least eight words within a 30-second capture window. It runs for transcript
+display, copying/export and summary input, while original segments and raw text stay
+on disk. “Show repeated microphone audio” reveals those segments. This is conservative
+text matching, not acoustic echo cancellation: different recognition, mixed speech
+or different chunk boundaries can still produce echoes, and an intentional long
+verbatim repetition inside that window can be hidden. Short replies and later
+repetitions are retained. Speaker playback can also affect system-tap timestamps;
+those timestamps are capture-chunk offsets, not word-level alignment.
+
 
 Starting a meeting from the capsule or the menu bar docks a floating card
 (`NotetakerController`) to the right edge of the screen under the pointer. It

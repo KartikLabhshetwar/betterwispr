@@ -38,6 +38,9 @@ final class AppModel {
     var history: [Transcript] = []
     var vocabulary: [VocabularyEntry] = []
     var settings = AppSettings()
+    var notesCLICatalogs: [NotesCLI: NotesCLICatalog] = [:]
+    var notesCatalogErrors: [NotesCLI: String] = [:]
+    var loadingNotesCatalogs: Set<NotesCLI> = []
     var models: [SpeechModel] { SpeechModel.catalog + settings.speechConnections.map(\.speechModel) }
     let updater = AppUpdater()
     let meetings = MeetingModel()
@@ -97,7 +100,8 @@ final class AppModel {
         }
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
-        meetings.notesModel = settings.notesModel
+        meetings.notesSettings = settings
+        if let cli = settings.notesCLI { Task { await refreshNotesCLIModels(cli) } }
         refreshModels()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
         refreshMicrophones()
@@ -431,22 +435,26 @@ final class AppModel {
 
     var canEditConnections: Bool { !isBusy && meetings.activity == .idle }
 
-    func saveConnection(_ connection: SpeechConnection, key: String?) throws {
+    func saveConnection(_ connection: SpeechConnection, key: String?, forNotes: Bool = false) throws {
         guard canEditConnections else { throw SpeechError.busy }
         _ = try connection.validatedURL()
-        let keys = SpeechAPIKeyStore()
+        let keys = forNotes ? SpeechAPIKeyStore.notes : SpeechAPIKeyStore()
         let previousKey = try keys.read(for: connection)
         let newKey = key ?? previousKey ?? ""
         try connection.validateAPIKey(newKey)
         let previous = settings
-        let oldConnection = settings.speechConnections.first { $0.id == connection.id }
+        var connections = forNotes ? settings.notesConnections : settings.speechConnections
+        let oldConnection = connections.first { $0.id == connection.id }
         try keys.save(newKey, for: connection)
-        if let index = settings.speechConnections.firstIndex(where: { $0.id == connection.id }) {
-            settings.speechConnections[index] = connection
+        if let index = connections.firstIndex(where: { $0.id == connection.id }) {
+            connections[index] = connection
         } else {
-            settings.speechConnections.append(connection)
+            connections.append(connection)
         }
-        if let oldConnection, oldConnection.keychainAccount != connection.keychainAccount,
+        if forNotes { settings.notesConnections = connections } else { settings.speechConnections = connections }
+        if forNotes, let oldConnection, oldConnection.keychainAccount != connection.keychainAccount,
+           settings.notesConnectionID == connection.id { settings.notesSelection = .apple }
+        if !forNotes, let oldConnection, oldConnection.keychainAccount != connection.keychainAccount,
            settings.selectedModelID == connection.speechModel.id {
             settings.selectedModelID = "apple"
         }
@@ -456,7 +464,8 @@ final class AppModel {
             try keys.save(previousKey ?? "", for: connection)
             throw error
         }
-        if previous.selectedModelID == connection.speechModel.id {
+        meetings.notesSettings = settings
+        if !forNotes, previous.selectedModelID == connection.speechModel.id {
             provider?.cancel()
             loading?.task.cancel()
             provider = nil
@@ -469,26 +478,34 @@ final class AppModel {
         }
     }
 
-    func deleteConnection(_ connection: SpeechConnection) throws {
+    func deleteConnection(_ connection: SpeechConnection, forNotes: Bool = false) throws {
         guard canEditConnections else { throw SpeechError.busy }
-        let keys = SpeechAPIKeyStore()
+        let keys = forNotes ? SpeechAPIKeyStore.notes : SpeechAPIKeyStore()
         let previousKey = try keys.read(for: connection)
         let previous = settings
         try keys.save("", for: connection)
-        settings.speechConnections.removeAll { $0.id == connection.id }
-        if settings.selectedModelID == connection.speechModel.id { settings.selectedModelID = "apple" }
+        if forNotes {
+            settings.notesConnections.removeAll { $0.id == connection.id }
+            if settings.notesConnectionID == connection.id { settings.notesSelection = .apple }
+        } else {
+            settings.speechConnections.removeAll { $0.id == connection.id }
+            if settings.selectedModelID == connection.speechModel.id { settings.selectedModelID = "apple" }
+        }
         do { try persist() }
         catch {
             settings = previous
             try keys.save(previousKey ?? "", for: connection)
             throw error
         }
-        provider?.cancel()
-        loading?.task.cancel()
-        provider = nil
-        preparedModelID = nil
-        loading = nil
-        warmUpSelectedModel()
+        meetings.notesSettings = settings
+        if !forNotes {
+            provider?.cancel()
+            loading?.task.cancel()
+            provider = nil
+            preparedModelID = nil
+            loading = nil
+            warmUpSelectedModel()
+        }
     }
 
     private func refreshModels() {
@@ -651,9 +668,32 @@ final class AppModel {
         meetings.useMicrophone(choice)
     }
 
-    func selectNotesModel(_ name: String?) {
-        settings.notesModel = name
-        meetings.notesModel = name
+    func selectNotesModel(_ selection: NotesModelSelection) {
+        guard meetings.activity == .idle else { return }
+        settings.notesSelection = selection
+        saveNotesSettings()
+        if case .cli(let cli) = selection { Task { await refreshNotesCLIModels(cli) } }
+    }
+
+    func refreshNotesCLIModels(_ cli: NotesCLI) async {
+        guard loadingNotesCatalogs.insert(cli).inserted else { return }
+        defer { loadingNotesCatalogs.remove(cli) }
+        notesCatalogErrors[cli] = nil
+        do {
+            let catalog = try await NotesCLICatalog.load(cli)
+            try Task.checkCancellation()
+            notesCLICatalogs[cli] = catalog
+            if settings.cliModel(cli).isEmpty, let defaultID = catalog.defaultID, meetings.activity == .idle {
+                settings.setCLIModel(defaultID, for: cli)
+                saveNotesSettings()
+            }
+        } catch {
+            if !Task.isCancelled { notesCatalogErrors[cli] = error.localizedDescription }
+        }
+    }
+
+    func saveNotesSettings() {
+        meetings.notesSettings = settings
         saveSettings()
     }
 

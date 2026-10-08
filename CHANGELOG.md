@@ -7,6 +7,9 @@ All notable changes to BetterWispr are listed here. The format follows
 ## [0.1.0] - 2026-10-08
 
 ### Added
+- Meeting summaries with signed-in Claude Code and Codex subscriptions, or a custom OpenAI-compatible chat-completions endpoint and API key stored in macOS Keychain. Choose the notes provider independently of speech recognition; Apple Intelligence remains the default, with no automatic cloud fallback.
+- Claude Code and Codex model pickers populated by the installed CLIs, including exact model IDs, refresh and custom model entry. The chosen model is saved and identified on generated summaries.
+- A notes-model test in Models that uses a short synthetic sample, with cancellation and actionable connection errors.
 - Meeting notes and titles with Ollama. Choose an installed Ollama model under Notes model in the Notetaker settings menu, and BetterWispr writes the title, summary, key points, decisions and action items with it on this Mac. Apple Intelligence stays the default, BetterWispr never switches models on its own, and cloud and embedding models are not offered.
 - Voice commands for English and Auto language: "comma", "question mark", "full stop", "add a period", "new line", "new paragraph", "scratch that" and "sorry, remove that" delete the last sentence, and "at the rate KV" or "at sign KV" types "@KV". Commands are rule-based and run on your Mac.
 - Learn from corrections: fix a misheard word in History with the pencil, or in the text field within 30 seconds of a paste, and BetterWispr adds it to Vocabulary with a Learned badge and a toast. Turn it off in Settings.
@@ -35,6 +38,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - `VERSION` file and this changelog. The app bundle version is stamped from `VERSION` at build time.
 
 ### Changed
+- Meeting summaries combine the transcript and all of My thoughts, including longer notes. Edited thoughts show when the summary needs updating, with an Update summary button.
 - The menu bar menu shows whether BetterWispr is ready, listening or transcribing, switches the speech model and microphone, and opens Settings and update checks. Show capsule and Show welcome guide are gone.
 - Start Notetaker on the dashboard now docks the meeting card beside your call, the same as starting from the capsule or the menu bar.
 - The dashboard no longer opens the live transcript while you record. It keeps the list of notes and opens the finished note once recording and notes are done.
@@ -45,6 +49,8 @@ All notable changes to BetterWispr are listed here. The format follows
 - Waveform that fits your voice. It learns the room's noise floor and your recent loudness, so quiet voices fill the bars and steady background noise stays flat. Bars rise fast and fall slowly, follow the voice in steps of about 20 ms instead of jumping with each 100 ms audio buffer, and a travelling wave shows while transcribing. Reduce Motion keeps the bars still.
 
 ### Fixed
+- Hide matching long microphone echoes of nearby system-audio transcript entries in the transcript, export and summarization input. Original entries remain saved and can be revealed with Show repeated microphone audio.
+- Cancelled or failed summary generation preserves the saved meeting and previous summary. Oversized notes fail explicitly if they cannot be condensed, instead of silently losing the end of the source.
 - An open note now switches to its Summary tab as soon as the notes are written, instead of staying on the transcript.
 - Paste into other apps stopped after every rebuild because ad-hoc signing changed the app's code requirement and macOS revoked Accessibility. `scripts/build-app.sh` now signs with a stable identity, and a blocked paste shows an Allow button instead of silently copying.
 - English transcript cleanup removes "uh", "um", "er", "hmm", "mm" and their supported spellings, set-off "you know", and unpunctuated back-to-back repeats such as "which you which you" before vocabulary replacements. It preserves "mm" after a numeric value, "you know?", punctuated repeats, numbers and common doubles such as "that that" and "long long". Language detection ignores fillers; other languages are left as spoken, and history keeps the raw recognizer output.

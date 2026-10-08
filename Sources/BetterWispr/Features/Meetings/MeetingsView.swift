@@ -212,13 +212,11 @@ private struct NotetakerSettings: View {
             MicrophonePicker(model: model) { Text("Microphone") }
                 .pickerStyle(.inline)
             Divider()
-            Picker("Notes model", selection: Binding(get: { model.meetings.notesModel }, set: { model.selectNotesModel($0) })) {
-                Text("Apple Intelligence").tag(String?.none)
-                ForEach(notesModels, id: \.self) { Text($0).tag(Optional($0)) }
-            }
-            .pickerStyle(.inline)
-            .disabled(model.meetings.activity != .idle)
-            if model.meetings.ollamaModels.isEmpty { Text("Install Ollama and pull a model to write notes with it") }
+            NotesModelPicker(model: model)
+                .pickerStyle(.inline)
+                .disabled(model.meetings.activity != .idle)
+            Button("Configure and test notes models…") { model.selectedPage = .models }
+
         } label: {
             Image(systemName: "gearshape")
         }
@@ -230,11 +228,7 @@ private struct NotetakerSettings: View {
         .accessibilityLabel("Notetaker settings")
     }
 
-    private var notesModels: [String] {
-        let installed = model.meetings.ollamaModels
-        guard let saved = model.meetings.notesModel, !installed.contains(saved) else { return installed }
-        return installed + [saved]
-    }
+
 }
 
 private struct NoteRow: View {

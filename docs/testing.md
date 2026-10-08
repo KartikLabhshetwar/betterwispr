@@ -265,6 +265,54 @@ These checks do not establish live provider acceptance or recognition quality.
 
 ## Meeting notes
 
+Validation on 2026-10-08 for BYOK/subscription notes:
+- `swift build`, `swift test` (61 tests, live-provider test disabled by default),
+  and `./scripts/build-app.sh` passed. Added checks cover old settings/summary
+  decoding, real CAF chunk writing and conversion through stubbed speech/notes HTTP,
+  raw transcript persistence and export, malformed/failed/truncated responses,
+  cancellation, CLI process timeout/large output/interactive replies, model catalog
+  parsing and explicit selection persistence, long thoughts and echo filtering.
+- `BETTERWISPR_LIVE_NOTES=1 swift test --filter liveNotesProvidersGenerateFromSyntheticMeeting`
+  passed all three provider cases using synthetic text: signed-in Claude Code,
+  signed-in Codex, and Ollama's OpenAI-compatible HTTP endpoint with `llama3.1:8b`.
+  Requires both CLIs already signed in and that Ollama model already installed;
+  this command never downloads models. A first local-API run exposed an invalid
+  structured response; JSON-object output plus explicit string/array types in the
+  prompt fixed the observed schema mismatches before the passing run.
+- Native capture test: Parakeet v3 recorded microphone (Me) and synthetic playback
+  through the system-audio tap (Them), stopped, and automatically generated a saved
+  Ollama summary with decisions and an action item. Speaker audio was also picked
+  up by the microphone; the new filter hid the matching Me segment after relaunch.
+- The Models “Test notes model” button returned a real Claude summary. The saved
+  test meeting was then updated with a synthetic QA thought and regenerated with
+  Claude Code. This checks combined thoughts/transcript input, not recognition
+  accuracy. No live cloud API key endpoint was exercised.
+- Native model pickers showed all 12 Claude and 7 Codex models reported by the
+  installed CLIs. Choosing Claude Sonnet and testing returned a summary labeled
+  `claude-sonnet-5-5`; live tests also checked explicit default-model generation
+  and summary provenance for both CLIs. Catalog counts depend on the CLI/account.
+- After relaunching the final packaged app, the saved synthetic meeting regenerated
+  with `Claude Code · claude-sonnet-5-5`. Its summary combined the spoken Friday
+  launch/$500 budget with the personal QA sign-off thought. The selected model
+  survived the relaunch and the summary footer showed the exact model ID.
+
+Additional regression checks:
+- [ ] Add a notes API connection using a complete chat-completions URL, custom
+  model ID and key. Saving sends nothing; select it under Notes model and test.
+  Rotate its key, change its URL, remove it and relaunch. Speech selection stays
+  unchanged, keys stay in Keychain, and an edited active URL needs selection again.
+- [ ] Select Claude Code or Codex, choose a discovered model or enter an exact ID,
+  and test. Refresh the catalog and relaunch: the chosen ID should stay selected,
+  and generated summaries should name it. Signed-out, missing/outdated CLI and subscription-limit failures should
+  be actionable without exposing provider output or starting another provider.
+- [ ] Edit thoughts during summary generation. The completed summary should be
+  marked for update until regenerated with the new text. Cancel generation and
+  verify the previous summary remains intact with no late replacement.
+- [ ] Test speaker playback with partial overlap and different recognition results;
+  exact text filtering does not replace acoustic echo cancellation. Verify short
+  replies and intentional later repetitions stay visible.
+
+
 UI validation on 2026-10-08: inspected the packaged native app in dark appearance
 with a temporary synthetic meeting. Verified the meeting sidebar, separate
 My thoughts / Transcript / Summary tabs, transcript search, the Parakeet v3

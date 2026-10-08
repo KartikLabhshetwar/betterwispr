@@ -9,6 +9,7 @@ struct MeetingDetailView: View {
     @State private var transcriptQuery = ""
     @State private var showsSearch = false
     @State private var showsModelNote = true
+    @State private var showsEchoes = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Tab: String, CaseIterable {
@@ -179,10 +180,14 @@ struct MeetingDetailView: View {
             case .finishing(let active) where active == id:
                 progress("Transcribing the last few seconds…")
             case .generating(let active) where active == id:
-                if let (step, total) = meetings.generationStep, total > 1 {
-                    progress("Writing summary… part \(step) of \(total)")
-                } else {
-                    progress("Writing summary on this Mac…")
+                HStack {
+                    if let (step, total) = meetings.generationStep, total > 1 {
+                        progress("Writing summary… part \(step) of \(total)")
+                    } else {
+                        progress("Writing summary with \(meetings.notesSettings.notesModelName)…")
+                    }
+                    Spacer(minLength: 8)
+                    Button("Cancel", action: meetings.cancelNotes)
                 }
             default:
                 HStack {
@@ -225,10 +230,9 @@ struct MeetingDetailView: View {
         VStack(alignment: .leading, spacing: 18) {
             if meeting.summary != nil {
                 HStack(spacing: 6) {
-                    Text("Your summary is ready.")
-                    Button("Check it out →") { tab = .summary }
-                        .buttonStyle(.plain)
-                        .underline()
+                    Text(meeting.summaryNeedsUpdate ? "Include your latest thoughts in the summary." : "Your summary includes these thoughts.")
+                    Button("Update summary") { meetings.generateNotes(id) }
+                        .disabled(meetings.activity != .idle || meetings.notesAvailability != .available)
                 }
                 .font(.callout)
                 .foregroundStyle(.tertiary)
@@ -259,6 +263,16 @@ struct MeetingDetailView: View {
     @ViewBuilder private func summary(_ meeting: Meeting) -> some View {
         if let summary = meeting.summary {
             VStack(alignment: .leading, spacing: 26) {
+                HStack(alignment: .firstTextBaseline) {
+                    if meeting.summaryNeedsUpdate {
+                        Text("Update to include your latest thoughts and transcript.")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button("Update summary") { meetings.generateNotes(id) }
+                        .disabled(meetings.activity != .idle || meetings.notesAvailability != .available)
+                        .help("Combine the full transcript and your current thoughts using \(meetings.notesSettings.notesModelName)")
+                }
                 if !summary.overview.isEmpty {
                     Text(summary.overview).font(.system(size: 16)).lineSpacing(6).textSelection(.enabled)
                 }
@@ -269,7 +283,7 @@ struct MeetingDetailView: View {
                         ForEach(summary.actionItems) { item in actionItem(item) }
                     }
                 }
-                Text("Generated on this Mac")
+                Text(summary.modelName.map { "Generated with \($0)" } ?? "Generated summary")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -329,7 +343,7 @@ struct MeetingDetailView: View {
         }
         return VStack(alignment: .leading, spacing: 12) {
             Text("Bring it all together").font(.system(size: 24, design: .serif))
-            Text("\(meetings.notesModel ?? "Apple Intelligence") turns your transcript and thoughts into a summary, key points, decisions, and action items.")
+            Text("\(meetings.notesSettings.notesModelName) turns your transcript and thoughts into a summary, key points, decisions, and action items.")
                 .foregroundStyle(.secondary)
             Button { meetings.generateNotes(id) } label: {
                 Label("Generate summary", systemImage: "sparkles")
@@ -398,7 +412,12 @@ struct MeetingDetailView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 44)
         } else {
-            let segments = meeting.segments.filter { transcriptQuery.isEmpty || $0.text.localizedStandardContains(transcriptQuery) }
+            let cleaned = meeting.transcriptSegments
+            if cleaned.count < meeting.segments.count {
+                Toggle("Show repeated microphone audio", isOn: $showsEchoes)
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            let segments = (showsEchoes ? meeting.segments : cleaned).filter { transcriptQuery.isEmpty || $0.text.localizedStandardContains(transcriptQuery) }
             if segments.isEmpty, !meeting.segments.isEmpty {
                 Text("No matching words").foregroundStyle(.secondary)
             }

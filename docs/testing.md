@@ -318,6 +318,13 @@ were not exercised in this UI pass.
   A title you typed before the notes were written is kept.
 - [ ] With Apple Intelligence off or unsupported, stop a meeting. The transcript
   and notes are saved, and Generate summary is disabled with the reason shown.
+- [ ] Start Notetaker from the dashboard. The card docks beside the call, and the
+  dashboard stays on the list instead of showing the live transcript. Stop the
+  meeting; the dashboard opens the finished note on its Summary tab.
+- [ ] With Ollama running and a model pulled, choose it under Notes model in the
+  Notetaker settings menu. Stop a meeting; the title and summary are written by
+  that model. Embedding and cloud models are not listed. Quit Ollama and Generate
+  summary says Ollama isn't running; Apple Intelligence is never used instead.
 - [ ] Disconnect networking, then start, record, stop and summarize a meeting with
   an installed model. Everything works and a network monitor shows no requests.
 

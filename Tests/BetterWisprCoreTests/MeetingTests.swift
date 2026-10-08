@@ -125,3 +125,33 @@ import Testing
     #expect(!sections[2].title.contains("2026"))
     #expect(sections[3].title.contains("2025"))
 }
+
+@Test func ollamaOffersOnlyModelsStoredOnThisMac() throws {
+    let tags = #"{"models":[{"name":"llama3.1:8b","model":"llama3.1:8b"},{"name":"gpt-oss:120b-cloud","model":"gpt-oss:120b-cloud","remote_host":"https://ollama.com:443"}]}"#
+    #expect(try JSONDecoder().decode(Ollama.Tags.self, from: Data(tags.utf8)).localNames == ["llama3.1:8b"])
+}
+
+@Test func notesWriterCondensesEachPartAndCleansTheDraft() async throws {
+    let model = FakeNotesModel()
+    let notes = try await NotesWriter.write(parts: ["Me: one", "Them: two"], notes: "", model: model) { _, _ in }
+
+    #expect(await model.prompts.count == 3)
+    #expect(notes.title == "Launch plan")
+    #expect(notes.summary.keyPoints == ["Ship Friday"])
+    #expect(notes.summary.actionItems.map(\.text) == ["Me: send the deck"])
+}
+
+private actor FakeNotesModel: NotesLanguageModel {
+    private(set) var prompts: [String] = []
+
+    func respond(to prompt: String) -> String {
+        prompts.append(prompt)
+        return "- condensed"
+    }
+
+    func draft(_ prompt: String) -> NotesDraft {
+        prompts.append(prompt)
+        return NotesDraft(title: "  Launch plan\n", overview: "We planned the launch.", keyPoints: ["Ship Friday", "  "],
+                          decisions: [], actionItems: ["Me: send the deck", ""])
+    }
+}

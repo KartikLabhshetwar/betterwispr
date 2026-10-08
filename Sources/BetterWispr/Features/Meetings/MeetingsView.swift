@@ -172,7 +172,7 @@ private struct NotesHome: View {
                 .accessibilityLabel("Search notes")
             NotetakerSettings(model: model)
             Button {
-                if capturing { meetings.stop() } else { model.startMeeting() }
+                if capturing { meetings.stop() } else { model.startNotetaker() }
             } label: {
                 Label(capturing ? "Stop Notetaker" : "Start Notetaker", systemImage: capturing ? "stop.circle" : "record.circle")
                     .font(.system(size: 14, weight: .medium))
@@ -211,14 +211,29 @@ private struct NotetakerSettings: View {
             Divider()
             MicrophonePicker(model: model) { Text("Microphone") }
                 .pickerStyle(.inline)
+            Divider()
+            Picker("Notes model", selection: Binding(get: { model.meetings.notesModel }, set: { model.selectNotesModel($0) })) {
+                Text("Apple Intelligence").tag(String?.none)
+                ForEach(notesModels, id: \.self) { Text($0).tag(Optional($0)) }
+            }
+            .pickerStyle(.inline)
+            .disabled(model.meetings.activity != .idle)
+            if model.meetings.ollamaModels.isEmpty { Text("Install Ollama and pull a model to write notes with it") }
         } label: {
             Image(systemName: "gearshape")
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("Transcription model and microphone")
+        .task { await model.meetings.refreshOllamaModels() }
+        .help("Transcription model, microphone and notes model")
         .accessibilityLabel("Notetaker settings")
+    }
+
+    private var notesModels: [String] {
+        let installed = model.meetings.ollamaModels
+        guard let saved = model.meetings.notesModel, !installed.contains(saved) else { return installed }
+        return installed + [saved]
     }
 }
 
@@ -361,7 +376,7 @@ extension AppModel {
                        vocabulary: vocabulary, silenceThreshold: settings.silenceThreshold, microphone: settings.microphone)
     }
 
-    /// Starts a meeting from outside the dashboard and docks its card beside the call.
+    /// Starts a meeting and docks its card beside the call.
     func startNotetaker() {
         startMeeting()
         if let id = meetings.activity.meetingID { onShowNotetaker?(id) } else { onShowDashboard?() }

@@ -55,10 +55,8 @@ struct MeetingDetailView: View {
                 }
                 footer(meeting)
             }
-            .onAppear {
-                meetings.notesAvailability = MeetingNotesGenerator.availability
-                tab = meetings.isActive(id) || meeting.summary == nil ? .transcript : .summary
-            }
+            .onAppear { tab = meetings.isActive(id) || meeting.summary == nil ? .transcript : .summary }
+            .onChange(of: meeting.summary?.generatedAt) { if meeting.summary != nil { tab = .summary } }
         }
     }
 
@@ -271,7 +269,7 @@ struct MeetingDetailView: View {
                         ForEach(summary.actionItems) { item in actionItem(item) }
                     }
                 }
-                Text("Generated on this Mac with Apple Intelligence")
+                Text("Generated on this Mac")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -331,7 +329,7 @@ struct MeetingDetailView: View {
         }
         return VStack(alignment: .leading, spacing: 12) {
             Text("Bring it all together").font(.system(size: 24, design: .serif))
-            Text("Apple Intelligence turns your transcript and thoughts into a summary, key points, decisions, and action items.")
+            Text("\(meetings.notesModel ?? "Apple Intelligence") turns your transcript and thoughts into a summary, key points, decisions, and action items.")
                 .foregroundStyle(.secondary)
             Button { meetings.generateNotes(id) } label: {
                 Label("Generate summary", systemImage: "sparkles")

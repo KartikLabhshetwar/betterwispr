@@ -29,35 +29,58 @@ public enum MeetingNotesGenerator {
     // ponytail: characters at ~4 per token; switch to SystemLanguageModel.tokenCount(for:) once the minimum OS reaches 26.4.
     static let budget = 6000
 
-    public static var availability: NotesAvailability {
-        #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) {
-            switch SystemLanguageModel.default.availability {
-            case .available: return .available
-            case .unavailable(.deviceNotEligible): return .unavailable("This Mac doesn’t support Apple Intelligence, so notes can’t be written here. Your transcript and notes are still saved.")
-            case .unavailable(.appleIntelligenceNotEnabled): return .unavailable("Turn on Apple Intelligence in System Settings to write notes on this Mac.")
-            case .unavailable(.modelNotReady): return .unavailable("Apple Intelligence is still downloading its model. Try again soon.")
-            case .unavailable: return .unavailable("Apple Intelligence isn’t available right now. Your transcript and notes are still saved.")
-            }
-        }
-        #endif
-        return .unavailable("Notes need macOS 26 with Apple Intelligence. Your transcript and notes are still saved.")
+    /// Apple Intelligence availability when `ollamaModel` is nil; an Ollama model is checked when notes are written.
+    public static func availability(ollamaModel: String?) -> NotesAvailability {
+        ollamaModel == nil ? appleAvailability : .available
     }
 
-    /// Writes a title and summary on device, condensing long transcripts part by part first.
-    public static func generate(segments: [MeetingSegment], userNotes: String,
+    /// Writes a title and summary on this Mac, condensing long transcripts part by part first.
+    public static func generate(segments: [MeetingSegment], userNotes: String, ollamaModel: String?,
                                 onStep: @escaping @MainActor @Sendable (Int, Int) -> Void) async throws -> GeneratedMeetingNotes {
         let notes = userNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         let spoken = segments.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         guard !spoken.isEmpty || !notes.isEmpty else { throw MeetingNotesError.nothingToSummarize }
-        if case .unavailable(let message) = availability { throw MeetingNotesError.unavailable(message) }
+        if case .unavailable(let message) = availability(ollamaModel: ollamaModel) { throw MeetingNotesError.unavailable(message) }
+        return try await NotesWriter.write(parts: TranscriptChunker.chunks(spoken, budget: budget), notes: notes,
+                                           model: try languageModel(ollamaModel), onStep: onStep)
+    }
+
+    private static var appleAvailability: NotesAvailability {
         #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
-            return try await NotesWriter.write(parts: TranscriptChunker.chunks(spoken, budget: budget), notes: notes, onStep: onStep)
+            switch SystemLanguageModel.default.availability {
+            case .available: return .available
+            case .unavailable(.deviceNotEligible): return .unavailable("This Mac doesn’t support Apple Intelligence. Choose an Ollama model in Notetaker settings to write notes here. Your transcript and notes are still saved.")
+            case .unavailable(.appleIntelligenceNotEnabled): return .unavailable("Turn on Apple Intelligence in System Settings, or choose an Ollama model in Notetaker settings, to write notes on this Mac.")
+            case .unavailable(.modelNotReady): return .unavailable("Apple Intelligence is still downloading its model. Try again soon, or choose an Ollama model in Notetaker settings.")
+            case .unavailable: return .unavailable("Apple Intelligence isn’t available right now. Choose an Ollama model in Notetaker settings, or try again later. Your transcript and notes are still saved.")
+            }
         }
         #endif
-        throw MeetingNotesError.unavailable(availability.message)
+        return .unavailable("Notes need macOS 26 with Apple Intelligence, or an Ollama model chosen in Notetaker settings. Your transcript and notes are still saved.")
     }
+
+    private static func languageModel(_ ollamaModel: String?) throws -> any NotesLanguageModel {
+        if let ollamaModel { return OllamaNotesModel(name: ollamaModel) }
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *) { return AppleNotesModel() }
+        #endif
+        throw MeetingNotesError.unavailable(appleAvailability.message)
+    }
+}
+
+/// The notes a model returns before they are cleaned into a `MeetingSummary`.
+struct NotesDraft: Decodable, Sendable {
+    var title: String
+    var overview: String
+    var keyPoints: [String]
+    var decisions: [String]
+    var actionItems: [String]
+}
+
+protocol NotesLanguageModel: Sendable {
+    func respond(to prompt: String) async throws -> String
+    func draft(_ prompt: String) async throws -> NotesDraft
 }
 
 extension NotesAvailability {
@@ -133,20 +156,36 @@ struct GeneratedNotes {
 }
 
 @available(macOS 26.0, *)
-private enum NotesWriter {
+struct AppleNotesModel: NotesLanguageModel {
+    private static let options = GenerationOptions(temperature: 0.3)
+
+    func respond(to prompt: String) async throws -> String {
+        try await LanguageModelSession(instructions: NotesWriter.instructions).respond(to: prompt, options: Self.options).content
+    }
+
+    func draft(_ prompt: String) async throws -> NotesDraft {
+        let notes = try await LanguageModelSession(instructions: NotesWriter.instructions)
+            .respond(to: prompt, generating: GeneratedNotes.self, options: Self.options).content
+        return NotesDraft(title: notes.title, overview: notes.overview, keyPoints: notes.keyPoints,
+                          decisions: notes.decisions, actionItems: notes.actionItems)
+    }
+}
+#endif
+
+enum NotesWriter {
     static let instructions = """
         You write notes for a meeting between "Me", the person taking notes, and "Them", everyone else on the call. \
         Be factual. Use only the transcript and Me's own notes. Never invent names, numbers, dates or decisions. \
         Return an empty list when nothing applies.
         """
-    static let options = GenerationOptions(temperature: 0.3)
     static let condensePrompt = """
         Write short plain bullet notes for this part of a meeting. Keep who said what (Me or Them), \
         and keep names, numbers, dates, decisions and follow-up tasks exactly as stated. Add nothing else.
         """
     static let maximumRounds = 3
 
-    static func write(parts: [String], notes: String, onStep: @escaping @MainActor @Sendable (Int, Int) -> Void) async throws -> GeneratedMeetingNotes {
+    static func write(parts: [String], notes: String, model: any NotesLanguageModel,
+                      onStep: @escaping @MainActor @Sendable (Int, Int) -> Void) async throws -> GeneratedMeetingNotes {
         let budget = MeetingNotesGenerator.budget
         var material = parts.joined(separator: "\n")
         var step = 0
@@ -159,7 +198,7 @@ private enum NotesWriter {
                     step += 1
                     await onStep(step, total)
                     try Task.checkCancellation()
-                    condensed.append(try await condense(part))
+                    condensed.append(try await model.respond(to: "\(condensePrompt)\n\n\(part)"))
                 }
                 material = condensed.joined(separator: "\n")
                 guard material.count > budget, round + 1 < maximumRounds else { break }
@@ -172,20 +211,12 @@ private enum NotesWriter {
         let source = parts.count > 1 ? "Notes from each part of the meeting, in order:" : "Transcript:"
         let transcript = material.isEmpty ? "No speech was transcribed." : String(material.prefix(budget))
         let userNotes = notes.isEmpty ? "" : "Me's own notes, which the summary should follow:\n\(notes.prefix(budget / 3))\n\n"
-        let session = LanguageModelSession(instructions: instructions)
-        let response = try await session.respond(to: "Write the meeting notes.\n\n\(userNotes)\(source)\n\(transcript)",
-                                                 generating: GeneratedNotes.self, options: options)
-        let generated = response.content
+        let generated = try await model.draft("Write the meeting notes.\n\n\(userNotes)\(source)\n\(transcript)")
         return GeneratedMeetingNotes(
             title: clean(generated.title),
             summary: MeetingSummary(overview: clean(generated.overview), keyPoints: generated.keyPoints.compactMap(nonEmpty),
                                     decisions: generated.decisions.compactMap(nonEmpty),
                                     actionItems: generated.actionItems.compactMap(nonEmpty).map { ActionItem(text: $0) }))
-    }
-
-    private static func condense(_ part: String) async throws -> String {
-        let session = LanguageModelSession(instructions: instructions)
-        return try await session.respond(to: "\(condensePrompt)\n\n\(part)", options: options).content
     }
 
     private static func clean(_ text: String) -> String {
@@ -197,4 +228,3 @@ private enum NotesWriter {
         return text.isEmpty ? nil : text
     }
 }
-#endif

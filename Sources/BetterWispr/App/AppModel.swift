@@ -98,6 +98,7 @@ final class AppModel {
         }
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
+        meetings.notesModel = settings.notesModel
         refreshModels()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
         refreshMicrophones()
@@ -649,6 +650,12 @@ final class AppModel {
         settings.microphone = choice
         saveSettings()
         meetings.useMicrophone(choice)
+    }
+
+    func selectNotesModel(_ name: String?) {
+        settings.notesModel = name
+        meetings.notesModel = name
+        saveSettings()
     }
 
     private func refreshMicrophones() {

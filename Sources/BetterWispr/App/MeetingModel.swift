@@ -34,7 +34,10 @@ final class MeetingModel {
     var systemAudioIssue: String?
     var microphone: AudioInputDevice?
     var showsCallAudioHint = false
-    var notesAvailability = MeetingNotesGenerator.availability
+    /// The Ollama model that writes notes; nil uses Apple Intelligence.
+    var notesModel: String?
+    var ollamaModels: [String] = []
+    var notesAvailability: NotesAvailability { MeetingNotesGenerator.availability(ollamaModel: notesModel) }
 
     @ObservationIgnored private let store = MeetingStore()
     @ObservationIgnored private let recorder = MeetingRecorder()
@@ -76,7 +79,6 @@ final class MeetingModel {
         self.language = language
         self.vocabulary = vocabulary
         meetings.insert(meeting, at: 0)
-        selectedID = meeting.id
         saveNow(meeting.id)
         activity = .starting(meeting.id)
         message = nil
@@ -133,16 +135,20 @@ final class MeetingModel {
             self.edit(id, save: false) { $0.duration = duration }
             self.saveNow(id)
             self.provider = nil
-            self.notesAvailability = MeetingNotesGenerator.availability
             if self.notesAvailability == .available, self.meeting(id)?.hasContent == true {
                 await self.writeNotes(for: id, token: token)
             } else {
                 self.activity = .idle
             }
+            if self.session == token, self.selectedID == nil { self.selectedID = id }
         }
     }
 
     func useMicrophone(_ choice: AudioInputDevice?) { recorder.use(choice) }
+
+    func refreshOllamaModels() async {
+        ollamaModels = (try? await Ollama.installedModels()) ?? []
+    }
 
     func generateNotes(_ id: UUID) {
         guard activity == .idle else { return }
@@ -210,7 +216,6 @@ final class MeetingModel {
     }
 
     private func writeNotes(for id: UUID, token: UUID) async {
-        notesAvailability = MeetingNotesGenerator.availability
         guard let meeting = meeting(id) else {
             activity = .idle
             return
@@ -218,7 +223,7 @@ final class MeetingModel {
         activity = .generating(id)
         generationStep = nil
         do {
-            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, userNotes: meeting.notes) { [weak self] step, total in
+            let notes = try await MeetingNotesGenerator.generate(segments: meeting.segments, userNotes: meeting.notes, ollamaModel: notesModel) { [weak self] step, total in
                 guard let self, self.session == token else { return }
                 self.generationStep = (step, total)
             }

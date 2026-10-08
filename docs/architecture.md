@@ -61,11 +61,12 @@ behavior that unit tests cannot establish.
 `MeetingModel` owns meetings and is separate from dictation. It loads its own
 speech provider with `download: false` and releases it when the meeting ends.
 The Notetaker page's settings menu exposes the same model and microphone
-selection as dictation; both use `SpeechModel.makeProvider()` with independent
+selection as dictation, plus the notes model; both use `SpeechModel.makeProvider()` with independent
 provider instances. The model name is captured when recording starts. The page
 lists notes by day beside the current note (the one recording, otherwise the
 latest); `MeetingModel.selectedID` opens one full page, and nil returns to the
-list. Personal thoughts, the transcript, and the generated summary have separate
+list. Starting a meeting docks its card beside the call and leaves the dashboard
+on the list; the finished note opens there once notes are written. Personal thoughts, the transcript, and the generated summary have separate
 tabs backed by the existing meeting fields.
 
 1. Starting a meeting saves an empty `Meeting`, checks microphone permission and
@@ -79,9 +80,12 @@ tabs backed by the existing meeting fields.
    vocabulary as dictation, keeps raw and final text, inserts the segment by start
    time and saves. A failed chunk shows a message and the meeting continues.
 4. Stopping closes both sources, transcribes the remaining chunks, then writes
-   notes with Apple Intelligence when it is available. Long transcripts are
-   condensed part by part before the final summary. Without Apple Intelligence the
-   transcript and the user's own notes are still saved.
+   notes with the chosen notes model: Apple Intelligence by default, or an Ollama
+   model the user picked (`AppSettings.notesModel`). Ollama is reached only on
+   `127.0.0.1:11434`, and the picker lists only local models that can write text.
+   One `NotesWriter` condenses long transcripts part by part before the final
+   summary for both engines. Without an available notes model the transcript and
+   the user's own notes are still saved.
 5. Each meeting is one JSON file in `Application Support/BetterWispr/Meetings`.
    Unreadable files are reported and left untouched. Chunk files are deleted after
    transcription, on cancel and at quit, and leftovers are removed at launch.

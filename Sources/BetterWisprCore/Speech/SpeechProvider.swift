@@ -1,7 +1,7 @@
 import Foundation
 
 public enum SpeechEngine: String, Codable, Sendable {
-    case apple, whisperKit, parakeet
+    case apple, whisperKit, parakeet, api
 }
 
 public struct SpeechModel: Identifiable, Hashable, Sendable {
@@ -12,9 +12,10 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
     public let engine: SpeechEngine
     public let modelName: String
     public let tokenizerName: String?
+    public let connection: SpeechConnection?
 
     public init(id: String, name: String, detail: String, sizeLabel: String, engine: SpeechEngine,
-                modelName: String, tokenizerName: String? = nil) {
+                modelName: String, tokenizerName: String? = nil, connection: SpeechConnection? = nil) {
         self.id = id
         self.name = name
         self.detail = detail
@@ -22,6 +23,7 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
         self.engine = engine
         self.modelName = modelName
         self.tokenizerName = tokenizerName
+        self.connection = connection
     }
 
     public static let catalog: [SpeechModel] = [
@@ -40,10 +42,22 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
 public protocol SpeechProvider: AnyObject {
     var onProgress: (@MainActor @Sendable (Double) -> Void)? { get set }
     var onPartialTranscript: (@MainActor @Sendable (String) -> Void)? { get set }
-    /// Network access is permitted only when the caller explicitly requests a model download.
+    /// Local providers may download only with `download: true`. API providers only validate here;
+    /// their explicitly selected connection authorizes network use during transcription.
     func prepare(model: SpeechModel, download: Bool) async throws
     func transcribe(audioURL: URL, language: String?, vocabulary: [String]) async throws -> String
     func cancel()
+}
+
+extension SpeechModel {
+    @MainActor public func makeProvider() -> any SpeechProvider {
+        switch engine {
+        case .apple: AppleSpeechProvider()
+        case .whisperKit: WhisperKitProvider()
+        case .parakeet: ParakeetProvider()
+        case .api: APISpeechProvider()
+        }
+    }
 }
 
 public enum SpeechError: LocalizedError, Sendable {

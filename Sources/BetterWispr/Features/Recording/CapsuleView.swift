@@ -6,15 +6,17 @@ struct CapsuleView: View {
     let hover: CapsuleHover
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shakes = 0
+    @State private var hoveringMeeting = false
 
     private var isRecording: Bool { model.phase == .recording }
+    private var isMeetingRecording: Bool { model.meetings.activity.capturingID != nil }
     private var isFailed: Bool { model.failure != nil }
-    private var isActive: Bool { model.isBusy || isFailed }
+    private var isActive: Bool { model.isBusy || isMeetingRecording || isFailed }
     private var hovering: Bool { hover.isHovering }
-    private var isOpen: Bool { model.isBusy || hovering }
+    private var isOpen: Bool { model.isBusy || isMeetingRecording || hovering }
     private var showsControls: Bool { model.isBusy && !model.isHeldSession }
     private var finishesOnClick: Bool { showsControls && isRecording }
-    private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.38, bounce: 0.28) }
+    private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.3, bounce: 0) }
 
     var body: some View {
         VStack(spacing: 5) {
@@ -25,6 +27,7 @@ struct CapsuleView: View {
         .padding(.bottom, 6)
         .frame(width: 440, height: 160)
         .animation(spring, value: model.phase)
+        .animation(spring, value: model.meetings.activity)
         .animation(spring, value: hovering)
         .onChange(of: model.phase) {
             guard let failure = model.failure else { return }
@@ -43,8 +46,12 @@ struct CapsuleView: View {
 
     private var tooltip: some View {
         HStack(spacing: 4) {
-            Text("Dictate")
-            Text(model.settings.shortcut.displayName).fontWeight(.bold)
+            if hoveringMeeting {
+                Text("Record meeting")
+            } else {
+                Text("Dictate")
+                Text(model.settings.shortcut.displayName).fontWeight(.bold)
+            }
         }
         .font(.system(size: 13))
         .foregroundStyle(.white)
@@ -54,7 +61,7 @@ struct CapsuleView: View {
         .overlay { Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1) }
         .transition(.offset(y: 4).combined(with: .opacity))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Dictate with \(model.settings.shortcut.spokenName)")
+        .accessibilityLabel(hoveringMeeting ? "Record meeting" : "Dictate with \(model.settings.shortcut.spokenName)")
     }
 
     private func failureCard(_ failure: DictationFailure) -> some View {
@@ -115,43 +122,104 @@ struct CapsuleView: View {
     }
 
     private var pill: some View {
-        HStack(spacing: 8) {
+        Group {
             if model.isBusy {
-                if showsControls {
-                    roundButton("xmark", label: "Cancel dictation", action: model.cancelRecording)
+                recordingPill
+            } else if hovering || isMeetingRecording {
+                HStack(spacing: 4) {
+                    Button(action: model.toggleRecording) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 28)
+                            .background(.black, in: Capsule())
+                            .overlay { Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Start dictation")
+                    .accessibilityLabel("Start dictation")
+                    meetingButton
                 }
-                Waveform(mode: waveformMode, animated: !reduceMotion)
-                    .transition(.scale(scale: 0.4).combined(with: .opacity))
-                    .accessibilityLabel(waveformLabel)
-                    .accessibilityValue(isRecording ? "\(Int((model.voiceLevels.values.last ?? 0) * 100)) percent" : "")
-                if finishesOnClick {
-                    stopMark
-                }
-            } else if hovering {
-                Button(action: model.toggleRecording) {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 42, height: 24)
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .help("Start dictation")
-                .accessibilityLabel("Start dictation")
-                .transition(.scale(scale: 0.3).combined(with: .opacity))
+            } else {
+                Capsule()
+                    .fill(.black.opacity(0.6))
+                    .frame(width: 40, height: 9)
+                    .overlay { Capsule().strokeBorder(isFailed ? .red.opacity(0.85) : .white.opacity(0.5), lineWidth: 1) }
             }
         }
-        .padding(.horizontal, showsControls ? 5 : model.isBusy ? 14 : 4)
-        .frame(minWidth: isOpen ? nil : 40, minHeight: isOpen ? 32 : 9)
-        .background(isOpen ? Color(white: 0.07) : .black.opacity(0.6), in: Capsule())
-        .overlay { Capsule().strokeBorder(isFailed ? Color.red.opacity(0.85) : .white.opacity(isOpen ? 0.16 : 0.5), lineWidth: 1) }
         .shadow(color: .black.opacity(isOpen ? 0.3 : 0), radius: 8, y: 2)
-        .contentShape(Capsule())
-        .onTapGesture { if finishesOnClick { model.toggleRecording() } }
-        .help(finishesOnClick ? "Click to finish dictation" : "")
         .accessibilityElement(children: .contain)
         .modifier(Shake(animatableData: CGFloat(shakes)))
         .padding(.bottom, 10)
+    }
+
+    private var recordingPill: some View {
+        HStack(spacing: 18) {
+            Waveform(mode: waveformMode, animated: !reduceMotion)
+                .frame(width: 30)
+                .accessibilityLabel(waveformLabel)
+                .accessibilityValue(isRecording ? "\(Int((model.voiceLevels.values.last ?? 0) * 100)) percent" : "")
+            if finishesOnClick {
+                stopMark
+            } else if showsControls {
+                roundButton("xmark", label: "Cancel dictation", action: model.cancelRecording)
+            }
+        }
+        .padding(.leading, 20)
+        .padding(.trailing, showsControls ? 10 : 20)
+        .frame(height: 48)
+        .background(.black, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(isRecording ? Color(red: 0, green: 0.73, blue: 0.51) : .white.opacity(0.2),
+                                   lineWidth: isRecording ? 3 : 1)
+        }
+        .contentShape(Capsule())
+        .onTapGesture { if finishesOnClick { model.toggleRecording() } }
+        .help(finishesOnClick ? "Click to finish dictation. Right-click to cancel." : "")
+        .contextMenu {
+            Button("Cancel dictation", action: model.cancelRecording)
+        }
+        .accessibilityAction(named: Text("Cancel dictation"), model.cancelRecording)
+    }
+
+    private var meetingButton: some View {
+        HStack(spacing: 0) {
+            Button {
+                if isMeetingRecording {
+                    model.meetings.stop()
+                } else {
+                    model.startMeeting()
+                    model.onShowDashboard?()
+                }
+            } label: {
+                Image(systemName: isMeetingRecording ? "stop.circle.fill" : "record.circle")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(isMeetingRecording ? .red : .white)
+                    .frame(width: 28, height: 28)
+                    .background(.white.opacity(hoveringMeeting || isMeetingRecording ? 0.12 : 0), in: Circle())
+                    .contentShape(Circle())
+            }
+            .help(isMeetingRecording ? "Stop meeting" : "Start meeting")
+            .accessibilityLabel(isMeetingRecording ? "Stop meeting" : "Start meeting")
+            .disabled(model.meetings.activity != .idle && !isMeetingRecording)
+            Button {
+                model.selectedPage = .meetings
+                model.onShowDashboard?()
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 22, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .help("Open meeting notes")
+            .accessibilityLabel("Open meeting notes")
+        }
+        .buttonStyle(.plain)
+        .background(Color(white: 0.09), in: Capsule())
+        .overlay { Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1) }
+        .onHover { hoveringMeeting = $0 }
     }
 
     private var waveformMode: Waveform.Mode {
@@ -171,11 +239,11 @@ struct CapsuleView: View {
     }
 
     private var stopMark: some View {
-        Image(systemName: "stop.fill")
-            .font(.system(size: 8, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: 22, height: 22)
-            .background(Color.red, in: Circle())
+        RoundedRectangle(cornerRadius: 3)
+            .fill(.white)
+            .frame(width: 12, height: 12)
+            .frame(width: 32, height: 32)
+            .background(Color(red: 0.30, green: 0.29, blue: 0.26), in: Circle())
             .transition(.scale(scale: 0.3).combined(with: .opacity))
             .accessibilityLabel("Finish dictation")
             .accessibilityAddTraits(.isButton)
@@ -187,7 +255,7 @@ struct CapsuleView: View {
             Image(systemName: symbol)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white.opacity(0.85))
-                .frame(width: 22, height: 22)
+                .frame(width: 32, height: 32)
                 .background(.white.opacity(0.16), in: Circle())
                 .contentTransition(.symbolEffect(.replace))
         }
@@ -206,7 +274,7 @@ private struct Waveform: View {
 
     let mode: Mode
     let animated: Bool
-    private static let count = 11
+    private static let count = 5
 
     var body: some View {
         if animated && mode != .waiting {
@@ -219,7 +287,7 @@ private struct Waveform: View {
     }
 
     private func bars(at date: Date) -> some View {
-        HStack(spacing: 2.5) {
+        HStack(spacing: 3) {
             ForEach(0..<Self.count, id: \.self) { index in
                 Capsule()
                     .fill(.white.opacity(mode == .waiting ? 0.4 : 0.95))
@@ -239,7 +307,7 @@ private struct Waveform: View {
             return 0
         case .listening(let levels):
             let level = CGFloat(levels.value(at: date))
-            let envelope = 1 - 0.5 * distance * distance
+            let envelope = 1 - 0.85 * distance * distance
             let motion = animated ? 0.75 + 0.125 * (sin(time * 9.1 + position * 1.7) + sin(time * 5.3 + position * 0.8) + 2) / 2 : 1
             return level * envelope * motion
         case .processing:

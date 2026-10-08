@@ -128,11 +128,23 @@ try {
       fallback.includes('aria-label="BetterWispr on GitHub"'),
     "Loading keeps a usable GitHub link without a fabricated count",
   );
+  const homepage = await readFile("dist/index.html", "utf8");
+  const menuButton = homepage.match(
+    /<button\b[^>]*aria-controls="navigation-links"[^>]*>/,
+  )?.[0];
   assert.ok(
-    renderToStaticMarkup(createElement(StarOnGithub)).includes(
-      "Star on GitHub",
-    ),
-    "The hero retains its original star action",
+    menuButton?.includes('aria-expanded="false"') &&
+      menuButton.includes('aria-label="Open menu"'),
+    "The mobile navigation starts collapsed with a named toggle",
+  );
+  const hero = homepage.match(
+    /<section\b[^>]*aria-labelledby="hero-title"[^>]*>([\s\S]*?)<\/section>/,
+  )?.[1];
+  assert.ok(hero, "The homepage renders its hero");
+  assert.deepEqual(
+    [...hero.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((match) => match[1]),
+    ["https://github.com/KartikLabhshetwar/betterwispr/releases/latest"],
+    "The hero has only the macOS download action",
   );
 } finally {
   await vite.close();

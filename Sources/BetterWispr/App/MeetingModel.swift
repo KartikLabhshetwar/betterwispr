@@ -88,7 +88,7 @@ final class MeetingModel {
         work = Task { [weak self] in
             do {
                 if model.engine == .apple { try AppleSpeechProvider.checkAvailability(language: language) }
-                let provider = Self.makeProvider(for: model)
+                let provider = model.makeProvider()
                 try await provider.prepare(model: model, download: false)
                 try Task.checkCancellation()
                 guard let self, self.session == token else { return }
@@ -320,11 +320,4 @@ final class MeetingModel {
         }
     }
 
-    private static func makeProvider(for model: SpeechModel) -> any SpeechProvider {
-        switch model.engine {
-        case .apple: AppleSpeechProvider()
-        case .whisperKit: WhisperKitProvider()
-        case .parakeet: ParakeetProvider()
-        }
-    }
 }

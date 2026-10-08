@@ -32,10 +32,26 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
                                                kVK_F20].map(UInt32.init))
 
     public init?(keyCode: UInt32, modifiers: ShortcutModifiers, key: String) {
-        guard !key.isEmpty,
-              Self.functionKeyCodes.contains(keyCode) || !modifiers.isDisjoint(with: [.control, .option, .command]) else { return nil }
+        guard !key.isEmpty else { return nil }
+        if Self.modifier(for: keyCode) != nil {
+            guard modifiers.isEmpty else { return nil }
+        } else {
+            guard Self.functionKeyCodes.contains(keyCode) || !modifiers.isDisjoint(with: [.control, .option, .command]) else { return nil }
+        }
         self.init(validKeyCode: keyCode, modifiers: modifiers, key: key)
     }
+
+    public static func modifier(for keyCode: UInt32) -> ShortcutModifiers? {
+        switch Int(keyCode) {
+        case kVK_Control, kVK_RightControl: .control
+        case kVK_Option, kVK_RightOption: .option
+        case kVK_Shift, kVK_RightShift: .shift
+        case kVK_Command, kVK_RightCommand: .command
+        default: nil
+        }
+    }
+
+    public var isModifierOnly: Bool { modifiers.isEmpty && Self.modifier(for: keyCode) != nil }
 
     private init(validKeyCode keyCode: UInt32, modifiers: ShortcutModifiers, key: String) {
         self.keyCode = keyCode
@@ -49,7 +65,7 @@ public struct DictationShortcut: Codable, Equatable, Sendable {
                                                modifiers: try container.decode(ShortcutModifiers.self, forKey: .modifiers),
                                                key: try container.decode(String.self, forKey: .key)) else {
             throw DecodingError.dataCorruptedError(forKey: .modifiers, in: container,
-                                                   debugDescription: "A shortcut needs Control, Option or Command with a key, or a function key.")
+                                                   debugDescription: "A shortcut needs a modifier key alone, Control, Option or Command with a key, or a function key.")
         }
         self = shortcut
     }

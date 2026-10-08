@@ -113,6 +113,13 @@
   .comparison-link {
     @apply grid grid-cols-[1fr_auto] items-center gap-6 border-b border-zinc-200 py-8 transition-colors duration-700 ease-fluid hover:bg-zinc-50 sm:grid-cols-[auto_1fr_auto] lg:grid-cols-[auto_1fr_auto_auto];
   }
+  .home-hero .download-cta {
+    @apply min-h-13 w-full bg-white px-6 text-[#00159d] hover:bg-white/90 sm:w-auto;
+  }
+  .home-hero a:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 4px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

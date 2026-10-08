@@ -102,10 +102,21 @@ CLI. Neither recognizes microphone audio.
   ⌃⌥D. ⌥ Space no longer starts dictation; the new shortcut works in hold and
   toggle mode and is still set after relaunch. While recording a shortcut, Esc
   cancels and keeps the old one. Held modifiers show on the button as you press
-  them. A letter alone or with only ⇧, Fn, or modifiers released without a key
-  beep, say why under the label and keep listening. An F-key alone such as F5 is
-  accepted. A shortcut another app holds shows a toast and the old one keeps
+  them. A letter alone or with only ⇧, Fn, or multiple modifiers released without
+  a key are refused with feedback. An F-key alone such as F5 is accepted.
+  A shortcut another app holds shows a toast and the old one keeps
   working. Reset restores ⌥ Space.
+- [ ] In Settings, press and release left Option alone. With Accessibility enabled,
+  it saves as Left Option, works in hold and toggle mode inside BetterWispr and
+  TextEdit, and survives relaunch. Repeat for right Option, Control, Shift and
+  Command. The opposite-side key alone must not trigger dictation. Releasing the
+  chosen key must finish hold mode even if another modifier is down. Recording
+  ⌥ Space must still save the combination, not Option alone. Cancelling capture,
+  leaving Settings and resetting must remove the temporary listeners.
+- [ ] With Accessibility denied, selecting a modifier-only shortcut explains the
+  required permission and keeps the previous shortcut. Revoke permission with a
+  saved modifier shortcut, relaunch, then grant it again and return to BetterWispr;
+  the saved shortcut resumes working. Ordinary combinations remain available.
 - [ ] Disconnect the input device during capture; retry after reconnecting.
 - [ ] Move between Spaces, fullscreen windows and monitors. Confirm capsule
   positioning, keyboard controls, VoiceOver labels and reduced-motion behavior.
@@ -189,6 +200,12 @@ CLI. Neither recognizes microphone audio.
 
 None of these have been run yet.
 
+- [ ] Close the dashboard and hover over the floating capsule. The meeting button
+  appears beside the microphone, with "Record meeting" on hover. Click it: the
+  dashboard reopens to Meetings and recording starts. Move the pointer away: the
+  red Stop meeting button stays visible and stops capture when clicked. While
+  finishing or writing notes, a second meeting cannot be started. With an
+  uninstalled model selected, the button opens Models with the download message.
 - [ ] Start the first meeting on macOS 14.2 or later. macOS asks for system audio
   access with the `NSAudioCaptureUsageDescription` text. Allow it, play a video
   call or any audio, and confirm "Them" bubbles appear and the Them meter moves.

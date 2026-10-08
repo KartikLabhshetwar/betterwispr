@@ -6,6 +6,7 @@ public enum DictationMode: String, Codable, CaseIterable, Sendable {
 
 public struct AppSettings: Codable, Equatable, Sendable {
     public var selectedModelID: String = "apple"
+    public var speechConnections: [SpeechConnection] = []
     public var language: String = "auto"
     public var autoPaste: Bool = true
     public var copyToClipboard: Bool = true
@@ -21,6 +22,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         selectedModelID = try container.decode(String.self, forKey: .selectedModelID)
+        speechConnections = try container.decodeIfPresent([SpeechConnection].self, forKey: .speechConnections) ?? []
         language = try container.decode(String.self, forKey: .language)
         autoPaste = try container.decode(Bool.self, forKey: .autoPaste)
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? true

@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import DownloadCTA, { ClosingCTA } from "@/components/download-cta";
 import HeroDemo from "@/components/hero-demo";
 import FeatureBento from "@/components/feature-bento";
-import StarOnGithub from "@/components/star-on-github";
 import { comparisons } from "@/lib/comparisons";
 import { pageHead } from "@/lib/seo";
 
@@ -56,43 +55,66 @@ const FAQS = [
 function HomeComponent() {
   return (
     <>
-      <section className="page-shell pt-16 pb-12 text-center sm:pt-24">
-        <p className="eyebrow">A little less typing. A little more thinking.</p>
-        <h1 className="mx-auto mt-6 max-w-[680px] bg-linear-to-r from-black to-[#666666] bg-clip-text text-5xl tracking-tight text-transparent sm:text-7xl">
-          Hold to talk.
-          <br />
-          Release to type.
-        </h1>
-        <p className="mx-auto mt-6 max-w-[680px] text-lg text-zinc-600">
-          Your thoughts, in the app you’re already using. Hold{" "}
-          <kbd className="whitespace-nowrap font-medium text-zinc-900">
-            ⌥ Space
-          </kbd>
-          , speak naturally, and let BetterWispr do the typing. Speech stays on
-          your Mac.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <DownloadCTA />
-          <StarOnGithub />
+      <section
+        className="home-hero relative isolate overflow-hidden bg-[#00159d] text-white"
+        aria-labelledby="hero-title"
+      >
+        <div className="page-shell relative z-10 pt-10 pb-6 text-center sm:pt-14 sm:pb-8 lg:flex lg:min-h-[640px] lg:items-center lg:py-20 lg:text-left">
+          <div className="mx-auto max-w-xl lg:mx-0 lg:w-1/2">
+            <p className="eyebrow text-white/75">
+              A little less typing. A little more thinking.
+            </p>
+            <h1
+              id="hero-title"
+              className="mt-5 text-[clamp(2.125rem,10vw,3.5rem)] leading-[1.08] tracking-tight lg:mt-6 lg:text-6xl xl:text-7xl"
+            >
+              Hold to talk.
+              <br />
+              Release to type.
+            </h1>
+            <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-white/85 sm:text-lg lg:mx-0 lg:mt-6">
+              Your thoughts, in the app you’re already using. Hold{" "}
+              <kbd className="whitespace-nowrap font-medium text-white">
+                ⌥ Space
+              </kbd>
+              , speak naturally, and let BetterWispr do the typing. Speech stays on
+              your Mac.
+            </p>
+            <div className="mt-6 lg:mt-8">
+              <DownloadCTA />
+            </div>
+            <p className="mt-3 text-xs leading-relaxed text-white/75 sm:text-sm lg:mt-4">
+              Free · macOS 14+
+              <span className="block sm:inline">
+                <span className="hidden sm:inline"> · </span>
+                Apple Silicon recommended
+              </span>
+            </p>
+            <ul
+              className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-white/85 sm:text-sm lg:mt-8 lg:justify-start lg:gap-x-6"
+              aria-label="Product essentials"
+            >
+              {["No account", "Local speech models", "Your vocabulary"].map(
+                (text) => (
+                  <li key={text} className="flex items-center gap-2">
+                    <CheckIcon className="size-4" />
+                    {text}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
         </div>
-        <p className="mt-4 text-sm text-zinc-500">
-          Free · macOS 14+ · Apple Silicon recommended
-        </p>
-        <ul
-          className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-zinc-600"
-          aria-label="Product essentials"
-        >
-          {["No account", "Local speech models", "Your vocabulary"].map(
-            (text) => (
-              <li key={text} className="flex items-center gap-2">
-                <CheckIcon className="size-4" />
-                {text}
-              </li>
-            ),
-          )}
-        </ul>
+        <img
+          src="/assets/hero-statue.png"
+          alt=""
+          width={1672}
+          height={941}
+          fetchPriority="high"
+          className="h-[clamp(240px,75vw,360px)] w-full object-cover object-right lg:absolute lg:inset-0 lg:h-full"
+        />
       </section>
-      <section className="page-shell pb-20">
+      <section className="page-shell py-12 sm:py-20">
         <HeroDemo />
       </section>
 

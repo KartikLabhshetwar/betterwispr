@@ -38,7 +38,7 @@ final class AppModel {
     var history: [Transcript] = []
     var vocabulary: [VocabularyEntry] = []
     var settings = AppSettings()
-    let models = SpeechModel.catalog
+    var models: [SpeechModel] { SpeechModel.catalog + settings.speechConnections.map(\.speechModel) }
     let updater = AppUpdater()
     let meetings = MeetingModel()
     var preparingModelID: String?
@@ -49,6 +49,7 @@ final class AppModel {
     var accessibilityGranted = AXIsProcessTrusted()
     var onPresentationChange: (() -> Void)?
     var onShowCapsule: (() -> Void)?
+    var onShowDashboard: (() -> Void)?
 
     @ObservationIgnored private let store = LocalStore()
     @ObservationIgnored private let recorder = AudioRecorder()
@@ -208,7 +209,7 @@ final class AppModel {
         let language = settings.language == "auto" ? nil : settings.language
         let entries = vocabulary
         phase = .transcribing
-        statusMessage = "Transcribing on your Mac…"
+        statusMessage = model.engine == .api ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
         operation = Task { [weak self] in
             defer {
                 try? FileManager.default.removeItem(at: audio.url)
@@ -288,7 +289,7 @@ final class AppModel {
             observe(provider, token: token)
             return
         }
-        let next = Self.makeProvider(for: model)
+        let next = model.makeProvider()
         observe(next, token: token)
         loading = nil
         preparedModelID = nil
@@ -303,7 +304,7 @@ final class AppModel {
     @discardableResult
     private func load(_ model: SpeechModel) -> Task<Void, any Error> {
         if let loading, loading.id == model.id { return loading.task }
-        let next = Self.makeProvider(for: model)
+        let next = model.makeProvider()
         preparedModelID = nil
         provider = next
         let task = Task { [weak self] in
@@ -318,7 +319,7 @@ final class AppModel {
 
     private func warmUpSelectedModel() {
         let model = selectedModel
-        guard model.engine != .apple, isModelInstalled(model), preparedModelID != model.id else { return }
+        guard model.engine != .apple, model.engine != .api, isModelInstalled(model), preparedModelID != model.id else { return }
         load(model)
     }
 
@@ -333,16 +334,8 @@ final class AppModel {
         }
     }
 
-    private static func makeProvider(for model: SpeechModel) -> any SpeechProvider {
-        switch model.engine {
-        case .apple: AppleSpeechProvider()
-        case .whisperKit: WhisperKitProvider()
-        case .parakeet: ParakeetProvider()
-        }
-    }
-
     func installModel(_ model: SpeechModel) {
-        guard !isBusy else { return }
+        guard !isBusy, model.engine != .api else { return }
         let token = UUID()
         generation = token
         preparingModelID = model.id
@@ -399,6 +392,8 @@ final class AppModel {
     func selectModel(_ model: SpeechModel) {
         guard !isBusy else { return }
         settings.selectedModelID = model.id
+        provider?.cancel()
+        loading?.task.cancel()
         provider = nil
         preparedModelID = nil
         loading = nil
@@ -408,7 +403,65 @@ final class AppModel {
 
     func isModelInstalled(_ model: SpeechModel) -> Bool {
         _ = modelRevision
-        return model.engine == .apple || installedModelIDs.contains(model.id)
+        return model.engine == .apple || model.engine == .api || installedModelIDs.contains(model.id)
+    }
+
+    var canEditConnections: Bool { !isBusy && meetings.activity == .idle }
+
+    func saveConnection(_ connection: SpeechConnection, key: String?) throws {
+        guard canEditConnections else { throw SpeechError.busy }
+        _ = try connection.validatedURL()
+        let keys = SpeechAPIKeyStore()
+        let previousKey = try keys.read(for: connection)
+        let newKey = key ?? previousKey ?? ""
+        try connection.validateAPIKey(newKey)
+        let previous = settings
+        let oldConnection = settings.speechConnections.first { $0.id == connection.id }
+        try keys.save(newKey, for: connection)
+        if let index = settings.speechConnections.firstIndex(where: { $0.id == connection.id }) {
+            settings.speechConnections[index] = connection
+        } else {
+            settings.speechConnections.append(connection)
+        }
+        do { try persist() }
+        catch {
+            settings = previous
+            try keys.save(previousKey ?? "", for: connection)
+            throw error
+        }
+        if settings.selectedModelID == connection.speechModel.id {
+            provider?.cancel()
+            loading?.task.cancel()
+            provider = nil
+            preparedModelID = nil
+            loading = nil
+        }
+        if let oldConnection, oldConnection.keychainAccount != connection.keychainAccount {
+            do { try keys.save("", for: oldConnection) }
+            catch { statusMessage = "Connection saved, but its previous Keychain entry could not be removed: \(error.localizedDescription)" }
+        }
+    }
+
+    func deleteConnection(_ connection: SpeechConnection) throws {
+        guard canEditConnections else { throw SpeechError.busy }
+        let keys = SpeechAPIKeyStore()
+        let previousKey = try keys.read(for: connection)
+        let previous = settings
+        try keys.save("", for: connection)
+        settings.speechConnections.removeAll { $0.id == connection.id }
+        if settings.selectedModelID == connection.speechModel.id { settings.selectedModelID = "apple" }
+        do { try persist() }
+        catch {
+            settings = previous
+            try keys.save(previousKey ?? "", for: connection)
+            throw error
+        }
+        provider?.cancel()
+        loading?.task.cancel()
+        provider = nil
+        preparedModelID = nil
+        loading = nil
+        warmUpSelectedModel()
     }
 
     private func refreshModels() {
@@ -525,7 +578,9 @@ final class AppModel {
 
     func refreshPermissions() {
         microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let previouslyGranted = accessibilityGranted
         accessibilityGranted = AXIsProcessTrusted()
+        if previouslyGranted != accessibilityGranted, settings.shortcut.isModifierOnly, !isBusy { registerShortcut() }
     }
 
     func showCapsule() { onShowCapsule?() }

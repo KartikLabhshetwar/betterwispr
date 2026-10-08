@@ -62,6 +62,7 @@ func run() async throws {
     case .apple: throw CLIError.usage("Apple speech requires permissions granted through the macOS app. Select a Parakeet or Whisper model in the CLI.")
     case .whisperKit: provider = WhisperKitProvider()
     case .parakeet: provider = ParakeetProvider()
+    case .api: throw CLIError.usage("Configure API connections in the macOS app. The CLI uses local models only.")
     }
     let clock = ContinuousClock()
     let started = clock.now

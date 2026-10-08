@@ -39,7 +39,7 @@ import Testing
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }
 
-@Test func shortcutsNeedACommandKeyOrFunctionKeyAndRoundTripThroughSettings() throws {
+@Test func shortcutsValidateKeysAndRoundTripThroughSettings() throws {
     #expect(DictationShortcut.optionSpace.displayName == "⌥ Space")
     #expect(DictationShortcut.optionSpace.spokenName == "Option Space")
     let everything = try #require(DictationShortcut(keyCode: 40, modifiers: [.command, .shift, .option, .control], key: "K"))
@@ -62,6 +62,16 @@ import Testing
     #expect(throws: DecodingError.self) {
         try JSONDecoder().decode(DictationShortcut.self, from: Data(#"{"keyCode":2,"modifiers":512,"key":"D"}"#.utf8))
     }
+}
+
+@Test(arguments: [54, 55, 56, 58, 59, 60, 61, 62])
+func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
+    var settings = AppSettings()
+    settings.shortcut = try #require(DictationShortcut(keyCode: keyCode, modifiers: [], key: "Modifier"))
+    #expect(settings.shortcut.isModifierOnly)
+    #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings)) == settings)
+    #expect(DictationShortcut(keyCode: keyCode, modifiers: .option, key: "Modifier") == nil)
+    #expect(!DictationShortcut.optionSpace.isModifierOnly)
 }
 
 @Test func cleanerDropsMidSentenceFillersAndKeepsPrecedingPunctuation() {

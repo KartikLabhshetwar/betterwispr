@@ -45,7 +45,7 @@ struct OnboardingView: View {
             Text("Hold \(model.settings.shortcut.displayName) anywhere and speak. Release it, and your words appear where your cursor is.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Label("Everything runs on your Mac. No audio leaves it.", systemImage: "lock.fill")
+            Label("Built-in models keep your audio on this Mac.", systemImage: "lock.fill")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .padding(.top, 8)
@@ -99,7 +99,7 @@ struct OnboardingView: View {
             }
         } label: {
             Text(selected.name)
-            Text(model.isModelInstalled(selected) ? "Ready to use offline." : "Not downloaded yet.")
+            Text(selected.engine == .api ? "Uses your configured API endpoint." : model.isModelInstalled(selected) ? "Ready to use offline." : "Not downloaded yet.")
         }
     }
 

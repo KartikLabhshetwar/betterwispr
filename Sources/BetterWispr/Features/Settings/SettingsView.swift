@@ -71,11 +71,11 @@ struct SettingsView: View {
 
             Section {
                 PermissionRow(title: "Microphone", detail: "Needed to hear your voice.", granted: model.microphoneGranted, action: model.requestMicrophone)
-                PermissionRow(title: "Accessibility", detail: "Optional. Lets BetterWispr paste text into other apps.", granted: model.accessibilityGranted, action: model.requestAccessibility)
+                PermissionRow(title: "Accessibility", detail: "Needed for automatic paste and modifier-only shortcuts.", granted: model.accessibilityGranted, action: model.requestAccessibility)
             } header: {
                 Text("Permissions")
             } footer: {
-                Label("Speech is processed on this Mac. Audio is not kept after dictation. Downloading a model is the only time Whisper needs the internet.", systemImage: "lock.shield")
+                Label("Built-in models process speech on this Mac. A selected API connection sends audio to its endpoint. Temporary recordings are removed after processing; external providers control their own retention.", systemImage: "lock.shield")
                     .foregroundStyle(.secondary)
             }
         }
@@ -95,6 +95,7 @@ private struct ShortcutRecorder: View {
     let model: AppModel
     @State private var monitor: Any?
     @State private var held: ShortcutModifiers = []
+    @State private var modifierCandidate: DictationShortcut?
     @State private var feedback: String?
 
     private var isCapturing: Bool { monitor != nil }
@@ -114,15 +115,16 @@ private struct ShortcutRecorder: View {
                 }
                 recordButton
                     .accessibilityLabel(isCapturing ? "Keyboard shortcut, waiting for keys" : "Keyboard shortcut, \(shortcut.spokenName)")
-                    .accessibilityHint("Click, then press a new shortcut, like Option Space or F5.")
+                    .accessibilityHint("Click, then press a shortcut, or press and release a modifier key such as Option.")
             }
             .disabled(model.isBusy)
         } label: {
             Text("Keyboard shortcut")
             if isCapturing {
-                Text(feedback ?? "Hold ⌃, ⌥ or ⌘ and press a key, or press an F-key. Esc cancels.")
+                Text(feedback ?? "Press and release ⌃, ⌥, ⇧ or ⌘ alone, use a key combination, or press an F-key. Esc cancels.")
             } else {
                 Text(model.settings.dictationMode == .hold ? "Hold to speak. Release to finish." : "Press once to speak. Press again or click the capsule to finish.")
+                if shortcut.isModifierOnly { Text("Requires Accessibility permission. Uses the left or right key you recorded.") }
             }
         }
         .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
@@ -141,6 +143,7 @@ private struct ShortcutRecorder: View {
 
     private func start() {
         held = []
+        modifierCandidate = nil
         feedback = nil
         model.suspendShortcut()
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
@@ -153,6 +156,7 @@ private struct ShortcutRecorder: View {
         guard let monitor else { return }
         NSEvent.removeMonitor(monitor)
         self.monitor = nil
+        modifierCandidate = nil
         model.registerShortcut()
     }
 
@@ -160,6 +164,7 @@ private struct ShortcutRecorder: View {
         let flags = event.modifierFlags
         let modifiers = ShortcutModifiers(Self.modifierFlags.filter { flags.contains($0.flag) }.map(\.modifier))
         guard event.type == .keyDown else { return modifiersChanged(to: modifiers, keyCode: Int(event.keyCode)) }
+        modifierCandidate = nil
         if Int(event.keyCode) == kVK_Escape, modifiers.isEmpty { return stop() }
         let key = Self.keyNames[Int(event.keyCode)] ?? event.characters(byApplyingModifiers: [])?.uppercased() ?? ""
         guard let shortcut = DictationShortcut(keyCode: UInt32(event.keyCode), modifiers: modifiers, key: key) else {
@@ -173,12 +178,20 @@ private struct ShortcutRecorder: View {
     }
 
     private func modifiersChanged(to modifiers: ShortcutModifiers, keyCode: Int) {
+        if let candidate = modifierCandidate, candidate.keyCode == UInt32(keyCode), modifiers.isEmpty {
+            model.changeShortcut(candidate)
+            return stop()
+        }
+        modifierCandidate = nil
         if keyCode == kVK_Function {
-            feedback = "Fn can’t be a shortcut. Hold ⌃, ⌥ or ⌘ and press a key."
+            feedback = "Fn can’t be a shortcut. Try ⌥ alone or an F-key such as F5."
         } else if held.isEmpty, !modifiers.isEmpty {
             feedback = nil
+            if modifiers == DictationShortcut.modifier(for: UInt32(keyCode)), let key = Self.keyNames[keyCode] {
+                modifierCandidate = DictationShortcut(keyCode: UInt32(keyCode), modifiers: [], key: key)
+            }
         } else if !modifiers.isSuperset(of: held), feedback == nil {
-            feedback = "\(held.symbols) needs a key too. Hold it and press one, like \(held.symbols) Space."
+            feedback = "Press and release one modifier alone, or hold the modifiers and press another key."
         }
         held = modifiers
     }
@@ -188,6 +201,8 @@ private struct ShortcutRecorder: View {
     ]
 
     private static let keyNames: [Int: String] = [
+        kVK_Control: "Left Control", kVK_RightControl: "Right Control", kVK_Option: "Left Option", kVK_RightOption: "Right Option",
+        kVK_Shift: "Left Shift", kVK_RightShift: "Right Shift", kVK_Command: "Left Command", kVK_RightCommand: "Right Command",
         kVK_Space: "Space", kVK_Return: "Return", kVK_Tab: "Tab", kVK_Delete: "Delete", kVK_ForwardDelete: "Forward Delete",
         kVK_Escape: "Esc", kVK_Home: "Home", kVK_End: "End", kVK_PageUp: "Page Up", kVK_PageDown: "Page Down",
         kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",

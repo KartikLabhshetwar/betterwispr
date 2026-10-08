@@ -4,16 +4,31 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-08
 
 ### Added
+- Native macOS dictation app with a global ⌥ Space shortcut, paste into the focused app and transcript history.
+- Local speech models: Apple speech, Parakeet TDT v3 (25 European languages) and v2 (English) through FluidAudio, and Whisper large-v3 turbo through WhisperKit.
+- Compact recording overlay with an idle pill, a hover tooltip showing the chosen shortcut and a dictate button.
+- Three-step welcome guide on first launch: intro, permissions, model and first dictation. Replay it from the menu bar.
+- Personal vocabulary with spelling hints and whole-phrase replacements, plus local model management.
+- Optional local phrase booster for Parakeet vocabulary. Download it explicitly from the Vocabulary page to help recognize names and technical terms. The English-only booster runs with English or automatic language selection, preserves punctuation around replaced words, and loads installed assets offline.
 - Hold-to-talk dictation, now the default: hold ⌥ Space while speaking and release to finish. "Press to toggle" keeps the previous behavior and is set in Settings.
 - Change the dictation shortcut in Settings. Click the shortcut, press a new combination that includes ⌘, ⌥ or ⌃ or an F-key such as F5, or reset it to ⌥ Space. The recorder shows the keys you hold and says why a key it refuses can’t be used. Hints, menus and error cards show the shortcut you chose.
 - "Copy to clipboard" setting, on by default. When on, each dictation stays on the clipboard after it is pasted. When off, BetterWispr restores the previous clipboard, and with paste also off it leaves the clipboard alone. A blocked paste still copies so the text is never lost.
+- Settings for spoken language, input sensitivity, automatic paste, local transcript history, the floating capsule and opening at login.
 - Error card above the capsule with a shake and red outline for taps, early releases, missing speech, blocked paste and other failures. It dismisses itself after six seconds and respects Reduce Motion.
-- About section at the bottom of Settings with the app logo, version, a link to the source code and the author's X profile.
-- In-app updates from GitHub Releases through Sparkle 2. Check from Settings or the app menu, and choose whether BetterWispr checks daily and installs new versions on its own. Updates install only when their EdDSA signature matches the app's public key.
-- Meeting notes. Start a meeting from the Meetings page or the menu bar to record your microphone as "Me" and other apps' audio as "Them" (macOS 14.2 or later), follow a live transcript, and write your own notes. When it ends, Apple Intelligence writes a summary, key points, decisions and action items on this Mac. Without Apple Intelligence the transcript and your notes are still saved. Audio never leaves the Mac.
+- Toast confirmations for copy and delete, adapted from BetterShot's toast panel.
+- Menu bar icon switches to a microphone while recording.
+- App icon and in-app logo: a hand-drawn "w" on a light tile, shown on a dark tile in Dark Mode. `scripts/build-app.sh` renders the icon from the same SwiftUI view.
+- Dedicated About page with the app logo, version, source code and issue links, and the author's X profile.
+- In-app updates from GitHub Releases through Sparkle 2. Check from About or the app menu, and choose whether BetterWispr checks daily and installs new versions on its own. Updates install only when their EdDSA signature matches the app's public key.
+- Meeting notes. Start a meeting from the Meetings page or the menu bar to record your microphone as "Me" and other apps' audio as "Them" (macOS 14.2 or later), follow a live transcript, and write your own notes. When it ends, Apple Intelligence on a supported Mac running macOS 26 or later writes a summary, key points, decisions and action items locally. Without Apple Intelligence the transcript and your notes are still saved. Search saved meetings, mark action items complete and copy meeting notes and transcripts as Markdown. Audio never leaves the Mac.
+- Website with a typing and dictation demo, feature overview, comparison pages, download links, privacy and terms pages, and a dedicated changelog rendered from this file. Pages include static content and social previews.
+- `BetterWisprCLI` for local model downloads and file transcription, defaulting to `parakeet-v3`. Pass comma-separated spelling hints with `--vocabulary` or explicitly install the Parakeet booster with `--download-phrase-booster`.
+- Local transcript evaluation script reporting word error rate, character error rate and false speech on silent clips, with an accuracy evaluation plan.
+- `make dev` for local testing and `make ship` for a signed, notarized DMG and Sparkle update feed.
+- `VERSION` file and this changelog. The app bundle version is stamped from `VERSION` at build time.
 
 ### Changed
 - The app bundle's `CFBundleVersion` now follows `VERSION` instead of a fixed `1`, so Sparkle can tell releases apart.
@@ -24,19 +39,4 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Fixed
 - Paste into other apps stopped after every rebuild because ad-hoc signing changed the app's code requirement and macOS revoked Accessibility. `scripts/build-app.sh` now signs with a stable identity, and a blocked paste shows an Allow button instead of silently copying.
-- Dictation no longer pastes filler words or stutters. English "uh", "um", "er" and "hmm" and back-to-back repeats such as "which you which you" are removed before vocabulary replacements. Comma-separated repeats, numbers and common doubles such as "that that" and "long long" are kept, other languages are left as spoken, and history keeps the raw recognizer output.
-
-## [0.1.0] - 2026-10-08
-
-### Added
-- Native macOS dictation app with a global ⌥ Space shortcut, paste into the focused app and transcript history.
-- Local speech models: Apple speech, Parakeet TDT v3 (25 European languages) and v2 (English) through FluidAudio, and Whisper large-v3 turbo through WhisperKit.
-- Compact recording overlay: idle pill, "Dictate ⌥ Space" hover tooltip with a dictate button, live waveform with cancel and finish buttons.
-- Three-step welcome guide on first launch: intro, permissions, model and first dictation. Replay it from the menu bar.
-- Personal vocabulary and local model management.
-- Toast confirmations for copy, paste and delete, adapted from BetterShot's toast panel.
-- Menu bar icon switches to a microphone while recording.
-- App icon and in-app logo: a hand-drawn "w" on a light tile, shown on a dark tile in Dark Mode. `scripts/build-app.sh` renders the icon from the same SwiftUI view.
-- `BetterWisprCLI` for local model downloads and file transcription, defaulting to `parakeet-v3`.
-- `make dev` for local testing and `make ship` for a signed, notarized DMG.
-- `VERSION` file and this changelog. The app bundle version is stamped from `VERSION` at build time.
+- English transcript cleanup removes "uh", "um", "er", "hmm", "mm" and their supported spellings, set-off "you know", and unpunctuated back-to-back repeats such as "which you which you" before vocabulary replacements. It preserves "mm" after a numeric value, "you know?", punctuated repeats, numbers and common doubles such as "that that" and "long long". Language detection ignores fillers; other languages are left as spoken, and history keeps the raw recognizer output.

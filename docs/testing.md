@@ -6,6 +6,137 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Bluetooth playback check, 2026-10-09, version 0.1.3
+
+The user reported that YouTube audio in their AirPods lost quality while
+BetterWispr ran, but not while Wispr Flow ran. Their saved settings chose the
+AirPods as the microphone with Keep microphone ready enabled, so the AirPods
+input stayed open whenever the app ran. A Core Audio probe on the user's MacBook
+Pro read the AirPods output nominal rate as 48000 Hz idle, 24000 Hz while the
+AirPods microphone was captured, and 48000 Hz while the built-in microphone was
+captured. Keep microphone ready was removed, superseding the standby notes
+below, and while the lid is open Automatic now uses the built-in microphone
+instead of a Bluetooth default input. With AirPods as the macOS default input and
+output, a temporary test ran the shared `MicrophoneInput` path for 2 seconds
+per case. Automatic resolved to MacBook Pro Microphone, received 101,760 frames
+and left the AirPods output at 48000 Hz. Choosing the AirPods received 49,912
+frames and dropped the output to 24000 Hz. The test process had no microphone
+permission (status not determined), so this measured device selection and
+playback rate, not captured speech. `swift build` and `swift test` (89 tests)
+passed, and the new selection test fails when the Bluetooth check is reverted.
+Selection with the lid closed, and closing the lid during a recording, have not
+been exercised on hardware.
+
+## Microphone recovery check, 2026-10-08, version 0.1.3
+
+Audio follow-up: the user reported that engine recovery alone still clipped
+speech. Local diagnostics then measured 100 ms AVAudioEngine tap batches,
+Bluetooth format changes from 48 to 24 kHz, and a hardware startup call blocking
+the main thread for 2.56 seconds. The replacement input-only Audio Queue uses
+20 ms buffers and starts off the main actor. It leaves a running queue alone
+when the native rate changes. Live short dictations showed roughly 0.1–0.25 s
+recognition time, while cold AirPods starts delivered about half a second of
+zeros before nonzero input. These are individual diagnostic observations, not
+latency or recognition benchmarks. A short recording passed the volume gate
+but returned empty recognition, so lowering the gate alone would not solve it.
+
+The user explicitly chose the new opt-in “Keep microphone ready” setting to
+avoid repeated hardware wake-up. Its idle callback discards audio without any
+file or speech-provider access. Existing settings default to disabled.
+Automated coverage includes first-buffer/stop-boundary waiting, cancellation,
+timeout, quiet speech across buffer sizes, digital-silence waveform recovery,
+format conversion and the setting's backward-compatible decoding/round-trip.
+`swift build`, `swift test` (87 tests), app packaging, strict signature checking
+and both 0.1.3 bundle version fields passed. After enabling standby through the
+native Settings switch with the user's permission, no recording file was open
+while idle. The next AirPods dictation delivered a nonzero first buffer about
+57 ms after startup began and returned nonempty recognition in about 96 ms.
+The cold-start silent prelude was absent in that sample. The user subsequently
+reported continued clipping, incorrect words and no-speech failures with
+standby enabled, so that observation did not establish a fix. Physical
+Bluetooth/USB hot-plug remains manual.
+On 2026-10-09 the final build passed all 87 tests again and was relaunched;
+the saved standby choice reopened the AirPods input queue automatically.
+
+The 2026-10-09 follow-up found complete digital silence in some warm recordings
+(including a 12.4-second session), despite fast queue startup. The same synthetic
+spoken phrase converted to 24 and 48 kHz CAF transcribed correctly through the
+installed Parakeet model at both rates. This rules out a simple rate-conversion
+failure for those samples, not a live capture failure. Standby was opening a
+different queue from each recording; capture now shares one queue per device.
+`swift build` and all 88 tests passed, including delivery to overlapping
+subscribers, independent detach and exclusion of audio preceding attachment.
+App packaging, strict signature verification and both 0.1.3 version fields
+passed. In the launched app, four consecutive AirPods dictations attached to
+the original standby queue (two subscribers, no additional hardware starts),
+captured nonzero speech and returned nonempty recognition. The user reported
+that normal chat now felt like it was working well. This is positive dictation
+feedback, not a scored accuracy test. A live meeting with this shared stream
+and physical device switching remain unverified.
+
+Capsule follow-up: `swift build`, `swift test` (84 tests; live provider tests
+opt-in) and `./scripts/build-app.sh` passed. The rebuilt native app was launched;
+its compact 132 × 36 hands-free pill and separate cancel/finish controls were
+visually inspected. Clicking × stopped capture and displayed the cancellation
+card with Undo and a progress line. Automated checks cover quick-tap conversion,
+stale releases, single-use Undo, settings snapshots, dismissal/expiry audio
+cleanup and old timers not replacing a newer phase. Live held-shortcut timing,
+Undo transcription/paste into another app, sound quality and accessibility
+display settings remain manual checks.
+
+Further capsule refinement: the hands-free pill is now 108 × 28 points, with
+18-point circles inside 24-point hit areas; the notetaker pill is 60 × 26.
+Successful paste returns to idle without a completion card or announcement.
+Four original, locally bundled soft-pluck cues replace macOS alert sounds.
+`swift build`, `swift test` (87 tests), app packaging and strict code-signature
+verification passed. A separate app-bundle probe resolved and decoded all four
+sounds from its copied Resources folder. The rebuilt app's smaller hands-free
+pill and cancellation were visually checked. Live notetaker sizing, listening
+quality and successful-paste behavior remain manual checks.
+
+The subsequent refinement widens the notetaker pill to 100 × 26 points and
+replaces the synthesized cues with Kenney UI Audio clicks. Build, all 87 tests,
+app packaging and strict signature verification passed again; the updated app
+was relaunched while dictation and meeting capture were idle.
+
+Final sound refinement removes the generated and Kenney packs, including their
+download cache and the stale sound bundle in the packaged app. Only the local
+Wispr Flow default cues remain. All four local WAVs match their source bytes
+and decode with macOS `afinfo`; missing cues stay silent in the automated check.
+`swift build`, all 87 tests, app packaging and strict signature verification
+passed. Card expiry now uses an absolute monotonic deadline with zero tolerance
+so the Undo countdown and audio cleanup finish together.
+
+The supplied 23:43 crash report identifies a MainActor assertion in the Audio
+Queue microphone callback. Its explicit `@Sendable` annotation is retained and
+documented. After relaunching the rebuilt app, native microphone startup and
+two completed dictations were observed while the user interacted; the reported
+crash did not recur. This does not establish recognition accuracy or device
+switching behavior. Listening quality remains a user check.
+
+The duplicate-sound follow-up removes the post-insertion completion cue and
+its local WAV. Hold and hands-free dictation retain the recording-stop cue;
+notetaker has no feedback-sound calls. Build, all 87 tests, app packaging and
+strict signature verification passed. The app was relaunched after confirming
+both recording modes were idle. Live listening was not exercised in this pass.
+
+- `swift build` and `swift test` passed (82 tests; live notes-provider tests
+  remain opt-in). Synthetic checks cover dictation switches between 8, 16, 24,
+  44.1 and 48 kHz, mono/stereo conversion, repeated switches, meeting chunk
+  formats and offsets, and coalescing/cancelling engine notifications.
+- `./scripts/build-app.sh` produced a signed debug bundle with both version
+  fields set to `0.1.3`.
+- The rebuilt native app started capture with AirPods Pro explicitly selected.
+  Its temporary CAF grew beyond 1 MB; Escape returned to idle and removed it.
+  The microphone picker was switched to the built-in mic and back during
+  capture, with no displayed capture error, then the test was cancelled.
+- A separate command-line probe lacked microphone permission and did not
+  record. The native app used its existing permission. These checks establish
+  capture and cancellation, not speech-recognition accuracy.
+- Still pending: physical Bluetooth/USB connect and disconnect, Bluetooth
+  profile renegotiation, live meeting microphone/system-audio continuity,
+  denied permissions and testing on the minimum supported macOS version.
+
 ## Release check — 2026-10-08, version 0.1.0
 
 Base commit: `490ae9787842548c49bd70ad93a200f53062add0`, plus the dashboard
@@ -206,20 +337,34 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   assume an energy threshold is a reliable speech detector.
 - [ ] Repeat rapid start/stop, stop while preparation is pending, and cancel during
   recording/recognition. Only one session is active; no later transcript is pasted
-  after cancellation and the microphone indicator turns off.
+  after cancellation. The microphone indicator turns off.
 - [ ] With the dashboard focused, click Start Dictating, then press Escape.
   It returns to Start Dictating with "Cancelled.", adds no history entry and
-  removes the session's temporary audio. Escape still cancels shortcut capture
+  offers Undo for five seconds when speech was captured, then removes the
+  session's temporary audio. Escape still cancels shortcut capture
   in Settings without changing the saved shortcut.
-- [ ] Hold mode: hold ⌥ Space, speak, release. The compact glass capsule shows only the waveform,
-  with no cancel or finish buttons. Text is inserted once. Tap ⌥ Space
-  briefly; the capsule expands into an error card, shows "Don’t tap. Hold ⌥ Space." and pastes nothing.
+- [ ] Hold mode: hold ⌥ Space, speak, release. The 96 × 28 point glass capsule
+  shows only the wider waveform, with no cancel or finish buttons. Text is
+  inserted once. Tap ⌥ Space briefly; recording stays active hands-free and
+  expands to the 108 × 28 point pill with separate × and ✓ controls.
   Release before the bars move; it shows "Keep holding ⌥ Space." and pastes nothing.
-- [ ] Toggle mode: press ⌥ Space once and speak. The glass capsule is 64 × 28 points,
-  with a neutral border, five white waveform bars and a white stop square in a gray circle.
-  Clicking anywhere on the capsule finishes, as does pressing ⌥ Space again.
-  Right-click and choose Cancel dictation; the session is discarded and nothing
-  is pasted. During preparation/transcription, the visible cancel button works.
+- [ ] Toggle mode: press ⌥ Space once and speak. The 108 × 28 point capsule has
+  nine waveform bars, a gray × button and a white ✓ button. The circles are
+  18 points across with 24-point hit areas. Clicking ✓
+  finishes, as does pressing ⌥ Space again; clicking the waveform does nothing.
+  During preparation/transcription, × works and ✓ is disabled.
+- [ ] Cancel capture or transcription using ×, Escape or the menu. The capsule
+  morphs into "Transcript cancelled", with Undo when audio is recoverable and
+  a five-second progress line. Undo transcribes that audio once with its original
+  model/settings/destination. Switching apps still prevents automatic paste.
+  Expiry, dismissal, quitting or a new session discard the cancelled audio.
+  Cancel before capture starts or after delivery begins: no Undo is offered.
+- [ ] With Dictation sounds enabled, finishing, completion, cancellation and
+  errors play quiet cues after microphone capture stops. Turning it off silences
+  them; recording meeting audio also suppresses them. Start a new dictation during
+  a cue: playback stops before capture. Check reduced motion and increased contrast.
+- [ ] Meeting recording uses a 100 × 26 point pill, thirteen waveform
+  bars, green border and stop square. Clicking it still stops the notetaker.
 - [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
   The tooltip changes to "Dictate" with the shortcut, "Start notetaker" and
   "Open meeting notes" respectively. Move between them and then away; tooltips
@@ -260,15 +405,21 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   must leave the clipboard untouched and show no toast.
 - [ ] While dictating or transcribing, the capsule must show only the waveform,
   never the recognized text.
-- [ ] After a successful paste no toast appears. Copy-only results still show
-  a "Copied" toast.
+- [ ] Finishing dictation plays one stop cue. Successful paste returns directly
+  to idle without another sound, message or announcement. Copy-only still shows
+  "Copied to clipboard"; with both output options off it shows "Transcript ready".
+- [ ] Notetaker starts, stops, finishes its notes and displays errors silently.
+- [ ] The locally installed cues (finish, cancellation and attention)
+  play from an app moved outside the build directory. Check quality and volume
+  on speakers and headphones. Removing a cue leaves that event silent; no
+  bundled or macOS sound replaces it.
 - [ ] Repeat with a clipboard image or rich text; the app must preserve supported
   pasteboard representations, not just plain text.
 - [ ] Change clipboard contents while recognition/paste is pending. New user
   clipboard contents must not be replaced by an old snapshot.
 - [ ] Switch to another app while recognition is pending. It must not paste into
   the newly focused app. The capsule shows "Copied, not pasted." with the text
-  and a Copy button whose ring empties over five seconds before the card closes.
+  and a Copy button, with a progress line that empties over five seconds before the card closes.
   ⌘V pastes the text, and Copy copies it again, closes the card and shows the
   "Copied" toast. Start a new dictation while the card is open; the card must
   give way to the recording pill and never show the earlier text again. The
@@ -467,14 +618,41 @@ were not exercised in this UI pass.
   speakers, note how often the other side's words also appear as "Me" through
   the microphone. Record the result; do not assume either way.
 - [ ] Start a meeting on the built-in microphone, then connect AirPods or another
-  headset mid-meeting. Both meters keep moving and new Me and Them entries keep
+  headset and choose it from the card menu mid-meeting. Both meters keep moving and new Me and Them entries keep
   appearing after the switch.
 - [ ] With Microphone set to Automatic, connect and disconnect AirPods and a USB
   mic during a meeting. The card's microphone label follows the macOS default
-  input each time, and Me entries keep appearing. Pick a specific mic from the
+  input each time, except that an AirPods default keeps the built-in mic while
+  the lid is open, and Me entries keep appearing. Pick a specific mic from the
   card menu mid-meeting; capture switches to it without stopping the meeting.
-- [ ] Choose a USB mic in Settings, unplug it, and dictate. Dictation uses the
-  macOS default; the picker shows the mic as "(not connected)". Plug it back in
+- [ ] With Microphone set to Automatic and AirPods as the macOS input and
+  output, play a video and dictate. The picker shows "Automatic (MacBook Pro
+  Microphone)", the waveform follows your voice, and the video keeps full sound
+  quality. Choose the AirPods in Settings and repeat; playback drops to call
+  quality only while recording and recovers after it stops.
+- [ ] With Microphone set to Automatic and AirPods as the macOS input, start a
+  meeting with the lid open, then close the lid on an external display. Me
+  capture moves to the AirPods and keeps producing entries. Open the lid;
+  capture returns to the built-in mic. Repeat during a dictation; speech from
+  before and after closing the lid is transcribed.
+- [ ] With the AirPods chosen in Settings, start dictation. Repeat immediately
+  after connecting them and after an app starts/stops headset playback. The
+  waveform moves and stopping produces a nonempty recording. Repeat with a USB microphone.
+- [ ] During dictation, change the macOS default input between the built-in mic
+  and a USB mic, then choose the AirPods in Settings and disconnect/reconnect
+  the headset. Speech captured before
+  and after each switch is retained at the correct speed. Repeat with the AirPods
+  as the macOS default; Automatic stays on the built-in mic.
+- [ ] During a meeting, repeat those switches and headset profile changes.
+  "Me" capture resumes, earlier chunks remain, offsets stay ordered, and
+  "Them" capture continues. Repeat with a specifically selected microphone.
+- [ ] Stop or cancel immediately during a device switch in both dictation and
+  meetings. No delayed retry reactivates the microphone or adds a stale result.
+- [ ] Make every input unavailable during capture. Dictation reports a capture
+  failure after its retries; meetings report the microphone issue and keep
+  system audio running. Reconnecting an input resumes the meeting microphone.
+- [ ] Choose a USB mic in Settings, unplug it, and dictate. Dictation uses
+  Automatic; the picker shows the mic as "(not connected)". Plug it back in
   and it is used again without reselecting.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or

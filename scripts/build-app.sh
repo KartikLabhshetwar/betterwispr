@@ -26,7 +26,7 @@ if [[ ! -f "$icon" || "${icon_sources[0]}" -nt "$icon" || "${icon_sources[1]}" -
     iconutil -c icns "$iconset" -o "$icon"
 fi
 cp "$icon" "$app/Contents/Resources/AppIcon.icns"
-rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle" "$app/Contents/Frameworks/Sparkle.framework"
+rm -rf "$app/Contents/Resources/Licenses" "$app/Contents/Resources/BetterWispr_BetterWispr.bundle" "$app/Contents/MacOS/FluidAudio_FluidAudio.bundle" "$app/Contents/MacOS/BetterWispr_BetterWispr.bundle" "$app/Contents/Frameworks/Sparkle.framework"
 ditto "$binary_dir/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
 rm -rf "$app/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices" "$app/Contents/Frameworks/Sparkle.framework/XPCServices"
 mkdir -p "$app/Contents/Resources/Licenses"
@@ -39,6 +39,7 @@ cp .build/checkouts/Sparkle/LICENSE "$app/Contents/Resources/Licenses/Sparkle-MI
 # SwiftPM resources from speech/tokenizer dependencies must travel with the app.
 for resource in "$binary_dir"/*.bundle; do
     [[ -d "$resource" ]] || continue
+    [[ "$(basename "$resource")" == BetterWispr_BetterWispr.bundle ]] && continue
     cp -R "$resource" "$app/Contents/Resources/"
     [[ "$(basename "$resource")" == FluidAudio_* ]] && continue
     cp -R "$resource" "$app/Contents/MacOS/"

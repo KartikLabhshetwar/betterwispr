@@ -33,10 +33,13 @@ Sources/
 1. A dashboard action or the global shortcut (**Option–Space** unless changed in
    Settings) starts a session. Capture the previously focused external app before
    showing the nonactivating capsule.
-2. Check microphone permission and prepare the selected provider. Model downloads
-   are separate user actions, never a side effect of transcription.
+2. Validate the selected provider and check microphone permission. Apple speech
+   authorization and API-key checks still precede capture. Installed neural-model
+   warm-up runs independently, so it need not delay capture; readiness is checked
+   again before transcription. Model downloads are separate user actions.
 3. Record microphone audio locally and publish levels to the capsule. Stopping
-   closes the recording before recognition reads it.
+   drains the in-flight input buffer and closes the file before preparing the
+   selected provider and recognizing it.
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running.
@@ -165,19 +168,65 @@ deleted, and its expand button opens the meeting in the dashboard instead.
 `AudioInputs` lists Core Audio devices with an input stream, keyed by UID, and
 skips private aggregate devices (Core Audio's per-process default aggregate and
 BetterWispr's system audio tap). `AppSettings.microphone` is the saved choice;
-nil means Automatic and follows the macOS default input. A chosen microphone is
-used only while it is connected, otherwise the macOS default is used; there is
-no other fallback. Dictation and meetings both route a fresh `AVAudioEngine`
-input to the resolved device before reading its format.
+nil means Automatic, which follows the macOS default input with one exception.
+Recording from a Bluetooth headset's microphone switches its playback to the
+call profile (measured 48 to 24 kHz on AirPods Pro), so when the default input
+is Bluetooth and IOKit reports no closed MacBook lid (desktops never do),
+Automatic uses the built-in microphone. A closed lid disconnects the built-in microphone, so
+the Bluetooth default is used then. Other inputs, such as USB, dock or HDMI
+capture devices, are not substituted automatically because some deliver only
+silence. A chosen microphone is used only while it is connected, otherwise
+Automatic is used. Both recorders use `MicrophoneInput`, an input-only Core Audio
+queue bound to that UID. It requests the device's native rate/channel count and
+20 ms interleaved Float32 buffers. Audio Queue delivers buffers on a serial
+worker, where existing writers handle files and levels. No file writes or locks
+run on the hardware's real-time IO thread. Stop disposes the queue
+synchronously, so no callback runs after it returns. The microphone is active only during recording.
+`MicrophoneInput` shares one queue per device UID between dictation and
+meetings, including concurrent startup, so a dictation during a meeting adds a
+receiver instead of opening a second queue. A receiver sees only samples at or
+after its subscription time, and detaching drains its callback before its file
+is finalized. No idle audio is cached or replayed. The last subscriber closes
+the queue.
 
-`AudioInputObserver` reports connects, disconnects and default-input changes,
-debounced on the main actor. The settings picker and the meeting card's
-microphone menu refresh from it. During a meeting, `MeetingRecorder` rebuilds
-its microphone engine when the resolved device changes or the engine has
-stopped, closing the current "Me" chunk first so offsets stay continuous. A
-configuration change on a running engine bound to the same device is ignored,
-because every fresh engine posts one as it binds its input; rebuilding on it
-loops and leaves only sub-second chunks that are dropped as silence. A dictation already in progress keeps its device until it ends.
+Both recorders wait for an actual audio callback before reporting readiness;
+silence counts, so this does not require the user to speak first. Normal finish
+waits for the callback whose host timestamp covers the stop request before
+closing the file. Startup and finish waits are bounded and cancellable. Each
+input restart has a new callback token, rejecting late audio progress from an
+older input queue. Speech gating measures 20 ms slices rather than entire hardware
+buffers, so a Bluetooth device's larger batches do not dilute brief, quiet
+speech. Waveform calibration remembers digital silence and timestamps delivered
+slices in the past instead of replaying them with another buffer of delay.
+
+`AudioInputObserver` reports connects, disconnects, default-input changes and
+screen-parameter changes (closing the lid on an external display removes the
+built-in screen), debounced on the main actor. The settings picker and the meeting card's
+microphone menu refresh from it. During capture it also listens for the selected
+device's stream-format, nominal-rate and alive-state changes, including Bluetooth
+profile changes that keep the same UID. The recorders restart when the resolved
+device changes or the input queue stops. A running Audio Queue handles native
+rate changes internally; restarting it again would add another Bluetooth
+wake-up. Notifications that do not change those properties leave capture alone.
+Restarts wait for the 300 ms debounce and make up to three attempts if the
+device is temporarily unavailable. Stopping or cancelling removes the observers and
+pending retries; session tokens reject late callbacks.
+
+Dictation keeps its file open across restarts and uses `AVAudioConverter` when
+the new input's format differs, preserving the recorded audio and its duration.
+An unrecoverable restart ends dictation with an error. Meetings close and hand
+off the current "Me" chunk before restarting, then begin a chunk in the new
+format at its actual meeting offset. System audio continues independently; a
+microphone failure is reported, and a later device change can resume capture.
+Changing the selected microphone also applies to either active recording.
+
+Capture uses Apple's
+[Audio Queue Services](https://developer.apple.com/documentation/audiotoolbox/audio-queue-services)
+and [device UID routing](https://developer.apple.com/documentation/audiotoolbox/kaudioqueueproperty_currentdevice).
+`MicrophoneCapture` diagnostics report startup/callback timing, format and RMS;
+`DictationTiming` reports recognition time and whether text was empty. Neither
+logs audio samples, microphone names or transcripts. Hardware startup runs away
+from the main actor because Bluetooth initialization can block.
 
 ## Add a model
 

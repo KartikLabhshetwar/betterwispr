@@ -125,7 +125,7 @@ private struct MenuContents: View {
         case .recording: "Listening…"
         case .transcribing: "Transcribing…"
         case .preparing: "Preparing…"
-        case .idle, .failed, .unpasted: "BetterWispr: Ready"
+        case .idle, .failed, .unpasted, .cancelled, .completed: "BetterWispr: Ready"
         }
     }
 
@@ -155,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) {
-        model.cancelRecording()
+        model.discardRecording()
         model.meetings.endForQuit()
         capsule?.close()
         notetaker?.close()

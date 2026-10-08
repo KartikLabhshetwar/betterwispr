@@ -11,7 +11,7 @@ struct SettingsView: View {
             Section("Dictation") {
                 MicrophonePicker(model: model) {
                     Text("Microphone")
-                    Text("Used for dictation and meeting notes. A chosen mic is used whenever it’s connected; otherwise BetterWispr follows Sound settings.")
+                    Text("Used for dictation and meeting notes. Automatic follows Sound settings, but uses your Mac’s own mic instead of Bluetooth headphones while the lid is open, since recording through headphones drops them to call-quality sound. A chosen mic is used whenever it’s connected.")
                 }
                 ShortcutRecorder(model: model)
                 Picker(selection: setting(\.dictationMode)) {
@@ -19,7 +19,7 @@ struct SettingsView: View {
                     Text("Press to toggle").tag(DictationMode.toggle)
                 } label: {
                     Text("Shortcut behavior")
-                    Text("Hold \(model.settings.shortcut.displayName) while you speak, or press it once and click the capsule when you’re done.")
+                    Text("Hold and release to finish, or tap once for hands-free dictation. Click ✓ or press the shortcut again when you’re done.")
                 }
                 .disabled(model.isBusy)
                 Picker(selection: setting(\.language)) {
@@ -65,6 +65,10 @@ struct SettingsView: View {
             }
 
             Section("Workspace") {
+                Toggle(isOn: setting(\.soundEffects)) {
+                    Text("Dictation sounds")
+                    Text("Subtle feedback when you finish, cancel, or need attention. Sounds stay quiet during meeting capture.")
+                }
                 Toggle(isOn: setting(\.showCapsule)) {
                     Text("Floating recording capsule")
                     Text("Keep a small voice control at the bottom of your screen.")
@@ -140,7 +144,7 @@ private struct ShortcutRecorder: View {
             if isCapturing {
                 Text(feedback ?? "Press and release ⌃, ⌥, ⇧ or ⌘ alone, use a key combination, or press an F-key. Esc cancels.")
             } else {
-                Text(model.settings.dictationMode == .hold ? "Hold to speak. Release to finish." : "Press once to speak. Press again or click the capsule to finish.")
+                Text(model.settings.dictationMode == .hold ? "Hold to speak and release to finish. Tap for hands-free dictation." : "Press once to speak. Press again or click ✓ to finish.")
                 if shortcut.isModifierOnly { Text("Requires Accessibility permission. Uses the left or right key you recorded.") }
             }
         }
@@ -237,7 +241,7 @@ struct MicrophonePicker<Label: View>: View {
     var body: some View {
         Picker(selection: Binding(get: { model.settings.microphone?.id },
                                   set: { id in model.selectMicrophone(model.microphoneChoices.first { $0.id == id }) })) {
-            Text(model.defaultMicrophone.map { "Automatic (\($0.name))" } ?? "Automatic").tag(String?.none)
+            Text(model.automaticMicrophone.map { "Automatic (\($0.name))" } ?? "Automatic").tag(String?.none)
             ForEach(model.microphoneChoices) { device in
                 Text(model.microphones.contains { $0.id == device.id } ? device.name : "\(device.name) (not connected)")
                     .tag(Optional(device.id))

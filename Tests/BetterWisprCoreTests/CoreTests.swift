@@ -32,6 +32,7 @@ import Testing
     #expect(settings.selectedModelID == "parakeet-v3")
     #expect(settings.dictationMode == .hold)
     #expect(!settings.copyToClipboard)
+    #expect(settings.soundEffects)
     #expect(settings.shortcut == .optionSpace)
     #expect(settings.microphone == nil)
     #expect(settings.completedOnboardingVersion == 0)
@@ -41,19 +42,42 @@ import Testing
     toggled.completedOnboardingVersion = 1
     toggled.onboardingStep = 2
     toggled.copyToClipboard = true
+    toggled.soundEffects = false
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }
 
 @Test func chosenMicrophoneIsUsedOnlyWhileConnected() {
-    let builtIn = AudioInputDevice(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
-    let airPods = AudioInputDevice(id: "AA-BB-CC:input", name: "AirPods Pro")
-    let renamed = AudioInputDevice(id: airPods.id, name: "Kartik’s AirPods")
-    #expect(AudioInputs.resolve(nil, available: [builtIn, airPods], systemDefault: airPods) == airPods)
-    #expect(AudioInputs.resolve(builtIn, available: [builtIn, airPods], systemDefault: airPods) == builtIn)
-    #expect(AudioInputs.resolve(airPods, available: [builtIn], systemDefault: builtIn) == builtIn)
-    #expect(AudioInputs.resolve(airPods, available: [builtIn, renamed], systemDefault: builtIn) == renamed)
-    #expect(AudioInputs.resolve(airPods, available: [], systemDefault: nil) == nil)
+    let builtIn = AudioInputs.Input(device: .init(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone"), connection: .builtIn)
+    let airPods = AudioInputs.Input(device: .init(id: "AA-BB-CC:input", name: "AirPods Pro"), connection: .bluetooth)
+    let renamed = AudioInputs.Input(device: .init(id: airPods.device.id, name: "Kartik’s AirPods"), connection: .bluetooth)
+    func resolve(_ choice: AudioInputs.Input?, _ inputs: [AudioInputs.Input], default systemDefault: AudioInputs.Input?) -> AudioInputDevice? {
+        AudioInputs.resolve(choice?.device, inputs: inputs, systemDefault: systemDefault?.device, lidClosed: false)
+    }
+    #expect(resolve(airPods, [builtIn, airPods], default: builtIn) == airPods.device)
+    #expect(resolve(builtIn, [builtIn, airPods], default: airPods) == builtIn.device)
+    #expect(resolve(airPods, [builtIn], default: builtIn) == builtIn.device)
+    #expect(resolve(airPods, [builtIn, renamed], default: builtIn) == renamed.device)
+    #expect(resolve(airPods, [], default: nil) == nil)
+    let usb = AudioInputs.Input(device: .init(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7"), connection: .other)
+    #expect(resolve(usb, [builtIn, airPods], default: airPods) == builtIn.device)
+}
+
+@Test func automaticMicrophoneKeepsBluetoothHeadphonesOutOfCallQuality() {
+    let builtIn = AudioInputs.Input(device: .init(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone"), connection: .builtIn)
+    let usb = AudioInputs.Input(device: .init(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7"), connection: .other)
+    let airPods = AudioInputs.Input(device: .init(id: "AA-BB-CC:input", name: "AirPods Pro"), connection: .bluetooth)
+    let iPhone = AudioInputs.Input(device: .init(id: "iPhone-continuity", name: "iPhone Microphone"), connection: .other)
+    func automatic(_ inputs: [AudioInputs.Input], default systemDefault: AudioInputs.Input?, lidClosed: Bool = false) -> AudioInputDevice? {
+        AudioInputs.resolve(nil, inputs: inputs, systemDefault: systemDefault?.device, lidClosed: lidClosed)
+    }
+    #expect(automatic([iPhone, usb, airPods, builtIn], default: airPods) == builtIn.device)
+    #expect(automatic([iPhone, builtIn, airPods, usb], default: airPods, lidClosed: true) == airPods.device)
+    #expect(automatic([iPhone, usb, airPods], default: airPods) == airPods.device)
+    #expect(automatic([builtIn, airPods, usb], default: usb) == usb.device)
+    #expect(automatic([builtIn, airPods, iPhone], default: iPhone) == iPhone.device)
+    #expect(automatic([builtIn, airPods], default: nil) == nil)
+    #expect(AudioInputs.resolve(airPods.device, inputs: [builtIn, airPods], systemDefault: airPods.device, lidClosed: false) == airPods.device)
 }
 
 @Test func shortcutsValidateKeysAndRoundTripThroughSettings() throws {

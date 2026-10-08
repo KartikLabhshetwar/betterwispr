@@ -4,6 +4,20 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [0.1.3] - 2026-10-08
+
+### Fixed
+- Videos and music in AirPods and other Bluetooth headphones keep their full sound quality while you dictate. Recording from a Bluetooth headset's microphone switches its playback to call quality, so Automatic now uses your Mac's built-in microphone instead while the lid is open. With the lid closed, or on a Mac without a microphone, Automatic follows Sound settings. If you chose your headphones in Settings, they are still used, so switch Microphone to Automatic to keep full sound quality.
+- Successful dictation plays only the recording-stop sound; insertion and copying no longer play a second completion sound. Notetaker remains silent.
+- Microphone callbacks explicitly avoid inheriting MainActor isolation, preventing the capture-start crash reported on the audio worker queue.
+- Quick taps in Hold to talk start hands-free dictation with compact cancel and finish controls. Cancellation offers Undo with a countdown; successful insertion returns to idle without a completion message. The notetaker pill has more waveform width while keeping its compact height.
+- Dictation feedback uses only locally installed sounds. The earlier sound packs and all fallback cues have been removed.
+- Dictation and meeting notes wait for microphone audio before reporting readiness and finish the in-flight audio buffer before transcription. Both use input-only Core Audio capture with 20 ms buffers instead of the audio engine tap's larger batches. Dictation starts capturing without waiting for the speech model to prepare. Bluetooth startup runs off the UI thread, and a running input queue handles Bluetooth rate changes without a second restart.
+- Quiet, brief speech is checked in small windows so larger Bluetooth audio buffers do not dilute it below the silence threshold. Waveforms respond after digital silence from noise-cancelling headsets and show the latest delivered level without replaying a buffered delay.
+- Dictation and meeting notes recover microphone capture after AirPods and other external microphones change the device's audio configuration. Device changes are allowed to settle, and a failed restart is retried before reporting an error.
+- Automatic microphone selection follows device changes during dictation as well as meetings. Audio recorded before a switch is kept, including when the new microphone uses a different sample rate or channel count; meeting system audio continues independently.
+- Changing the microphone in Settings also applies to a dictation already in progress. Pending device changes are cancelled when recording stops or is cancelled.
+
 ## [0.1.2] - 2026-10-08
 
 ### Fixed

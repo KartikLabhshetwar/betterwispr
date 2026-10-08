@@ -13,14 +13,17 @@ struct CapsuleView: View {
         if case .recording = model.meetings.activity { true } else { false }
     }
     private var failure: DictationFailure? {
-        model.failure ?? (model.isBusy || model.unpasted != nil ? nil : model.meetings.message.map {
+        model.failure ?? (model.phase != .idle ? nil : model.meetings.message.map {
             DictationFailure(title: "Notetaker needs attention", message: $0)
         })
     }
-    private var showsCard: Bool { failure != nil || model.unpasted != nil }
+    private var showsCard: Bool {
+        switch model.phase {
+        case .cancelled, .completed, .unpasted, .failed: true
+        default: failure != nil
+        }
+    }
     private var showsToolbar: Bool { !showsCard && !model.isBusy && !isMeetingCapturing && hover.isHovering }
-    private var showsControls: Bool { isNotetaking || (model.isBusy && !model.isHeldSession) }
-    private var finishesOnClick: Bool { isNotetaking || (showsControls && isRecording) }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
 
     var body: some View {
@@ -37,6 +40,7 @@ struct CapsuleView: View {
         .onPreferenceChange(CapsuleRegions.self) { hover.update(regions: $0) }
         .environment(\.colorScheme, .dark)
         .animation(spring, value: model.phase)
+        .animation(spring, value: model.isHeldSession)
         .animation(spring, value: model.meetings.activity)
         .animation(spring, value: failure)
         .animation(spring, value: hover.isHovering)
@@ -49,6 +53,14 @@ struct CapsuleView: View {
             guard model.unpasted != nil else { return }
             AccessibilityNotification.Announcement("Copied, not pasted. Press Command V to paste it.").post()
         }
+        .onChange(of: model.phase) {
+            switch model.phase {
+            case .cancelled:
+                AccessibilityNotification.Announcement(model.canUndoCancellation ? "Transcript cancelled. Undo is available for five seconds." : "Transcript cancelled.").post()
+            case .completed(let message): AccessibilityNotification.Announcement(message).post()
+            default: break
+            }
+        }
     }
 
     private var surface: some View {
@@ -59,8 +71,17 @@ struct CapsuleView: View {
             } else if let text = model.unpasted {
                 unpastedCard(text)
                     .transition(.opacity)
-            } else if model.isBusy || isMeetingCapturing {
-                recordingPill
+            } else if model.phase == .cancelled {
+                cancellationCard
+                    .transition(.opacity)
+            } else if case .completed(let message) = model.phase {
+                completionCard(message)
+                    .transition(.opacity)
+            } else if isNotetaking {
+                notetakingPill
+                    .transition(.opacity)
+            } else if model.isBusy {
+                dictationPill
                     .transition(.opacity)
             } else if showsToolbar {
                 controls
@@ -71,12 +92,19 @@ struct CapsuleView: View {
         }
         .background {
             if !showsToolbar {
-                CapsuleGlass(cornerRadius: showsCard ? 22 : 18)
+                CapsuleGlass(cornerRadius: model.phase != .idle ? 24 : showsCard ? 22 : 18)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showsCard, let deadline = model.cardDeadline {
+                CapsuleCountdown(deadline: deadline, duration: model.cardDuration)
+                    .padding(.horizontal, 22)
+                    .allowsHitTesting(false)
             }
         }
         .overlay {
             if isNotetaking && isMeetingRecording && !showsCard {
-                Capsule().strokeBorder(Color(red: 0, green: 0.73, blue: 0.51), lineWidth: 2)
+                Capsule().strokeBorder(Color(red: 0, green: 0.73, blue: 0.51), lineWidth: 1.5)
                     .allowsHitTesting(false)
             }
         }
@@ -120,7 +148,7 @@ struct CapsuleView: View {
     private func failureCard(_ failure: DictationFailure) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
-                Image(systemName: "exclamationmark.triangle")
+                Image(systemName: model.failure == nil ? "exclamationmark.triangle" : failure.symbol)
                     .font(.system(size: 17, weight: .medium))
                     .foregroundStyle(.yellow)
                     .accessibilityHidden(true)
@@ -146,12 +174,16 @@ struct CapsuleView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(.white.opacity(0.7))
                 .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(model.failure == nil ? nil : 4)
             if failure.needsAccessibility {
                 Button("Allow Accessibility") {
                     model.requestAccessibility()
                     model.dismissCard()
                 }
                 .buttonStyle(.bordered)
+            } else if model.failure != nil {
+                Button("Try again", action: model.toggleRecording)
+                    .buttonStyle(.bordered)
             }
             if isMeetingCapturing {
                 Button("Stop notetaker", action: model.meetings.stop)
@@ -183,7 +215,6 @@ struct CapsuleView: View {
                         .frame(width: 26, height: 26)
                         .background(.white.opacity(0.06), in: Circle())
                         .overlay { Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1) }
-                        .overlay { CountdownRing(seconds: AppModel.unpastedCardSeconds) }
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -198,6 +229,37 @@ struct CapsuleView: View {
         }
         .padding(18)
         .frame(width: 360, alignment: .leading)
+    }
+
+    private var cancellationCard: some View {
+        HStack(spacing: 16) {
+            Text("Transcript cancelled")
+                .font(.system(size: 14, weight: .medium))
+            Spacer(minLength: 0)
+            if model.canUndoCancellation {
+                Button("Undo", action: model.undoCancellation)
+                    .help("Transcribe the audio you just cancelled")
+            } else {
+                Button("Dismiss", action: model.dismissCard)
+            }
+        }
+        .foregroundStyle(.white)
+        .buttonStyle(CapsuleCardButtonStyle())
+        .padding(.horizontal, 18)
+        .frame(width: 320, height: 56)
+    }
+
+    private func completionCard(_ message: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color(red: 0.55, green: 0.9, blue: 0.7))
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 22)
+        .frame(height: 48)
     }
 
     private func dismissFailure() {
@@ -223,51 +285,74 @@ struct CapsuleView: View {
         }
     }
 
-    private var recordingPill: some View {
-        HStack(spacing: 8) {
-            Waveform(mode: waveformMode, animated: !reduceMotion)
-                .frame(width: isNotetaking ? 24 : 20)
-                .accessibilityLabel(waveformLabel)
-            if finishesOnClick {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(.white)
-                    .frame(width: 8, height: 8)
-                    .frame(width: isNotetaking ? 24 : 20, height: isNotetaking ? 24 : 20)
-                    .background(.white.opacity(0.16), in: Circle())
-                    .accessibilityLabel(isNotetaking ? "Stop notetaker" : "Finish dictation")
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { finishCapture() }
-            } else if showsControls {
+    private var dictationPill: some View {
+        HStack(spacing: 4) {
+            if !model.isHeldSession {
                 Button(action: model.cancelRecording) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 20, height: 20)
-                        .background(.white.opacity(0.12), in: Circle())
+                        .frame(width: 18, height: 18)
+                        .background(.white.opacity(0.2), in: Circle())
+                        .frame(width: 24, height: 24)
+                        .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .help("Cancel dictation")
                 .accessibilityLabel("Cancel dictation")
             }
+            Waveform(mode: waveformMode, animated: !reduceMotion, count: model.isHeldSession ? 13 : 9)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(waveformLabel)
+            if !model.isHeldSession {
+                Button(action: model.toggleRecording) {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.black.opacity(isRecording ? 1 : 0.45))
+                        .frame(width: 18, height: 18)
+                        .background(.white.opacity(isRecording ? 1 : 0.25), in: Circle())
+                        .frame(width: 24, height: 24)
+                        .contentShape(Circle())
+                }
+                .disabled(!isRecording)
+                .help("Finish dictation")
+                .accessibilityLabel("Finish dictation")
+            }
         }
-        .padding(.leading, isNotetaking ? 12 : 10)
-        .padding(.trailing, showsControls ? 6 : 10)
-        .frame(height: isNotetaking ? 32 : showsControls ? 28 : 24)
+        .font(.system(size: 10, weight: .semibold))
+        .foregroundStyle(.white)
+        .buttonStyle(.plain)
+        .padding(.horizontal, 4)
+        .frame(width: model.isHeldSession ? 96 : 108, height: 28)
         .contentShape(Capsule())
-        .onTapGesture { if finishesOnClick { finishCapture() } }
-        .contextMenu {
-            if isNotetaking { Button("Stop notetaker", action: model.meetings.stop) }
-            else { Button("Cancel dictation", action: model.cancelRecording) }
-        }
-        .accessibilityActions {
-            if isNotetaking { Button("Stop notetaker", action: model.meetings.stop) }
-            else { Button("Cancel dictation", action: model.cancelRecording) }
-        }
-        .capsuleRegion(isNotetaking ? .notetaker : .dictation)
+        .contextMenu { Button("Cancel dictation", action: model.cancelRecording) }
+        .accessibilityActions { Button("Cancel dictation", action: model.cancelRecording) }
+        .capsuleRegion(.dictation)
     }
 
-    private func finishCapture() {
-        if isNotetaking { model.meetings.stop() }
-        else if isRecording { model.toggleRecording() }
+    private var notetakingPill: some View {
+        HStack(spacing: 4) {
+            Waveform(mode: waveformMode, animated: !reduceMotion, count: 13)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(waveformLabel)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(.white)
+                .frame(width: 7, height: 7)
+                .frame(width: 18, height: 18)
+                .background(.white.opacity(0.16), in: Circle())
+                .frame(width: 24, height: 24)
+                .accessibilityLabel("Stop notetaker")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { model.meetings.stop() }
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 4)
+        .frame(width: 100, height: 26)
+        .contentShape(Capsule())
+        .onTapGesture { model.meetings.stop() }
+        .contextMenu {
+            Button("Stop notetaker", action: model.meetings.stop)
+        }
+        .accessibilityActions {
+            Button("Stop notetaker", action: model.meetings.stop)
+        }
+        .capsuleRegion(.notetaker)
     }
 
     private var meetingButton: some View {
@@ -325,19 +410,31 @@ struct CapsuleView: View {
     }
 }
 
-private struct CountdownRing: View {
-    let seconds: Double
-    @State private var remaining = 1.0
+private struct CapsuleCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .medium))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.white.opacity(configuration.isPressed ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private struct CapsuleCountdown: View {
+    let deadline: Date
+    let duration: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Circle()
-            .trim(from: 0, to: remaining)
-            .stroke(.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-            .padding(0.75)
-            .allowsHitTesting(false)
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+            GeometryReader { geometry in
+                Rectangle().fill(.white.opacity(0.18))
+                Rectangle().fill(.white.opacity(0.9))
+                    .frame(width: geometry.size.width * (reduceMotion ? 1 : max(0, min(1, deadline.timeIntervalSince(context.date) / max(duration, 0.01)))))
+            }
+        }
+            .frame(height: 3)
             .accessibilityHidden(true)
-            .onAppear { withAnimation(.linear(duration: seconds)) { remaining = 0 } }
     }
 }
 
@@ -373,7 +470,7 @@ struct Waveform: View {
     let mode: Mode
     let animated: Bool
     var color: Color = .white
-    private static let count = 5
+    var count = 5
 
     var body: some View {
         if animated && mode != .waiting {
@@ -387,7 +484,7 @@ struct Waveform: View {
 
     private func bars(at date: Date) -> some View {
         HStack(spacing: 2.5) {
-            ForEach(0..<Self.count, id: \.self) { index in
+            ForEach(0..<count, id: \.self) { index in
                 Capsule()
                     .fill(color.opacity(mode == .waiting ? 0.4 : 0.95))
                     .frame(width: 2, height: 3 + 11 * height(of: index, at: date))
@@ -399,7 +496,7 @@ struct Waveform: View {
     private func height(of index: Int, at date: Date) -> CGFloat {
         let time = date.timeIntervalSinceReferenceDate
         let position = Double(index)
-        let middle = Double(Self.count - 1) / 2
+        let middle = Double(max(2, count) - 1) / 2
         let distance = abs(position - middle) / middle
         switch mode {
         case .waiting:

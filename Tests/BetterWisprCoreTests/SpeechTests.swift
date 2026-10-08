@@ -1,3 +1,5 @@
+@preconcurrency import AVFoundation
+import AppKit
 import FluidAudio
 import Foundation
 import Testing
@@ -51,6 +53,7 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
 
     var muted = VoiceLevelMeter()
     #expect([0, .nan, .infinity].map { muted.update(rms: $0, over: 0.1) } == [0, 0, 0])
+    #expect(muted.update(rms: amplitude(-35), over: 0.1) > 0.5)
 }
 
 @Test func waveformMovesAtTheSameSpeedForAnySliceLength() {
@@ -63,6 +66,181 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
     #expect(buffered.max()! > 0.9)
     #expect(buffered.last! < 0.05)
     #expect(zip(buffered, sliced).allSatisfy { abs($0 - $1) < 0.03 })
+}
+
+private func microphoneTone(_ seconds: Double, rate: Double, channels: AVAudioChannelCount) -> AVAudioPCMBuffer {
+    let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: channels)!
+    let frames = AVAudioFrameCount(seconds * rate)
+    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)!
+    buffer.frameLength = frames
+    for channel in 0..<Int(channels) {
+        for frame in 0..<Int(frames) { buffer.floatChannelData![channel][frame] = 0.3 * sin(Float(frame) * 2 * .pi * 440 / Float(rate)) }
+    }
+    return buffer
+}
+
+@Test func sharedMicrophoneDeliversOnlyActiveAudioAndDetachesRecordersIndependently() throws {
+    let delivery = MicrophoneDelivery()
+    let buffer = microphoneTone(0.1, rate: 24_000, channels: 1)
+    let dictationURL = FileManager.default.temporaryDirectory.appending(path: "betterwispr-shared-\(UUID().uuidString).caf")
+    let meetingURL = FileManager.default.temporaryDirectory.appending(path: "betterwispr-shared-\(UUID().uuidString).caf")
+    defer {
+        try? FileManager.default.removeItem(at: dictationURL)
+        try? FileManager.default.removeItem(at: meetingURL)
+    }
+    let dictation = try RecordingWriter(url: dictationURL, format: buffer.format, threshold: 0.002)
+    let meeting = try RecordingWriter(url: meetingURL, format: buffer.format, threshold: 0.002)
+    let openerID = UUID(), dictationID = UUID(), meetingID = UUID()
+    delivery.add(openerID, since: 9) { _, _ in }
+    func deliver(at seconds: Double) {
+        delivery.receive(buffer, at: AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: seconds)))
+    }
+    deliver(at: 9)
+    delivery.add(dictationID, since: 10.03) { buffer, _ in _ = dictation.write(buffer) }
+    delivery.add(meetingID, since: 10.05) { buffer, _ in _ = meeting.write(buffer) }
+    deliver(at: 10)
+    delivery.remove(dictationID)
+    deliver(at: 10.1)
+    delivery.remove(meetingID)
+    deliver(at: 10.2)
+    delivery.remove(openerID)
+    let first = dictation.finish(), second = meeting.finish()
+    #expect(first.error == nil && second.error == nil)
+    #expect(abs(first.duration - 0.07) <= 1.0 / 24_000)
+    #expect(abs(second.duration - 0.15) <= 1.0 / 24_000)
+}
+
+@Test(arguments: [24_000.0, 48_000.0])
+func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) throws {
+    let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-switch-\(UUID().uuidString).caf")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let headset = AVAudioFormat(standardFormatWithSampleRate: rate, channels: rate == 24_000 ? 1 : 2)!
+    let writer = try RecordingWriter(url: url, format: headset, threshold: 0.002)
+    let inputs: [(Double, AVAudioChannelCount)] = [(24_000, 1), (48_000, 2), (24_000, 1), (48_000, 2), (44_100, 2), (16_000, 1), (8_000, 1)]
+    for (rate, channels) in inputs {
+        for _ in 0..<10 { #expect(!writer.write(microphoneTone(0.1, rate: rate, channels: channels)).isEmpty) }
+    }
+    let result = writer.finish()
+    #expect(result.error == nil)
+    #expect(abs(result.duration - Double(inputs.count)) < 0.05)
+    #expect(result.hasSpeech)
+    let file = try AVAudioFile(forReading: url)
+    #expect(file.processingFormat == headset)
+    #expect(abs(Double(file.length) / rate - Double(inputs.count)) < 0.05)
+    let audio = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(file.length)))
+    try file.read(into: audio)
+    for second in inputs.indices {
+        let middle = Int((Double(second) + 0.5) * rate)
+        #expect((middle..<(middle + 100)).contains { abs(audio.floatChannelData![0][$0]) > 0.1 })
+    }
+    #expect(writer.write(microphoneTone(0.1, rate: rate, channels: headset.channelCount)).isEmpty)
+}
+
+@Test func meetingMicrophoneSwitchKeepsChunksAndOffsetsAcrossFormats() throws {
+    var chunks: [MeetingAudioChunk] = []
+    defer { for chunk in chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    for (offset, rate, channels) in [(0.0, 48_000.0, 2), (1.3, 24_000.0, 1), (2.6, 44_100.0, 2)] {
+        let buffer = microphoneTone(1, rate: rate, channels: AVAudioChannelCount(channels))
+        let writer = try MeetingChunkWriter(speaker: .me, format: buffer.format, threshold: 0.002,
+                                            policy: ChunkPolicy(), startOffset: offset)
+        #expect(writer.write(buffer).rms > 0.1)
+        writer.finish()
+        let ready = writer.takeReady()
+        chunks += ready.chunks
+        #expect(ready.error == nil)
+        let chunk = try #require(ready.chunks.first)
+        #expect(ready.chunks.count == 1)
+        #expect(chunk.speaker == .me && chunk.hasSpeech)
+        #expect(chunk.start == offset && chunk.duration == 1)
+        let file = try AVAudioFile(forReading: chunk.url)
+        #expect(file.processingFormat == buffer.format)
+        #expect(file.length == AVAudioFramePosition(rate))
+        #expect(writer.takeReady().chunks.isEmpty)
+    }
+}
+
+@MainActor
+@Test func microphoneReadinessAndFinishWaitForCurrentAudioAndCancelCleanly() async throws {
+    let progress = AudioCaptureProgress()
+    let old = progress.begin()
+    let current = progress.begin()
+    var ready = false
+    let start = Task { try await progress.wait(); ready = true }
+    defer { start.cancel() }
+    progress.receive(through: 1, generation: old)
+    try await Task.sleep(for: .milliseconds(30))
+    #expect(!ready)
+    progress.receive(through: 1, generation: current)
+    try await start.value
+    #expect(ready)
+
+    var finished = false
+    let stop = Task { try await progress.wait(through: 2); finished = true }
+    defer { stop.cancel() }
+    try await Task.sleep(for: .milliseconds(30))
+    #expect(!finished)
+    progress.receive(through: 2, generation: current)
+    try await stop.value
+    #expect(finished)
+
+    let cancelled = Task { try await progress.wait(through: 3) }
+    progress.cancel()
+    await #expect(throws: CancellationError.self) { try await cancelled.value }
+    let stalled = AudioCaptureProgress()
+    do {
+        try await stalled.wait(through: 1)
+        Issue.record("A stalled input must time out instead of finalizing incomplete audio")
+    } catch AudioRecordingError.inputStalled {}
+}
+
+@Test(arguments: [0.02, 0.1, 0.5])
+func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSeconds: Double) throws {
+    let rate = 48_000.0
+    let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+    let url = FileManager.default.temporaryDirectory.appending(path: "betterwispr-gate-\(UUID().uuidString).caf")
+    defer { try? FileManager.default.removeItem(at: url) }
+    let writer = try RecordingWriter(url: url, format: format, threshold: 0.002)
+    let meeting = try MeetingChunkWriter(speaker: .me, format: format, threshold: 0.002,
+                                        policy: ChunkPolicy(), startOffset: 0)
+    defer { meeting.cancel() }
+    let framesPerBuffer = Int(bufferSeconds * rate)
+    for start in stride(from: 0, to: Int(rate), by: framesPerBuffer) {
+        let buffer = microphoneTone(bufferSeconds, rate: rate, channels: 1)
+        for frame in 0..<framesPerBuffer {
+            let time = Double(start + frame) / rate
+            buffer.floatChannelData![0][frame] = (0.04..<0.36).contains(time) ? 0.003 * sin(Float(time) * 2 * .pi * 440) : 0
+        }
+        _ = writer.write(buffer)
+        _ = meeting.write(buffer)
+    }
+    let result = writer.finish()
+    #expect(result.error == nil && result.hasSpeech && result.duration == 1)
+    meeting.finish()
+    let ready = meeting.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.error == nil)
+    #expect(try #require(ready.chunks.first).hasSpeech)
+}
+
+@MainActor
+@Test func microphoneObserverCoalescesDeviceAndDisplayChangesAndIgnoresThemAfterCancel() async throws {
+    var changes = 0
+    let observer = AudioInputObserver { changes += 1 }
+    defer { observer.cancel() }
+    for _ in 0..<3 {
+        observer.scheduleCheck()
+    }
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(changes == 1)
+    for _ in 0..<2 {
+        NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+    }
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(changes == 2)
+    observer.scheduleCheck()
+    observer.cancel()
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(changes == 2)
 }
 
 @Test func waveformPlaysBufferSlicesAcrossTheirDuration() {

@@ -30,6 +30,13 @@ dependency for in-app updates. No Sparkle source is copied; its license ships in
 the app bundle. `scripts/build-app.sh` removes Sparkle's XPC services because
 they exist only for sandboxed apps and BetterWispr is not sandboxed.
 
+Local sound files can be installed in
+`~/Library/Application Support/BetterWispr/SoundOverrides/` as `finished.wav`,
+`cancelled.wav` and `attention.wav`. Missing cues are silent;
+there is no bundled or system-sound fallback. These user-local files are not
+copied into app bundles or distributed by this project. The previous generated
+and Kenney sound packs have been removed.
+
 `scripts/release.sh` follows the separate-architecture signing and notarization
 workflow in the sibling BetterShot project's `scripts/release.sh`
 (BSD-3-Clause, copyright 2026 Kartik Labhshetwar, the same author). BetterWispr
@@ -99,6 +106,19 @@ BetterWispr after the arm-after-paste approach used by Scribe and OpenWhispr;
 no upstream code is copied into it.
 
 ## Runtime engines and alternatives reviewed
+
+The 0.1.3 microphone follow-up reviewed Handy revision
+`f6b3f8297061acaa763a48c4cdefbbf342c814ac`, especially its
+[recorder](https://github.com/cjpais/Handy/blob/f6b3f8297061acaa763a48c4cdefbbf342c814ac/src-tauri/src/audio_toolkit/audio/recorder.rs)
+and [audio manager](https://github.com/cjpais/Handy/blob/f6b3f8297061acaa763a48c4cdefbbf342c814ac/src-tauri/src/managers/audio.rs):
+first-sample readiness, draining pending audio at stop, and retaining device
+preparation. VoiceInk revision `c09cc1f677f40f2ee665843a61f07670210f012e`'s
+[Core Audio recorder](https://github.com/Beingpax/VoiceInk/blob/c09cc1f677f40f2ee665843a61f07670210f012e/VoiceInk/Infrastructure/Audio/CoreAudioRecorder.swift)
+was reviewed for prepared capture and shutdown draining. BetterWispr implements
+readiness and timestamp-boundary completion with an input-only Core Audio queue
+shared by dictation and meetings. Apple Audio Queue Services supplies buffer
+ownership and callback dispatch instead of adding a custom real-time ring buffer. No source was copied or translated from either project;
+in particular, no GPL VoiceInk code is incorporated.
 
 | Project | Upstream terms | Use in this project / useful pattern |
 | --- | --- | --- |

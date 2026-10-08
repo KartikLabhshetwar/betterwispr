@@ -124,14 +124,15 @@ final class MeetingModel {
         }
         guard case .recording(let id) = activity else { return }
         let token = session
-        recorder.stop()
         ticker?.cancel()
         let duration = Date().timeIntervalSince(startedAt)
         elapsed = duration
         activity = .finishing(id)
         work = Task { [weak self] in
-            await self?.drain?.value
             guard let self, self.session == token else { return }
+            await self.recorder.stop()
+            await self.drain?.value
+            guard self.session == token else { return }
             self.edit(id, save: false) { $0.duration = duration }
             self.saveNow(id)
             self.provider = nil

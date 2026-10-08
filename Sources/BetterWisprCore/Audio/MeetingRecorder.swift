@@ -1,4 +1,3 @@
-import Accelerate
 @preconcurrency import AVFoundation
 import Foundation
 
@@ -40,9 +39,11 @@ public final class MeetingRecorder {
     private var origin = Date()
     private var threshold: Float = 0.002
     private var choice: AudioInputDevice?
-    private var engine: AVAudioEngine?
-    private var engineObserver: (any NSObjectProtocol)?
+    private var changingInput = false
+    private var input: MicrophoneInput?
     private var inputObserver: AudioInputObserver?
+    private var microphoneProgress: AudioCaptureProgress?
+    private var recoveryAttempts = 0
     private var writers: [Speaker: MeetingChunkWriter] = [:]
     private var stopSystemAudio: (() -> Void)?
     private var meters: [Speaker: VoiceLevelMeter] = [:]
@@ -52,9 +53,9 @@ public final class MeetingRecorder {
         self.policy = policy
     }
 
-    /// Nil microphone follows the macOS default input.
+    /// Nil microphone uses Automatic.
     public func start(silenceThreshold: Float, microphone choice: AudioInputDevice?) async throws {
-        guard session == nil else { throw AudioRecordingError.alreadyRecording }
+        guard session == nil, !changingInput else { throw AudioRecordingError.alreadyRecording }
         let id = UUID()
         session = id
         systemAudioIssue = nil
@@ -70,14 +71,20 @@ public final class MeetingRecorder {
         }
     }
 
-    /// Switches the live recording to another microphone; nil follows the macOS default input.
+    /// Switches the live recording to another microphone; nil uses Automatic.
     public func use(_ choice: AudioInputDevice?) {
         self.choice = choice
-        if let session { followMicrophone(session: session) }
+        if session != nil { inputObserver?.scheduleCheck() }
     }
 
-    public func stop() {
-        guard session != nil else { return }
+    public func stop() async {
+        guard let id = session else { return }
+        inputObserver?.cancel()
+        if input?.isRunning == true, let microphoneProgress {
+            do { try await microphoneProgress.wait(through: ProcessInfo.processInfo.systemUptime) }
+            catch { if session == id, !(error is CancellationError) { onError?(error) } }
+        }
+        guard session == id else { return }
         haltInputs()
         for speaker in [Speaker.me, .them] {
             guard let writer = writers[speaker] else { continue }
@@ -107,49 +114,63 @@ public final class MeetingRecorder {
         guard session == id else { throw CancellationError() }
         guard allowed else { throw AudioRecordingError.permissionDenied }
         origin = Date()
-        try runMicrophone(session: id, startOffset: 0)
-        inputObserver = AudioInputObserver { [weak self] in self?.followMicrophone(session: id) }
+        let progress = AudioCaptureProgress()
+        microphoneProgress = progress
+        inputObserver = AudioInputObserver { [weak self] in
+            Task { @MainActor [weak self] in await self?.followMicrophone(session: id) }
+        }
+        try await runMicrophone(session: id, startOffset: 0)
+        try await progress.wait()
+        guard session == id else { throw CancellationError() }
     }
 
-    /// Records from a fresh engine, because an engine that already ran keeps its old input device.
-    private func runMicrophone(session id: UUID, startOffset: TimeInterval) throws {
-        let engine = AVAudioEngine()
-        let device = try AudioInputs.route(engine, to: choice)
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else { throw AudioRecordingError.unavailable }
+    private func runMicrophone(session id: UUID, startOffset: TimeInterval) async throws {
+        guard let progress = microphoneProgress else { throw AudioRecordingError.notRecording }
+        changingInput = true
+        defer { changingInput = false }
+        let input = try MicrophoneInput(choice: choice)
+        let format = input.format
         let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: threshold, policy: policy, startOffset: startOffset)
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable [weak self] buffer, _ in
-            let level = writer.write(buffer)
-            Task { @MainActor [weak self] in self?.receive(level, from: .me, session: id) }
-        }
+        let capture = progress.begin()
+        let sampleRate = format.sampleRate
         do {
-            engine.prepare()
-            try engine.start()
+            inputObserver?.observeDevice(input.deviceID)
+            try await input.start { @Sendable [weak self] buffer, time in
+                let end = AudioCaptureProgress.endTime(time, frames: buffer.frameLength, sampleRate: sampleRate)
+                let level = writer.write(buffer)
+                Task { @MainActor [weak self] in
+                    guard let self, self.session == id, progress.generation == capture else { return }
+                    progress.receive(through: end, generation: capture)
+                    self.receive(level, from: .me, session: id)
+                }
+            }
         } catch {
-            input.removeTap(onBus: 0)
-            engine.stop()
+            input.stop()
             writer.cancel()
             throw error
         }
-        self.engine = engine
-        writers[.me] = writer
-        engineObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
-                                                                queue: .main) { @Sendable [weak self] _ in
-            Task { @MainActor [weak self] in self?.followMicrophone(session: id) }
+        guard session == id, !Task.isCancelled else {
+            input.stop()
+            writer.cancel()
+            throw CancellationError()
         }
-        microphone = device
-        onMicrophone?(device)
+        self.input = input
+        writers[.me] = writer
+        recoveryAttempts = 0
+        microphone = input.device
+        onMicrophone?(input.device)
+        inputObserver?.scheduleCheck()
     }
 
-    /// Restarts only when the engine stopped or another input now resolves; a fresh engine reports a configuration change as it binds its device.
-    private func followMicrophone(session id: UUID) {
-        guard engine?.isRunning != true || AudioInputs.resolve(choice) != microphone else { return }
-        restartMicrophone(session: id)
+    /// Let a running Audio Queue handle Bluetooth format changes without another hardware restart.
+    private func followMicrophone(session id: UUID) async {
+        guard session == id, !changingInput else { return }
+        guard input?.isRunning != true || AudioInputs.resolve(choice)?.id != microphone?.id else { return }
+        await restartMicrophone(session: id)
     }
 
     /// Hands off the chunk recorded so far, then picks the microphone back up on whichever input now resolves.
-    private func restartMicrophone(session id: UUID) {
+    private func restartMicrophone(session id: UUID) async {
         guard session == id else { return }
         haltMicrophone()
         if let writer = writers.removeValue(forKey: .me) {
@@ -157,22 +178,27 @@ public final class MeetingRecorder {
             hand(writer.takeReady())
         }
         do {
-            try runMicrophone(session: id, startOffset: Date().timeIntervalSince(origin))
+            try await runMicrophone(session: id, startOffset: Date().timeIntervalSince(origin))
         } catch {
+            guard session == id else { return }
             microphone = nil
             onMicrophone?(nil)
             levels.me = 0
             onLevels?(levels)
-            onError?(error)
+            recoveryAttempts += 1
+            if recoveryAttempts < 3 { inputObserver?.scheduleCheck() }
+            else {
+                recoveryAttempts = 0
+                onError?(error)
+            }
         }
     }
 
     private func haltMicrophone() {
-        if let engineObserver { NotificationCenter.default.removeObserver(engineObserver) }
-        engineObserver = nil
-        engine?.stop()
-        engine?.inputNode.removeTap(onBus: 0)
-        engine = nil
+        inputObserver?.observeDevice(nil)
+        input?.stop()
+        if let error = input?.error { onError?(error) }
+        input = nil
     }
 
     private func startSystemAudio(session id: UUID, threshold: Float) async {
@@ -227,6 +253,9 @@ public final class MeetingRecorder {
         writers = [:]
         stopSystemAudio = nil
         session = nil
+        microphoneProgress?.cancel()
+        microphoneProgress = nil
+        recoveryAttempts = 0
         meters = [:]
         levels = (0, 0)
         onLevels?(levels)
@@ -235,8 +264,7 @@ public final class MeetingRecorder {
     }
 }
 
-/// AVAudioEngine and the Core Audio IOProc call write on their own threads. The lock protects the open file,
-/// counters and finished chunks against rotation, stop and cancel; no AVAudioPCMBuffer escapes the call.
+/// Unchecked because a lock guards the file, counters and chunks against rotation, stop and cancel, and no buffer outlives a write.
 final class MeetingChunkWriter: @unchecked Sendable {
     private let lock = NSLock()
     private let speaker: Speaker
@@ -279,13 +307,16 @@ final class MeetingChunkWriter: @unchecked Sendable {
             closeChunk()
             return (0, seconds(count))
         }
-        let rms = Self.rms(of: buffer)
+        let slices = VoiceLevelMeter.slices(of: buffer)
+        let rms = slices.map(\.rms).max() ?? 0
         frames += count
-        if rms >= threshold {
-            activeFrames += count
-            silentFrames = 0
-        } else {
-            silentFrames += count
+        for slice in slices {
+            if slice.rms >= threshold {
+                activeFrames += AVAudioFramePosition(slice.frames)
+                silentFrames = 0
+            } else {
+                silentFrames += AVAudioFramePosition(slice.frames)
+            }
         }
         if policy.shouldRotate(duration: seconds(frames), trailingSilence: seconds(silentFrames)) {
             closeChunk()
@@ -351,15 +382,4 @@ final class MeetingChunkWriter: @unchecked Sendable {
         Double(frames) / format.sampleRate
     }
 
-    private static func rms(of buffer: AVAudioPCMBuffer) -> Float {
-        guard let channels = buffer.floatChannelData else { return 0 }
-        let count = Int(buffer.format.channelCount)
-        let interleaved = buffer.format.isInterleaved
-        return (0..<count).reduce(0) { loudest, channel in
-            var value: Float = 0
-            vDSP_rmsqv(interleaved ? channels[0].advanced(by: channel) : channels[channel], vDSP_Stride(interleaved ? count : 1),
-                       &value, vDSP_Length(buffer.frameLength))
-            return max(loudest, value)
-        }
-    }
 }

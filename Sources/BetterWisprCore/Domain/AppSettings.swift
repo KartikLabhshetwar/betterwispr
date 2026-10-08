@@ -17,6 +17,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
     public var showCapsule: Bool = true
+    public var soundEffects: Bool = true
     public var launchAtLogin: Bool = false
     public var silenceThreshold: Float = 0.002
     public var dictationMode: DictationMode = .hold
@@ -25,7 +26,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var cleanup: CleanupLevel = .light
     /// Missing contexts use `.formal`, which leaves the transcript as recognized.
     public var styles: [StyleContext: StyleTone] = [:]
-    /// Nil follows the macOS default input.
+    /// Nil uses Automatic: the macOS default input, or the built-in mic instead of a Bluetooth headset while the lid is open.
     public var microphone: AudioInputDevice?
     /// The Ollama model that writes meeting notes; nil uses Apple Intelligence.
     public var notesModel: String?
@@ -86,6 +87,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
+        soundEffects = try container.decodeIfPresent(Bool.self, forKey: .soundEffects) ?? true
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
         silenceThreshold = try container.decode(Float.self, forKey: .silenceThreshold)
         dictationMode = try container.decodeIfPresent(DictationMode.self, forKey: .dictationMode) ?? .hold

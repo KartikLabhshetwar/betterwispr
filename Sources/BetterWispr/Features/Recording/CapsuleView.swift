@@ -8,6 +8,7 @@ struct CapsuleView: View {
 
     private var isRecording: Bool { model.phase == .recording }
     private var isMeetingCapturing: Bool { model.meetings.activity.capturingID != nil }
+    private var isNotetaking: Bool { !model.isBusy && isMeetingCapturing }
     private var isMeetingRecording: Bool {
         if case .recording = model.meetings.activity { true } else { false }
     }
@@ -16,9 +17,9 @@ struct CapsuleView: View {
             DictationFailure(title: "Notetaker needs attention", message: $0)
         })
     }
-    private var showsToolbar: Bool { failure == nil && !model.isBusy && (hover.isHovering || isMeetingCapturing) }
-    private var showsControls: Bool { model.isBusy && !model.isHeldSession }
-    private var finishesOnClick: Bool { showsControls && isRecording }
+    private var showsToolbar: Bool { failure == nil && !model.isBusy && !isMeetingCapturing && hover.isHovering }
+    private var showsControls: Bool { isNotetaking || (model.isBusy && !model.isHeldSession) }
+    private var finishesOnClick: Bool { isNotetaking || (showsControls && isRecording) }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
 
     var body: some View {
@@ -50,7 +51,7 @@ struct CapsuleView: View {
             if let failure {
                 failureCard(failure)
                     .transition(.opacity)
-            } else if model.isBusy {
+            } else if model.isBusy || isMeetingCapturing {
                 recordingPill
                     .transition(.opacity)
             } else if showsToolbar {
@@ -63,6 +64,12 @@ struct CapsuleView: View {
         .background {
             if !showsToolbar {
                 CapsuleGlass(cornerRadius: failure == nil ? 18 : 22)
+            }
+        }
+        .overlay {
+            if isNotetaking && isMeetingRecording && failure == nil {
+                Capsule().strokeBorder(Color(red: 0, green: 0.73, blue: 0.51), lineWidth: 2)
+                    .allowsHitTesting(false)
             }
         }
         .capsuleRegion(.surface)
@@ -173,58 +180,65 @@ struct CapsuleView: View {
     private var recordingPill: some View {
         HStack(spacing: 8) {
             Waveform(mode: waveformMode, animated: !reduceMotion)
-                .frame(width: 24)
+                .frame(width: isNotetaking ? 24 : 20)
                 .accessibilityLabel(waveformLabel)
-                .accessibilityValue(isRecording ? "\(Int((model.voiceLevels.values.last ?? 0) * 100)) percent" : "")
             if finishesOnClick {
                 RoundedRectangle(cornerRadius: 2)
                     .fill(.white)
                     .frame(width: 8, height: 8)
-                    .frame(width: 24, height: 24)
+                    .frame(width: isNotetaking ? 24 : 20, height: isNotetaking ? 24 : 20)
                     .background(.white.opacity(0.16), in: Circle())
-                    .accessibilityLabel("Finish dictation")
+                    .accessibilityLabel(isNotetaking ? "Stop notetaker" : "Finish dictation")
                     .accessibilityAddTraits(.isButton)
-                    .accessibilityAction { model.toggleRecording() }
+                    .accessibilityAction { finishCapture() }
             } else if showsControls {
                 Button(action: model.cancelRecording) {
                     Image(systemName: "xmark")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 20, height: 20)
                         .background(.white.opacity(0.12), in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Cancel dictation")
             }
         }
-        .padding(.leading, 12)
-        .padding(.trailing, showsControls ? 6 : 12)
-        .frame(height: showsControls ? 32 : 28)
+        .padding(.leading, isNotetaking ? 12 : 10)
+        .padding(.trailing, showsControls ? 6 : 10)
+        .frame(height: isNotetaking ? 32 : showsControls ? 28 : 24)
         .contentShape(Capsule())
-        .onTapGesture { if finishesOnClick { model.toggleRecording() } }
-        .contextMenu { Button("Cancel dictation", action: model.cancelRecording) }
-        .accessibilityAction(named: Text("Cancel dictation"), model.cancelRecording)
-        .capsuleRegion(.dictation)
+        .onTapGesture { if finishesOnClick { finishCapture() } }
+        .contextMenu {
+            if isNotetaking { Button("Stop notetaker", action: model.meetings.stop) }
+            else { Button("Cancel dictation", action: model.cancelRecording) }
+        }
+        .accessibilityActions {
+            if isNotetaking { Button("Stop notetaker", action: model.meetings.stop) }
+            else { Button("Cancel dictation", action: model.cancelRecording) }
+        }
+        .capsuleRegion(isNotetaking ? .notetaker : .dictation)
+    }
+
+    private func finishCapture() {
+        if isNotetaking { model.meetings.stop() }
+        else if isRecording { model.toggleRecording() }
     }
 
     private var meetingButton: some View {
         HStack(spacing: 0) {
             Button {
-                if isMeetingCapturing { model.meetings.stop() }
-                else {
-                    model.startMeeting()
-                    model.onShowDashboard?()
-                }
+                model.startMeeting()
+                model.onShowDashboard?()
             } label: {
-                Image(systemName: isMeetingCapturing ? "stop.fill" : "record.circle")
-                    .font(.system(size: isMeetingCapturing ? 10 : 15, weight: .medium))
+                Image(systemName: "record.circle")
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
                     .background(.white.opacity(hover.target == .notetaker ? 0.12 : 0), in: Circle())
                     .contentShape(Circle())
             }
-            .accessibilityLabel(isMeetingCapturing ? "Stop notetaker" : "Start notetaker")
-            .disabled(model.meetings.activity != .idle && !isMeetingCapturing)
+            .accessibilityLabel("Start notetaker")
+            .disabled(model.meetings.activity != .idle)
             .capsuleRegion(.notetaker)
             Button {
                 model.selectedPage = .meetings
@@ -241,27 +255,25 @@ struct CapsuleView: View {
         }
         .buttonStyle(.plain)
         .background { CapsuleGlass(cornerRadius: 14) }
-        .overlay {
-            if isMeetingRecording {
-                Capsule().strokeBorder(Color(red: 0, green: 0.73, blue: 0.51), lineWidth: 2)
-                    .allowsHitTesting(false)
-            }
-        }
     }
 
     private var waveformMode: Waveform.Mode {
+        if isNotetaking {
+            return isMeetingRecording ? .listening(VoiceLevels(values: [max(model.meetings.levels.me, model.meetings.levels.them)])) : .waiting
+        }
         switch model.phase {
-        case .recording: .listening(model.voiceLevels)
-        case .transcribing: .processing
-        default: .waiting
+        case .recording: return .listening(model.voiceLevels)
+        case .transcribing: return .processing
+        default: return .waiting
         }
     }
 
     private var waveformLabel: String {
+        if isNotetaking { return isMeetingRecording ? "Meeting audio level" : "Starting notetaker" }
         switch model.phase {
-        case .recording: "Microphone input level"
-        case .transcribing: "Transcribing"
-        default: "Starting microphone"
+        case .recording: return "Microphone input level"
+        case .transcribing: return "Transcribing"
+        default: return "Starting microphone"
         }
     }
 }
@@ -314,7 +326,7 @@ private struct Waveform: View {
             ForEach(0..<Self.count, id: \.self) { index in
                 Capsule()
                     .fill(.white.opacity(mode == .waiting ? 0.4 : 0.95))
-                    .frame(width: 2.5, height: 3 + 11 * height(of: index, at: date))
+                    .frame(width: 2, height: 3 + 11 * height(of: index, at: date))
             }
         }
         .frame(height: 14)

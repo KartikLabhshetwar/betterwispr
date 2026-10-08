@@ -35,6 +35,11 @@ import Testing
         .dictation: CGRect(x: 183, y: 192, width: 74, height: 32)
     ])
     #expect(hover.target == .dictation)
+    hover.update(regions: [
+        .surface: CGRect(x: 183, y: 192, width: 74, height: 32),
+        .notetaker: CGRect(x: 183, y: 192, width: 74, height: 32)
+    ])
+    #expect(hover.target == .notetaker) // The recording pill replaces all idle controls.
     hover.update(regions: [.surface: CGRect(x: 40, y: 104, width: 360, height: 120)])
     #expect(hover.isHovering && hover.target == nil) // No stale tooltip over an error.
 }

@@ -95,7 +95,7 @@ CLI. Neither recognizes microphone audio.
   with no cancel or finish buttons. Text is inserted once. Tap ⌥ Space
   briefly; the capsule expands into an error card, shows "Don’t tap. Hold ⌥ Space." and pastes nothing.
   Release before the bars move; it shows "Keep holding ⌥ Space." and pastes nothing.
-- [ ] Toggle mode: press ⌥ Space once and speak. The glass capsule is 32 points tall,
+- [ ] Toggle mode: press ⌥ Space once and speak. The glass capsule is 64 × 28 points,
   with a neutral border, five white waveform bars and a white stop square in a gray circle.
   Clicking anywhere on the capsule finishes, as does pressing ⌥ Space again.
   Right-click and choose Cancel dictation; the session is discarded and nothing
@@ -257,7 +257,8 @@ were not exercised in this UI pass.
   appears in its own capsule beside the microphone, with "Start notetaker" on hover.
   Its chevron opens Meetings without starting a recording. Click the record icon: the
   dashboard reopens to Meetings and recording starts. Move the pointer away: the
-  green outline and Stop notetaker button stay visible and stop capture when clicked.
+  single waveform/stop capsule stays visible and stops capture when clicked;
+  the microphone and chevron are hidden throughout notetaker capture.
   The green outline appears only during notetaker recording, never during dictation
   or while the notetaker is still starting. While
   finishing or writing notes, a second meeting cannot be started. With an

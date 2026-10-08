@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import DownloadCTA, { ClosingCTA } from "@/components/download-cta";
 import HeroDemo from "@/components/hero-demo";
 import FeatureBento from "@/components/feature-bento";
+import StarOnGithub from "@/components/star-on-github";
 import { comparisons } from "@/lib/comparisons";
 import { pageHead } from "@/lib/seo";
 
@@ -70,8 +71,9 @@ function HomeComponent() {
           , speak naturally, and let BetterWispr do the typing. Speech stays on
           your Mac.
         </p>
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <DownloadCTA />
+          <StarOnGithub />
         </div>
         <p className="mt-4 text-sm text-zinc-500">
           Free · macOS 14+ · Apple Silicon recommended

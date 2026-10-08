@@ -1,3 +1,4 @@
+import BetterWisprCore
 import SwiftUI
 
 struct SymbolTile: View {
@@ -16,10 +17,12 @@ struct SymbolTile: View {
 }
 
 struct KeyboardHint: View {
+    let shortcut: DictationShortcut
+
     var body: some View {
-        Text("⌥ Space")
+        Text(shortcut.displayName)
             .foregroundStyle(.secondary)
-            .accessibilityLabel("Option Space")
+            .accessibilityLabel(shortcut.spokenName)
     }
 }
 

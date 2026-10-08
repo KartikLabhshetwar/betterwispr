@@ -42,7 +42,7 @@ struct OnboardingView: View {
             BrandMark(size: 64)
             Text("Talk instead of type")
                 .font(.title.weight(.semibold))
-            Text("Hold ⌥ Space anywhere and speak. Release it, and your words appear where your cursor is.")
+            Text("Hold \(model.settings.shortcut.displayName) anywhere and speak. Release it, and your words appear where your cursor is.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Label("Everything runs on your Mac. No audio leaves it.", systemImage: "lock.fill")
@@ -67,10 +67,10 @@ struct OnboardingView: View {
 
     private var tryIt: some View {
         VStack(alignment: .leading, spacing: 16) {
-            header("Try it now", "Pick a speech model, then hold ⌥ Space and say something.")
+            header("Try it now", "Pick a speech model, then hold \(model.settings.shortcut.displayName) and say something.")
             Form {
                 modelRow
-                LabeledContent("Shortcut") { KeyboardHint().font(.body.weight(.semibold)) }
+                LabeledContent("Shortcut") { KeyboardHint(shortcut: model.settings.shortcut).font(.body.weight(.semibold)) }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)

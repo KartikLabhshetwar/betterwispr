@@ -16,8 +16,12 @@ struct DictationFailure: Equatable {
     var message: String
     var needsAccessibility = false
 
-    static let tapped = DictationFailure(title: "Don’t tap. Hold ⌥ Space.", message: "Hold ⌥ Space while speaking, release to see text.")
-    static let releasedEarly = DictationFailure(title: "Keep holding ⌥ Space.", message: "Wait for the bars to move, then speak and release.")
+    static func tapped(_ shortcut: DictationShortcut) -> DictationFailure {
+        DictationFailure(title: "Don’t tap. Hold \(shortcut.displayName).", message: "Hold \(shortcut.displayName) while speaking, release to see text.")
+    }
+    static func releasedEarly(_ shortcut: DictationShortcut) -> DictationFailure {
+        DictationFailure(title: "Keep holding \(shortcut.displayName).", message: "Wait for the bars to move, then speak and release.")
+    }
     static let noSpeech = DictationFailure(title: "No speech heard.", message: "Move closer to your microphone and try again.")
     static let pasteBlocked = DictationFailure(title: "Copied, not pasted.", message: "Allow Accessibility so text lands at your cursor. Press ⌘V for now.", needsAccessibility: true)
 }
@@ -48,6 +52,8 @@ final class AppModel {
 
     @ObservationIgnored private let store = LocalStore()
     @ObservationIgnored private let recorder = AudioRecorder()
+    @ObservationIgnored private let globalShortcut = GlobalShortcut()
+    @ObservationIgnored private var shortcutWarning: String?
     @ObservationIgnored private var provider: (any SpeechProvider)?
     @ObservationIgnored private var preparedModelID: String?
     @ObservationIgnored private var loading: (id: String, task: Task<Void, any Error>)?
@@ -82,6 +88,8 @@ final class AppModel {
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         refreshModels()
         recorder.onLevel = { [weak self] levels in self?.voiceLevels = levels }
+        globalShortcut.onPress = { [weak self] in self?.shortcutPressed() }
+        globalShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
         warmUpSelectedModel()
     }
 
@@ -96,9 +104,35 @@ final class AppModel {
         guard let pressedAt = shortcutPressedAt else { return }
         shortcutPressedAt = nil
         guard phase == .preparing || phase == .recording else { return }
-        if Date().timeIntervalSince(pressedAt) < 0.3 { abandon(.tapped) }
-        else if phase == .preparing { abandon(.releasedEarly) }
+        if Date().timeIntervalSince(pressedAt) < 0.3 { abandon(.tapped(settings.shortcut)) }
+        else if phase == .preparing { abandon(.releasedEarly(settings.shortcut)) }
         else { finishRecording() }
+    }
+
+    func registerShortcut() {
+        do {
+            try globalShortcut.register(settings.shortcut)
+            if statusMessage == shortcutWarning { statusMessage = "" }
+        } catch {
+            statusMessage = "\(error.localizedDescription) Use the menu bar or Record button to dictate, or choose another shortcut in Settings."
+            shortcutWarning = statusMessage
+        }
+    }
+
+    func suspendShortcut() { globalShortcut.unregister() }
+
+    func changeShortcut(_ shortcut: DictationShortcut) {
+        guard !isBusy else { return }
+        do {
+            try globalShortcut.register(shortcut)
+        } catch {
+            registerShortcut()
+            ToastWindow.shared.show(Toast(failure: "Couldn’t use \(shortcut.displayName)", error))
+            return
+        }
+        if statusMessage == shortcutWarning { statusMessage = "" }
+        settings.shortcut = shortcut
+        saveSettings()
     }
 
     func toggleRecording() {
@@ -134,7 +168,8 @@ final class AppModel {
                 guard self.generation == token else { return }
                 self.microphoneGranted = true
                 self.phase = .recording
-                self.statusMessage = held ? "Listening. Release ⌥ Space to finish." : "Listening. Press ⌥ Space or click the capsule to finish."
+                let shortcut = self.settings.shortcut.displayName
+                self.statusMessage = held ? "Listening. Release \(shortcut) to finish." : "Listening. Press \(shortcut) or click the capsule to finish."
                 let started = Date()
                 self.ticker = Task { [weak self] in
                     while !Task.isCancelled {

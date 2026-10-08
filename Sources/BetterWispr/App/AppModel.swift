@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 enum RecordingPhase: Equatable {
     case idle, preparing, recording, transcribing
     case failed(DictationFailure)
+    case unpasted(String)
 }
 
 struct DictationFailure: Equatable {
@@ -41,6 +42,7 @@ struct ModelInstallation: Equatable {
 final class AppModel {
     static let onboardingVersion = 1
     static let phraseBoosterID = "phrase-booster"
+    static let unpastedCardSeconds = 5.0
 
     var selectedPage: AppPage = .overview
     var phase: RecordingPhase = .idle { didSet { onPresentationChange?() } }
@@ -80,7 +82,7 @@ final class AppModel {
     @ObservationIgnored private var operation: Task<Void, Never>?
     @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var ticker: Task<Void, Never>?
-    @ObservationIgnored private var failureDismissal: Task<Void, Never>?
+    @ObservationIgnored private var cardDismissal: Task<Void, Never>?
     @ObservationIgnored private var shortcutPressedAt: Date?
     @ObservationIgnored private var generation = UUID()
     @ObservationIgnored private var targetApplication: NSRunningApplication?
@@ -94,6 +96,7 @@ final class AppModel {
     var isInstalling: Bool { installation != nil && installation?.failure == nil }
     var needsOnboarding: Bool { storageIsReadable && settings.completedOnboardingVersion < Self.onboardingVersion }
     var failure: DictationFailure? { if case .failed(let failure) = phase { failure } else { nil } }
+    var unpasted: String? { if case .unpasted(let text) = phase { text } else { nil } }
     var totalWords: Int { history.reduce(0) { $0 + $1.wordCount } }
     var totalDuration: TimeInterval { history.reduce(0) { $0 + $1.duration } }
 
@@ -288,7 +291,10 @@ final class AppModel {
                 let result = try await integration?.deliver(text, to: self.targetApplication)
                 guard self.generation == token else { return }
                 if result == .copiedForManualPaste && !AXIsProcessTrusted() { self.fail(.pasteBlocked) }
-                else {
+                else if result == .copiedForManualPaste {
+                    self.statusMessage = ""
+                    self.present(.unpasted(text), for: Self.unpastedCardSeconds)
+                } else {
                     self.phase = .idle
                     self.statusMessage = ""
                     switch result {
@@ -544,7 +550,7 @@ final class AppModel {
 
     func copyLatestTranscript() { copyText(partialTranscript) }
 
-    private func copyText(_ text: String) {
+    func copyText(_ text: String) {
         Task {
             do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
             catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
@@ -762,8 +768,8 @@ final class AppModel {
         defaultMicrophone = AudioInputs.systemDefault()
     }
 
-    func dismissFailure() {
-        if failure != nil { phase = .idle }
+    func dismissCard() {
+        if failure != nil || unpasted != nil { phase = .idle }
     }
 
     private func abandon(_ failure: DictationFailure) {
@@ -772,12 +778,17 @@ final class AppModel {
     }
 
     private func fail(_ failure: DictationFailure) {
-        phase = .failed(failure)
         statusMessage = failure.message
-        failureDismissal?.cancel()
-        failureDismissal = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(6))
-            guard !Task.isCancelled, let self, self.phase == .failed(failure) else { return }
+        present(.failed(failure), for: 6)
+    }
+
+    /// Shows a capsule card that closes itself unless another phase replaced it first.
+    private func present(_ card: RecordingPhase, for seconds: Double) {
+        phase = card
+        cardDismissal?.cancel()
+        cardDismissal = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, let self, self.phase == card else { return }
             self.phase = .idle
         }
     }

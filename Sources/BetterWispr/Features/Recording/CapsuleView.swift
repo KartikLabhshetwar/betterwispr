@@ -13,11 +13,12 @@ struct CapsuleView: View {
         if case .recording = model.meetings.activity { true } else { false }
     }
     private var failure: DictationFailure? {
-        model.failure ?? (model.isBusy ? nil : model.meetings.message.map {
+        model.failure ?? (model.isBusy || model.unpasted != nil ? nil : model.meetings.message.map {
             DictationFailure(title: "Notetaker needs attention", message: $0)
         })
     }
-    private var showsToolbar: Bool { failure == nil && !model.isBusy && !isMeetingCapturing && hover.isHovering }
+    private var showsCard: Bool { failure != nil || model.unpasted != nil }
+    private var showsToolbar: Bool { !showsCard && !model.isBusy && !isMeetingCapturing && hover.isHovering }
     private var showsControls: Bool { isNotetaking || (model.isBusy && !model.isHeldSession) }
     private var finishesOnClick: Bool { isNotetaking || (showsControls && isRecording) }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
@@ -25,7 +26,7 @@ struct CapsuleView: View {
     var body: some View {
         VStack(spacing: 6) {
             Spacer(minLength: 0)
-            if failure == nil, let target = hover.target {
+            if !showsCard, let target = hover.target {
                 tooltip(for: target)
             }
             surface
@@ -44,12 +45,19 @@ struct CapsuleView: View {
             guard let failure else { return }
             AccessibilityNotification.Announcement("\(failure.title) \(failure.message)").post()
         }
+        .onChange(of: model.unpasted) {
+            guard model.unpasted != nil else { return }
+            AccessibilityNotification.Announcement("Copied, not pasted. Press Command V to paste it.").post()
+        }
     }
 
     private var surface: some View {
         VStack(spacing: 0) {
             if let failure {
                 failureCard(failure)
+                    .transition(.opacity)
+            } else if let text = model.unpasted {
+                unpastedCard(text)
                     .transition(.opacity)
             } else if model.isBusy || isMeetingCapturing {
                 recordingPill
@@ -63,11 +71,11 @@ struct CapsuleView: View {
         }
         .background {
             if !showsToolbar {
-                CapsuleGlass(cornerRadius: failure == nil ? 18 : 22)
+                CapsuleGlass(cornerRadius: showsCard ? 22 : 18)
             }
         }
         .overlay {
-            if isNotetaking && isMeetingRecording && failure == nil {
+            if isNotetaking && isMeetingRecording && !showsCard {
                 Capsule().strokeBorder(Color(red: 0, green: 0.73, blue: 0.51), lineWidth: 2)
                     .allowsHitTesting(false)
             }
@@ -141,7 +149,7 @@ struct CapsuleView: View {
             if failure.needsAccessibility {
                 Button("Allow Accessibility") {
                     model.requestAccessibility()
-                    model.dismissFailure()
+                    model.dismissCard()
                 }
                 .buttonStyle(.bordered)
             }
@@ -154,8 +162,46 @@ struct CapsuleView: View {
         .frame(width: 360, alignment: .leading)
     }
 
+    private func unpastedCard(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .accessibilityHidden(true)
+                Text("Copied, not pasted.")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 4)
+                Button {
+                    model.copyText(text)
+                    model.dismissCard()
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: 26, height: 26)
+                        .background(.white.opacity(0.06), in: Circle())
+                        .overlay { Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+                        .overlay { CountdownRing(seconds: AppModel.unpastedCardSeconds) }
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Copy text")
+                .accessibilityLabel("Copy text")
+            }
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(4)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .frame(width: 360, alignment: .leading)
+    }
+
     private func dismissFailure() {
-        if model.failure != nil { model.dismissFailure() }
+        if model.failure != nil { model.dismissCard() }
         else { model.meetings.message = nil }
     }
 
@@ -276,6 +322,22 @@ struct CapsuleView: View {
         case .transcribing: return "Transcribing"
         default: return "Starting microphone"
         }
+    }
+}
+
+private struct CountdownRing: View {
+    let seconds: Double
+    @State private var remaining = 1.0
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: remaining)
+            .stroke(.white.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            .rotationEffect(.degrees(-90))
+            .padding(0.75)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onAppear { withAnimation(.linear(duration: seconds)) { remaining = 0 } }
     }
 }
 

@@ -278,7 +278,9 @@ copies explicitly; `FocusedAppIntegration` checks the captured app's process ID
 and sends paste only while it remains frontmost. Otherwise it copies for manual
 paste. Its guard tracks the destination app, not the individual text field.
 `deliver` returns an `OutputResult` case (`copied`, `copiedForManualPaste` or
-`pasted(into:)`); the app maps each case to a toast.
+`pasted(into:)`). The app shows `copiedForManualPaste` in a capsule card with the
+text and a Copy button that closes after five seconds, `copied` as a toast, and
+nothing after a successful paste.
 
 Current destinations share the same final transcript; model inference should not
 know which app will receive text. Validate prerequisites and expose errors

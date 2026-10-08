@@ -267,11 +267,15 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
 - [ ] Change clipboard contents while recognition/paste is pending. New user
   clipboard contents must not be replaced by an old snapshot.
 - [ ] Switch to another app while recognition is pending. It must not paste into
-  the newly focused app. Retrieve the transcript by manual copy. The current
-  guard checks the app process, not changes between fields inside the same app;
-  record this limitation when testing.
-- [ ] Quit the original destination app before recognition finishes. Verify a
-  recoverable failure and no paste into a replacement app.
+  the newly focused app. The capsule shows "Copied, not pasted." with the text
+  and a Copy button whose ring empties over five seconds before the card closes.
+  ⌘V pastes the text, and Copy copies it again, closes the card and shows the
+  "Copied" toast. Start a new dictation while the card is open; the card must
+  give way to the recording pill and never show the earlier text again. The
+  current guard checks the app process, not changes between fields inside the
+  same app; record this limitation when testing.
+- [ ] Quit the original destination app before recognition finishes. Verify the
+  same card and no paste into a replacement app.
 - [ ] Disable automatic paste. Dictation/history still work and no keystroke is
   sent to the frontmost app.
 - [ ] Revoke Accessibility and dictate. The capsule shows "Copied, not pasted."

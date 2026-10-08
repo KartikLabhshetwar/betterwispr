@@ -109,7 +109,7 @@ final class CapsuleController {
     }
 
     func update() {
-        if model.settings.showCapsule || model.isBusy || model.failure != nil || model.meetings.activity != .idle || model.meetings.message != nil { show() }
+        if model.settings.showCapsule || model.phase != .idle || model.meetings.activity != .idle || model.meetings.message != nil { show() }
         else { panel.orderOut(nil) }
     }
 

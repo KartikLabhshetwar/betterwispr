@@ -4,7 +4,9 @@
 
 # BetterWispr
 
-Local-first dictation for macOS. Hold **⌥ Space**, speak, release, and the text lands in whatever app you were typing in. Speech is transcribed on your Mac by default; nothing is sent anywhere unless you add an API connection yourself.
+**Free, open-source voice dictation for macOS.** Hold **⌥ Space**, speak, release, and the text lands in whatever app you were typing in.
+
+BetterWispr is a private, offline speech-to-text app and an open-source alternative to Wispr Flow. It transcribes on your Mac with Whisper, NVIDIA Parakeet or Apple's on-device speech recognition, so your voice never leaves your computer unless you add an API connection yourself.
 
 [Download the latest release](https://github.com/KartikLabhshetwar/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
 

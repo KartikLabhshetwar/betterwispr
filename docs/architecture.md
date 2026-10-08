@@ -107,9 +107,11 @@ input to the resolved device before reading its format.
 `AudioInputObserver` reports connects, disconnects and default-input changes,
 debounced on the main actor. The settings picker and the meeting card's
 microphone menu refresh from it. During a meeting, `MeetingRecorder` rebuilds
-its microphone engine when the resolved device changes or the engine reports a
-configuration change, closing the current "Me" chunk first so offsets stay
-continuous. A dictation already in progress keeps its device until it ends.
+its microphone engine when the resolved device changes or the engine has
+stopped, closing the current "Me" chunk first so offsets stay continuous. A
+configuration change on a running engine bound to the same device is ignored,
+because every fresh engine posts one as it binds its input; rebuilding on it
+loops and leaves only sub-second chunks that are dropped as silence. A dictation already in progress keeps its device until it ends.
 
 ## Add a model
 

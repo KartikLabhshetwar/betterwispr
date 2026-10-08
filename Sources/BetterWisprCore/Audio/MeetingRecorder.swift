@@ -136,14 +136,15 @@ public final class MeetingRecorder {
         writers[.me] = writer
         engineObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
                                                                 queue: .main) { @Sendable [weak self] _ in
-            Task { @MainActor [weak self] in self?.restartMicrophone(session: id) }
+            Task { @MainActor [weak self] in self?.followMicrophone(session: id) }
         }
         microphone = device
         onMicrophone?(device)
     }
 
+    /// Restarts only when the engine stopped or another input now resolves; a fresh engine reports a configuration change as it binds its device.
     private func followMicrophone(session id: UUID) {
-        guard engine == nil || AudioInputs.resolve(choice) != microphone else { return }
+        guard engine?.isRunning != true || AudioInputs.resolve(choice) != microphone else { return }
         restartMicrophone(session: id)
     }
 

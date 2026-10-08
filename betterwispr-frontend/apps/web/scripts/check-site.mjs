@@ -45,7 +45,7 @@ for (const path of paths) {
   );
   assert.ok(
     html.includes(
-      'href="https://github.com/KartikLabhshetwar/betterwispr/releases/latest"',
+      'href="https://github.com/opennookorg/betterwispr/releases/latest"',
     ),
     `${path}: working CTA destination configuration`,
   );
@@ -91,7 +91,7 @@ try {
   ]) {
     const html = renderToStaticMarkup(
       createElement(GitHubStars, {
-        repo: "KartikLabhshetwar/betterwispr",
+        repo: "opennookorg/betterwispr",
         stargazersCount: count,
         locales,
       }),
@@ -102,12 +102,12 @@ try {
     );
     assert.ok(
       html.includes(
-        `aria-label="Star KartikLabhshetwar/betterwispr on GitHub (${full})"`,
+        `aria-label="Star opennookorg/betterwispr on GitHub (${full})"`,
       ),
       `${count}: accessible full count`,
     );
     assert.ok(
-      html.includes('href="https://github.com/KartikLabhshetwar/betterwispr"'),
+      html.includes('href="https://github.com/opennookorg/betterwispr"'),
     );
     assert.ok(
       html.includes('target="_blank"') && html.includes('rel="noopener"'),
@@ -174,7 +174,7 @@ try {
   assert.ok(hero, "The homepage renders its hero");
   assert.deepEqual(
     [...hero.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((match) => match[1]),
-    ["https://github.com/KartikLabhshetwar/betterwispr/releases/latest"],
+    ["https://github.com/opennookorg/betterwispr/releases/latest"],
     "The hero has only the macOS download action",
   );
 } finally {

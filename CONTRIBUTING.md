@@ -8,7 +8,7 @@ You need macOS 14+, a Swift 6.2+ toolchain and Xcode or the Command Line Tools.
 The first build downloads Swift package dependencies, so it needs internet.
 
 ```sh
-git clone https://github.com/KartikLabhshetwar/betterwispr.git
+git clone https://github.com/opennookorg/betterwispr.git
 cd betterwispr
 make dev
 ```

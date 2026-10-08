@@ -5,7 +5,7 @@ struct AboutView: View {
     @Bindable var updater: AppUpdater
     let shortcut: DictationShortcut
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
-    private let repository = URL(string: "https://github.com/KartikLabhshetwar/betterwispr")!
+    private let repository = URL(string: "https://github.com/opennookorg/betterwispr")!
 
     var body: some View {
         Form {

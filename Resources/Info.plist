@@ -17,7 +17,7 @@
     <key>NSSpeechRecognitionUsageDescription</key><string>BetterWispr uses Apple's on-device speech recognition only when you choose the Apple model. Cloud recognition is never enabled.</string>
     <key>NSAppTransportSecurity</key>
     <dict><key>NSAllowsLocalNetworking</key><true/></dict>
-    <key>SUFeedURL</key><string>https://github.com/KartikLabhshetwar/betterwispr/releases/latest/download/appcast.xml</string>
+    <key>SUFeedURL</key><string>https://github.com/opennookorg/betterwispr/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key><string>QAcU47kj1MAVrne6SZCZ9c8XhIE0pOP/v3dCIEn+wH0=</string>
 </dict>
 </plist>

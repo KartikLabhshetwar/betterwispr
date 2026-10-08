@@ -51,11 +51,11 @@ cat > "$RELEASE_DIR/appcast.xml" <<EOF
         <item>
             <title>Version $VERSION</title>
             <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
-            <link>https://github.com/KartikLabhshetwar/betterwispr/releases/tag/v$VERSION</link>
+            <link>https://github.com/opennookorg/betterwispr/releases/tag/v$VERSION</link>
             <sparkle:version>$VERSION</sparkle:version>
             <sparkle:shortVersionString>$VERSION</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/KartikLabhshetwar/betterwispr/releases/download/v$VERSION/$(basename "$DMG_PATH")" type="application/octet-stream" $SIGNATURE/>
+            <enclosure url="https://github.com/opennookorg/betterwispr/releases/download/v$VERSION/$(basename "$DMG_PATH")" type="application/octet-stream" $SIGNATURE/>
         </item>
     </channel>
 </rss>

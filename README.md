@@ -8,7 +8,7 @@
 
 BetterWispr is a private, offline speech-to-text app and an open-source alternative to Wispr Flow. It transcribes on your Mac with Whisper, NVIDIA Parakeet or Apple's on-device speech recognition, so your voice never leaves your computer unless you add an API connection yourself.
 
-[Download the latest release](https://github.com/KartikLabhshetwar/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
+[Download the latest release](https://github.com/opennookorg/betterwispr/releases/latest) · [Website](https://betterwispr.com) · [Changelog](CHANGELOG.md)
 
 </div>
 
@@ -30,7 +30,7 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 
 ## Getting started
 
-1. Download the DMG from [Releases](https://github.com/KartikLabhshetwar/betterwispr/releases/latest) and drag BetterWispr to Applications.
+1. Download the DMG from [Releases](https://github.com/opennookorg/betterwispr/releases/latest) and drag BetterWispr to Applications.
 2. Open it and follow the welcome guide.
 3. Pick a model in **Models**. Apple on-device needs no download; Parakeet and Whisper download once, then work offline.
 4. Grant **Microphone** access, and **Accessibility** access so BetterWispr can paste for you.

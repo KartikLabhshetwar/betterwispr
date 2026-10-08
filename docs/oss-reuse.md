@@ -60,7 +60,8 @@ Download for macOS buttons.
 `betterwispr-frontend/apps/web/src/components/github-stars.tsx` adapts
 [Chánh Đại's GitHub Stars](https://chanhdai.com/components/github-stars),
 installed with `npx shadcn@latest add @ncdai/github-stars`. The upstream MIT
-license and copyright 2026 Chánh Đại are retained in the source. Changes use
+license and copyright 2026 Chánh Đại are retained in the source and deployed
+with the site at `/licenses/github-stars.txt`. Changes use
 the existing shared UI imports, supply the tooltip provider and add an
 accessible link label and singular-star wording. The existing GitHub action
 supplies BetterWispr's live count to the new compact header variant and retains

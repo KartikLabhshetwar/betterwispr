@@ -1,8 +1,7 @@
-import { GithubLogoIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import BrandMark from "@/components/brand-mark";
 import DownloadCTA from "@/components/download-cta";
-import { GITHUB_URL } from "@/lib/links";
+import StarOnGithub from "@/components/star-on-github";
 
 export default function Header() {
   return (
@@ -37,13 +36,9 @@ export default function Header() {
           >
             Changelog
           </Link>
-          <a
-            href={GITHUB_URL}
-            aria-label="BetterWispr on GitHub"
-            className="hidden rounded-lg p-2 text-zinc-600 hover:text-zinc-900 sm:block"
-          >
-            <GithubLogoIcon className="size-5" />
-          </a>
+          <div className="hidden sm:block">
+            <StarOnGithub compact />
+          </div>
           <DownloadCTA compact />
         </div>
       </nav>

@@ -1,31 +1,53 @@
-import { SparkleIcon, StarIcon } from "@phosphor-icons/react";
+import { GithubLogoIcon, SparkleIcon, StarIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
-import { GITHUB_API_URL, GITHUB_URL } from "@/lib/links";
+import { GitHubStars } from "@/components/github-stars";
+import { GITHUB_API_URL, GITHUB_REPO, GITHUB_URL } from "@/lib/links";
 
 const COUNT_UP_MS = 1200;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
-const COMPACT = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+const COMPACT = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 const SPARKLES = [
   { position: "-top-2 -right-2", delay: "0s" },
   { position: "-bottom-1 -left-2", delay: "0.2s" },
   { position: "-top-2 -left-1", delay: "0.4s" },
 ];
 
-type Stars = { status: "loading" } | { status: "ready"; count: number } | { status: "failed" };
+type Stars =
+  | { status: "loading" }
+  | { status: "ready"; count: number }
+  | { status: "failed" };
 
 /** Secondary hero action: a twinkling star and the live GitHub star count. */
-export default function StarOnGithub() {
+export default function StarOnGithub({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const [stars, setStars] = useState<Stars>({ status: "loading" });
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(GITHUB_API_URL, { signal: controller.signal, headers: { Accept: "application/vnd.github+json" } })
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`GitHub ${response.status}`))))
+    fetch(GITHUB_API_URL, {
+      signal: controller.signal,
+      headers: { Accept: "application/vnd.github+json" },
+    })
+      .then((response) =>
+        response.ok
+          ? response.json()
+          : Promise.reject(new Error(`GitHub ${response.status}`)),
+      )
       .then(({ stargazers_count }: { stargazers_count?: unknown }) =>
         setStars(
-          typeof stargazers_count === "number" ? { status: "ready", count: stargazers_count } : { status: "failed" },
+          typeof stargazers_count === "number" &&
+            Number.isSafeInteger(stargazers_count) &&
+            stargazers_count >= 0
+            ? { status: "ready", count: stargazers_count }
+            : { status: "failed" },
         ),
       )
       .catch(() => {
@@ -35,7 +57,7 @@ export default function StarOnGithub() {
   }, []);
 
   useEffect(() => {
-    if (stars.status !== "ready") return;
+    if (compact || stars.status !== "ready") return;
     if (window.matchMedia(REDUCED_MOTION).matches) {
       setShown(stars.count);
       return;
@@ -47,7 +69,24 @@ export default function StarOnGithub() {
       if (progress < 1) frame = requestAnimationFrame(tick);
     });
     return () => cancelAnimationFrame(frame);
-  }, [stars]);
+  }, [stars, compact]);
+
+  if (compact) {
+    return stars.status === "ready" ? (
+      <GitHubStars repo={GITHUB_REPO} stargazersCount={stars.count} />
+    ) : (
+      <a
+        href={GITHUB_URL}
+        aria-label="BetterWispr on GitHub"
+        aria-busy={stars.status === "loading"}
+        className="block rounded-lg p-2 text-zinc-600 hover:text-zinc-900"
+        target="_blank"
+        rel="noopener"
+      >
+        <GithubLogoIcon className="size-5" aria-hidden="true" />
+      </a>
+    );
+  }
 
   return (
     <a
@@ -69,7 +108,9 @@ export default function StarOnGithub() {
         ))}
       </span>
       Star on GitHub
-      {stars.status === "loading" && <span className="h-6 w-12 animate-pulse rounded-md bg-zinc-100 motion-reduce:animate-none" />}
+      {stars.status === "loading" && (
+        <span className="h-6 w-12 animate-pulse rounded-md bg-zinc-100 motion-reduce:animate-none" />
+      )}
       {stars.status === "ready" && (
         <span className="min-w-12 rounded-md bg-zinc-100 px-2 text-center font-mono text-sm text-zinc-600 tabular-nums">
           {COMPACT.format(shown)}

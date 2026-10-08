@@ -8,6 +8,7 @@ All notable changes to BetterWispr are listed here. The format follows
 
 ### Added
 - Hold-to-talk dictation, now the default: hold ⌥ Space while speaking and release to finish. "Press to toggle" keeps the previous behavior and is set in Settings.
+- Change the dictation shortcut in Settings. Click the shortcut, press a new combination that includes ⌘, ⌥ or ⌃ or an F-key such as F5, or reset it to ⌥ Space. The recorder shows the keys you hold and says why a key it refuses can’t be used. Hints, menus and error cards show the shortcut you chose.
 - "Copy to clipboard" setting, on by default. When on, each dictation stays on the clipboard after it is pasted. When off, BetterWispr restores the previous clipboard, and with paste also off it leaves the clipboard alone. A blocked paste still copies so the text is never lost.
 - Error card above the capsule with a shake and red outline for taps, early releases, missing speech, blocked paste and other failures. It dismisses itself after six seconds and respects Reduce Motion.
 - About section at the bottom of Settings with the app logo, version, a link to the source code and the author's X profile.

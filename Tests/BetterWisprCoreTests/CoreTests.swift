@@ -32,10 +32,36 @@ import Testing
     #expect(settings.selectedModelID == "parakeet-v3")
     #expect(settings.dictationMode == .hold)
     #expect(settings.copyToClipboard)
+    #expect(settings.shortcut == .optionSpace)
     var toggled = settings
     toggled.dictationMode = .toggle
     toggled.copyToClipboard = false
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
+}
+
+@Test func shortcutsNeedACommandKeyOrFunctionKeyAndRoundTripThroughSettings() throws {
+    #expect(DictationShortcut.optionSpace.displayName == "⌥ Space")
+    #expect(DictationShortcut.optionSpace.spokenName == "Option Space")
+    let everything = try #require(DictationShortcut(keyCode: 40, modifiers: [.command, .shift, .option, .control], key: "K"))
+    #expect(everything.displayName == "⌃⌥⇧⌘ K")
+    #expect(everything.spokenName == "Control Option Shift Command K")
+    #expect(DictationShortcut(keyCode: 2, modifiers: .shift, key: "D") == nil)
+    #expect(DictationShortcut(keyCode: 2, modifiers: [], key: "D") == nil)
+    #expect(DictationShortcut(keyCode: 2, modifiers: .control, key: "") == nil)
+    #expect(DictationShortcut(keyCode: 96, modifiers: [], key: "F5")?.displayName == "F5")
+    #expect(DictationShortcut(keyCode: 96, modifiers: .shift, key: "F5")?.spokenName == "Shift F5")
+    #expect(ShortcutModifiers([.option, .control]).symbols == "⌃⌥")
+
+    var settings = AppSettings()
+    settings.shortcut = try #require(DictationShortcut(keyCode: 2, modifiers: [.control, .shift], key: "D"))
+    let decoded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(decoded.shortcut == settings.shortcut)
+    #expect(decoded.shortcut.displayName == "⌃⇧ D")
+    let functionKey = try JSONDecoder().decode(DictationShortcut.self, from: Data(#"{"keyCode":96,"modifiers":0,"key":"F5"}"#.utf8))
+    #expect(functionKey.displayName == "F5")
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(DictationShortcut.self, from: Data(#"{"keyCode":2,"modifiers":512,"key":"D"}"#.utf8))
+    }
 }
 
 @Test func cleanerDropsMidSentenceFillersAndKeepsPrecedingPunctuation() {

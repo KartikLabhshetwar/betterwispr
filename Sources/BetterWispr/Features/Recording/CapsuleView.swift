@@ -44,7 +44,7 @@ struct CapsuleView: View {
     private var tooltip: some View {
         HStack(spacing: 4) {
             Text("Dictate")
-            Text("⌥ Space").fontWeight(.bold)
+            Text(model.settings.shortcut.displayName).fontWeight(.bold)
         }
         .font(.system(size: 13))
         .foregroundStyle(.white)
@@ -54,7 +54,7 @@ struct CapsuleView: View {
         .overlay { Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1) }
         .transition(.offset(y: 4).combined(with: .opacity))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Dictate with Option Space")
+        .accessibilityLabel("Dictate with \(model.settings.shortcut.spokenName)")
     }
 
     private func failureCard(_ failure: DictationFailure) -> some View {

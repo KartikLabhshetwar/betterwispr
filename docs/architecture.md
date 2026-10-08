@@ -18,7 +18,7 @@ Sources/
     Features/         Dashboard, meetings, history, models, vocabulary, settings and capsule UI
     Design/           Small shared view components and the brand mark, which also renders the app icon
   BetterWisprCore/
-    Domain/           AppSettings, Transcript, VocabularyEntry and Meeting value types
+    Domain/           AppSettings, DictationShortcut, Transcript, VocabularyEntry and Meeting value types
     Persistence/      SavedState, per-meeting files and atomic local JSON storage
     Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
@@ -30,8 +30,9 @@ Sources/
 
 ## Dictation flow
 
-1. A dashboard action or global **Option–Space** starts a session. Capture the
-   previously focused external app before showing the nonactivating capsule.
+1. A dashboard action or the global shortcut (**Option–Space** unless changed in
+   Settings) starts a session. Capture the previously focused external app before
+   showing the nonactivating capsule.
 2. Check microphone permission and prepare the selected provider. Model downloads
    are separate user actions, never a side effect of transcription.
 3. Record microphone audio locally and publish levels to the capsule. Stopping

@@ -37,6 +37,7 @@ public final class MeetingRecorder {
     private var session: UUID?
     private var origin = Date()
     private var engine: AVAudioEngine?
+    private var microphoneObserver: (any NSObjectProtocol)?
     private var writers: [Speaker: MeetingChunkWriter] = [:]
     private var stopSystemAudio: (() -> Void)?
     private var meters: [Speaker: VoiceLevelMeter] = [:]
@@ -92,10 +93,20 @@ public final class MeetingRecorder {
         guard session == id else { throw CancellationError() }
         guard allowed else { throw AudioRecordingError.permissionDenied }
         let engine = AVAudioEngine()
+        try installMicrophone(on: engine, session: id, threshold: threshold, startOffset: 0)
+        self.engine = engine
+        origin = Date()
+        microphoneObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine,
+                                                                    queue: .main) { @Sendable [weak self] _ in
+            Task { @MainActor [weak self] in self?.restartMicrophone(session: id, threshold: threshold) }
+        }
+    }
+
+    private func installMicrophone(on engine: AVAudioEngine, session id: UUID, threshold: Float, startOffset: TimeInterval) throws {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else { throw AudioRecordingError.unavailable }
-        let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: threshold, policy: policy, startOffset: 0)
+        let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: threshold, policy: policy, startOffset: startOffset)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { @Sendable [weak self] buffer, _ in
             let level = writer.write(buffer)
             Task { @MainActor [weak self] in self?.receive(level, from: .me, session: id) }
@@ -109,9 +120,22 @@ public final class MeetingRecorder {
             writer.cancel()
             throw error
         }
-        self.engine = engine
         writers[.me] = writer
-        origin = Date()
+    }
+
+    /// Picks the microphone back up after AVAudioEngine stops itself for an input device or format change.
+    private func restartMicrophone(session id: UUID, threshold: Float) {
+        guard session == id, let engine else { return }
+        engine.inputNode.removeTap(onBus: 0)
+        if let writer = writers.removeValue(forKey: .me) {
+            writer.finish()
+            hand(writer.takeReady())
+        }
+        do {
+            try installMicrophone(on: engine, session: id, threshold: threshold, startOffset: Date().timeIntervalSince(origin))
+        } catch {
+            onError?(error)
+        }
     }
 
     private func startSystemAudio(session id: UUID, threshold: Float) async {
@@ -156,6 +180,8 @@ public final class MeetingRecorder {
     }
 
     private func haltInputs() {
+        if let microphoneObserver { NotificationCenter.default.removeObserver(microphoneObserver) }
+        microphoneObserver = nil
         engine?.stop()
         engine?.inputNode.removeTap(onBus: 0)
         stopSystemAudio?()

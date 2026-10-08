@@ -62,6 +62,13 @@ private struct MenuContents: View {
         Button(model.phase == .recording ? "Finish dictation · ⌥ Space" : "Start dictation · ⌥ Space") { model.toggleRecording() }
             .disabled(model.phase == .preparing || model.phase == .transcribing)
         if model.isBusy { Button("Cancel") { model.cancelRecording() } }
+        Button(model.meetings.activity.capturingID == nil ? "Start meeting notes" : "Stop meeting") {
+            guard model.meetings.activity.capturingID == nil else { return model.meetings.stop() }
+            model.startMeeting()
+            openWindow(id: "dashboard")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+        .disabled(model.meetings.activity != .idle && model.meetings.activity.capturingID == nil)
         Divider()
         Button("Open dashboard") {
             openWindow(id: "dashboard")
@@ -101,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) {
         model.cancelRecording()
+        model.meetings.endForQuit()
         shortcut.unregister()
         capsule?.close()
     }

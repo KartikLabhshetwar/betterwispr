@@ -12,6 +12,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Error card above the capsule with a shake and red outline for taps, early releases, missing speech, blocked paste and other failures. It dismisses itself after six seconds and respects Reduce Motion.
 - About section at the bottom of Settings with the app logo, version, a link to the source code and the author's X profile.
 - In-app updates from GitHub Releases through Sparkle 2. Check from Settings or the app menu, and choose whether BetterWispr checks daily and installs new versions on its own. Updates install only when their EdDSA signature matches the app's public key.
+- Meeting notes. Start a meeting from the Meetings page or the menu bar to record your microphone as "Me" and other apps' audio as "Them" (macOS 14.2 or later), follow a live transcript, and write your own notes. When it ends, Apple Intelligence writes a summary, key points, decisions and action items on this Mac. Without Apple Intelligence the transcript and your notes are still saved. Audio never leaves the Mac.
 
 ### Changed
 - The app bundle's `CFBundleVersion` now follows `VERSION` instead of a fixed `1`, so Sparkle can tell releases apart.

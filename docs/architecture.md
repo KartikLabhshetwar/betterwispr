@@ -15,14 +15,15 @@ organization, not separate packages or a plugin loader.
 Sources/
   BetterWispr/
     App/              Lifecycle, session coordination, global shortcut, capsule and toast panels, updater
-    Features/         Dashboard, history, models, vocabulary, settings and capsule UI
+    Features/         Dashboard, meetings, history, models, vocabulary, settings and capsule UI
     Design/           Small shared view components and the brand mark, which also renders the app icon
   BetterWisprCore/
-    Domain/           AppSettings, Transcript and VocabularyEntry value types
-    Persistence/      SavedState and atomic local JSON storage
-    Audio/            Microphone capture, temporary recordings and level metering
+    Domain/           AppSettings, Transcript, VocabularyEntry and Meeting value types
+    Persistence/      SavedState, per-meeting files and atomic local JSON storage
+    Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
     Transcription/    Deterministic English filler/stutter cleanup and explicit vocabulary replacements
+    Notes/            On-device meeting notes with Foundation Models and transcript chunking
     Integrations/     Clipboard and guarded paste delivery
   BetterWisprCLI/      Developer entry point for model and file smoke tests
 ```
@@ -53,6 +54,32 @@ Audio callbacks must not mutate view state unsafely. Cancelled operations must
 not publish stale text or paste a result from a prior session. Keep these
 invariants when changing the implementation; the manual checklist covers OS
 behavior that unit tests cannot establish.
+
+## Meeting notes flow
+
+`MeetingModel` owns meetings and is separate from dictation. It loads its own
+speech provider with `download: false` and releases it when the meeting ends.
+
+1. Starting a meeting saves an empty `Meeting`, checks microphone permission and
+   starts `MeetingRecorder`. The microphone becomes "Me". On macOS 14.2 and later
+   a private Core Audio process tap on a private aggregate device records every
+   other app as "Them". If the tap fails, the meeting records the microphone only
+   and says so.
+2. Each source writes 10 to 30 second chunk files to the temporary folder and
+   rotates on a pause. Chunks without speech are deleted unread.
+3. One serial queue transcribes chunks in order, applies the same cleanup and
+   vocabulary as dictation, keeps raw and final text, inserts the segment by start
+   time and saves. A failed chunk shows a message and the meeting continues.
+4. Stopping closes both sources, transcribes the remaining chunks, then writes
+   notes with Apple Intelligence when it is available. Long transcripts are
+   condensed part by part before the final summary. Without Apple Intelligence the
+   transcript and the user's own notes are still saved.
+5. Each meeting is one JSON file in `Application Support/BetterWispr/Meetings`.
+   Unreadable files are reported and left untouched. Chunk files are deleted after
+   transcription, on cancel and at quit, and leftovers are removed at launch.
+
+A session token guards every continuation, so a stopped or quit meeting never
+receives a late segment or summary.
 
 ## Add a model
 

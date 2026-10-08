@@ -36,6 +36,7 @@ final class AppModel {
     var settings = AppSettings()
     let models = SpeechModel.catalog
     let updater = AppUpdater()
+    let meetings = MeetingModel()
     var preparingModelID: String?
     var downloadProgress: Double = 0
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized

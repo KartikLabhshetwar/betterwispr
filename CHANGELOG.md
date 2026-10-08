@@ -30,11 +30,11 @@ All notable changes to BetterWispr are listed here. The format follows
 - App icon and in-app logo: a hand-drawn "w" on a light tile, shown on a dark tile in Dark Mode. `scripts/build-app.sh` renders the icon from the same SwiftUI view.
 - Dedicated About page with the app logo, version, source code and issue links, and the author's X profile.
 - In-app updates from GitHub Releases through Sparkle 2. Check from About or the app menu, and choose whether BetterWispr checks daily and installs new versions on its own. Updates install only when their EdDSA signature matches the app's public key.
-- Meeting notes. Start a meeting from the Meetings page or the menu bar to record your microphone as "Me" and other apps' audio as "Them" (macOS 14.2 or later), follow a live transcript, and write your own notes. When it ends, Apple Intelligence on a supported Mac running macOS 26 or later writes a summary, key points, decisions and action items locally. Without Apple Intelligence the transcript and your notes are still saved. Search saved meetings, mark action items complete and copy meeting notes and transcripts as Markdown. Audio never leaves the Mac.
+- Meeting notes. Start a meeting from the Meetings page or the menu bar to record your microphone as "Me" and other apps' audio as "Them" (macOS 14.2 or later), follow a live transcript, and write your own notes. When it ends, Apple Intelligence on a supported Mac running macOS 26 or later writes a summary, key points, decisions and action items locally. Without Apple Intelligence the transcript and your notes are still saved. Search saved meetings, mark action items complete and copy meeting notes and transcripts as Markdown. With a built-in speech provider, audio stays on the Mac; API providers require explicit selection.
 - Website with a typing and dictation demo, feature overview, comparison pages, download links, privacy and terms pages, and a dedicated changelog rendered from this file. Pages include static content and social previews.
 - `BetterWisprCLI` for local model downloads and file transcription, defaulting to `parakeet-v3`. Pass comma-separated spelling hints with `--vocabulary` or explicitly install the Parakeet booster with `--download-phrase-booster`.
 - Local transcript evaluation script reporting word error rate, character error rate and false speech on silent clips, with an accuracy evaluation plan.
-- `make dev` for local testing and `make ship` for a signed, notarized DMG and Sparkle update feed.
+- `make dev` for local testing and `make ship` for separate Developer ID-signed, notarized and stapled Apple Silicon and Intel DMGs, with a Sparkle update feed that selects the matching architecture. Notarization credentials are stored once in Keychain with `make setup-notary`.
 - `VERSION` file and this changelog. The app bundle version is stamped from `VERSION` at build time.
 
 ### Changed
@@ -49,6 +49,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Waveform that fits your voice. It learns the room's noise floor and your recent loudness, so quiet voices fill the bars and steady background noise stays flat. Bars rise fast and fall slowly, follow the voice in steps of about 20 ms instead of jumping with each 100 ms audio buffer, and a travelling wave shows while transcribing. Reduce Motion keeps the bars still.
 
 ### Fixed
+- Escape now cancels an active dictation from the dashboard without adding a history entry. DMG packaging retries Finder's temporary busy error, and release preflight distinguishes Apple agreement errors from invalid credentials.
 - Hide matching long microphone echoes of nearby system-audio transcript entries in the transcript, export and summarization input. Original entries remain saved and can be revealed with Show repeated microphone audio.
 - Cancelled or failed summary generation preserves the saved meeting and previous summary. Oversized notes fail explicitly if they cannot be condensed, instead of silently losing the end of the source.
 - An open note now switches to its Summary tab as soon as the notes are written, instead of staying on the transcript.

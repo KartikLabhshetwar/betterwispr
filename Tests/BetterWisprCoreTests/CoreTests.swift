@@ -62,6 +62,7 @@ import Testing
     #expect(TranscriptCleaner.clean("Mm, that works.", language: "en") == "That works.")
     #expect(TranscriptCleaner.clean("We could, mmm, try it", language: "en") == "We could, try it")
     #expect(TranscriptCleaner.clean("mm-hmm, that sounds right", language: "en") == "mm-hmm, that sounds right")
+    #expect(TranscriptCleaner.clean("Cut it to 5 mm, mm, thanks", language: "en") == "Cut it to 5 mm, thanks")
 }
 
 @Test func cleanerDropsYouKnowOnlyWhenSetOffOnBothSides() {

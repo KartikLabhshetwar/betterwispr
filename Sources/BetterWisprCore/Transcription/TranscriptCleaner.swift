@@ -59,7 +59,9 @@ public enum TranscriptCleaner {
     }
 
     private static func fillerLength(_ tokens: [Token], at index: Int, after previous: String?) -> Int {
-        if fillers.contains(tokens[index].word.lowercased()) { return 1 }
+        let word = tokens[index].word.lowercased()
+        let followsNumber = index > 0 && tokens[index - 1].word.allSatisfy(\.isNumber)
+        if fillers.contains(word), !(word == "mm" && followsNumber) { return 1 }
         return isSetOffYouKnow(tokens, at: index, after: previous) ? 2 : 0
     }
 

@@ -18,7 +18,7 @@ Sources/
     Features/         Dashboard, meetings, history, models, vocabulary, settings and capsule UI
     Design/           Small shared view components and the brand mark, which also renders the app icon
   BetterWisprCore/
-    Domain/           AppSettings, Transcript, VocabularyEntry and Meeting value types
+    Domain/           AppSettings, DictationShortcut, Transcript, VocabularyEntry and Meeting value types
     Persistence/      SavedState, per-meeting files and atomic local JSON storage
     Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
@@ -30,8 +30,9 @@ Sources/
 
 ## Dictation flow
 
-1. A dashboard action or global **Option–Space** starts a session. Capture the
-   previously focused external app before showing the nonactivating capsule.
+1. A dashboard action or the global shortcut (**Option–Space** unless changed in
+   Settings) starts a session. Capture the previously focused external app before
+   showing the nonactivating capsule.
 2. Check microphone permission and prepare the selected provider. Model downloads
    are separate user actions, never a side effect of transcription.
 3. Record microphone audio locally and publish levels to the capsule. Stopping
@@ -122,6 +123,16 @@ The Apple provider requires on-device recognition and uses the current locale
 when no language is supplied. WhisperKit uses locally loaded Core ML weights and
 tokenizers. Its tokenizer adapter exists because the upstream public loader can
 fall back to the network; see [source attribution](oss-reuse.md).
+
+Parakeet's optional phrase booster is FluidAudio's CTC word-spotting model. It
+downloads only from the Vocabulary page or `--download-phrase-booster`, into
+FluidAudio's shared cache (`CtcModels.defaultCacheDirectory(for: .ctc110m)`),
+because FluidAudio reads the booster's tokenizer from that fixed folder. A
+`.betterwispr-installed` marker is written after the files load. `prepare`
+loads an installed booster with `CtcModels.loadDirect` and never downloads it;
+a missing or broken booster leaves plain Parakeet transcription unchanged.
+`transcribe` boosts only English or automatic-language dictation with a
+non-empty vocabulary and keeps the decoder's text when rescoring changes nothing.
 
 ## Add an integration
 

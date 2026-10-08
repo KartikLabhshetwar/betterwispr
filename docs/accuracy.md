@@ -19,6 +19,12 @@ The corpus work below remains a measurement plan, not benchmark results.
 | [Zayats et al., arXiv:1904.04388](https://arxiv.org/abs/1904.04388) | Repetitions were 46% of disfluent words in their data, and intended repetitions were only 4% of all repetitions, usually emphasis such as "a long long time ago". Collapsing adjacent repeats is usually right when emphatic and grammatical doubles are protected. |
 | [Andrusenko et al., arXiv:2406.07096](https://arxiv.org/abs/2406.07096) | A CTC word spotter that rescores a transducer's output raised recall of listed terms at a small precision cost. This is the route for names and jargon with Parakeet. FluidAudio implements it with a separate CTC model that must be installed explicitly. |
 | [Jogi et al., arXiv:2502.11572](https://arxiv.org/abs/2502.11572); [Peng et al., arXiv:2305.11095](https://arxiv.org/abs/2305.11095) | A Whisper keyword-list prompt helped rare words but raised average WER, and word-list prompts hurt multilingual models. The comma-joined Whisper vocabulary prompt should be measured with and without hints before it stays on by default. |
+| [Andrusenko et al., TurboBias, arXiv:2508.07014](https://arxiv.org/abs/2508.07014) | A phrase-boosting tree applied during greedy decoding of an attention encoder-decoder (Canary) raised listed-phrase F-score from 52.6 to 75.6 with precision falling from 97 to 93. Whisper is the same model family, so a WhisperKit logits filter is the candidate replacement for the keyword prompt. The transfer to Whisper is unmeasured. |
+| [Jamshid Lou and Johnson, arXiv:2004.05323](https://arxiv.org/abs/2004.05323) | Filled pauses and discourse markers "belong to a finite set of words and phrases" and are trivial to detect in parsed transcripts, while self-repairs need a trained model. This supports a closed filler list and no rule-based repair guessing. |
+| [arXiv:2509.20321](https://arxiv.org/abs/2509.20321) | On a deletion-only disfluency benchmark, LLM cleaners were weakest on fillers and discourse markers, and reasoning models over-deleted fluent words. Over-deletion is the main failure to guard against. |
+| [arXiv:2307.04008](https://arxiv.org/abs/2307.04008) | Shipping dictation products edit with flat templates invoked by trigger words, and open-ended spoken editing reached 30% to 55% end-state accuracy. Spoken edit commands should be a closed trigger set. |
+| [arXiv:2503.06924](https://arxiv.org/abs/2503.06924) | Prompting Whisper large-v3 with filler words ("um, uh") caused inserted sentences, loops and invented text. Never put fillers in a Whisper prompt. |
+| [arXiv:2402.08021](https://arxiv.org/abs/2402.08021) | About 1% of Whisper transcripts contained hallucinated phrases, and longer non-vocal duration predicted them. Trimming long pauses before decoding is the evidenced mitigation. |
 | [Gu et al., arXiv:2405.15216](https://arxiv.org/abs/2405.15216); [Pu et al., arXiv:2310.11532](https://arxiv.org/abs/2310.11532) | Zero-shot LLM correction degraded strong recognizer output, and correcting every utterance raised WER. A general LLM rewrite is not an accuracy fix. |
 | [Orhon et al., WhisperKit, arXiv:2507.10860](https://arxiv.org/abs/2507.10860) | On-device inference optimization can combine useful latency with low WER in the authors' benchmark. Treat it as evidence that local execution is viable, not a measurement of BetterWispr or proof that every feature is in the public OSS SDK. |
 
@@ -57,6 +63,7 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    current shared Whisper provider rejects digital silence before decoding;
    this fixed an observed Tiny-model insertion on an all-zero WAV. That guard
    and the recorder's adjustable RMS gate are not learned noise classifiers.
+   WhisperKit's built-in VAD chunking is also energy-based (`EnergyVAD`).
 3. **Control decoding.** Offer the spoken language when known, retain an automatic
    option for mixed use, and transcribe rather than translate. Start deterministic
    decoding; evaluate fallback, no-speech/log-probability thresholds and context
@@ -68,18 +75,37 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    exact entity recall and false insertions both with and without hints. Explicit
    user dictionary replacements should respect word boundaries and retain the
    original transcript for correction. Do not rewrite arbitrary near-matches.
-   Parakeet ignores vocabulary hints today. CTC word spotting is the evidenced
-   way to add them, and it needs an explicit download of its CTC model.
+   Parakeet uses vocabulary only when the optional phrase booster is installed.
+   The booster is FluidAudio's CTC word spotter (arXiv:2406.07096): a separate
+   110M CTC model (about 99 MB) scores each listed term against the audio, and a
+   decoded word is replaced only when a term fits the audio better. BetterWispr
+   uses FluidAudio's stricter `itnDefaultConfig` similarity floors, because the
+   default config replaced "We should render" with "Supabase" on a synthetic
+   clip, and keeps the punctuation the decoder put around a replaced word. Boosting runs
+   when the language is English or automatic, since the booster is English-only.
+   On two `say`-synthesized clips it corrected the eight listed terms Parakeet v3
+   had misspelled and changed nothing when no vocabulary was given. That is a
+   smoke test, not an accuracy measurement. WhisperKit 1.1.0 transcribes with
+   its greedy sampler only, so biasing methods that need beam search do not
+   apply to it without upstream work.
 5. **Separate recognition from rewriting.** First measure verbatim output. Local
    formatting or an optional local LLM must be scored separately and must not
    silently change negation, numbers, names or intent. Preserve raw and edited
    text. Broad hallucination blocklists can delete intended speech.
    `TranscriptCleaner` removes only a fixed list of English filled pauses (uh,
-   um, er, hmm and their spellings) and back-to-back repeats of one to three
-   words that no punctuation separates. Digits, number words and a short list of
+   um, er, hmm, mm and their spellings), the discourse marker "you know" when
+   commas or a sentence boundary set it off on both sides, and back-to-back
+   repeats of one to three words that no punctuation separates. "mm" after a
+   number stays as a unit, and "you know?" stays because removing it would turn
+   a statement into a question. Digits, number words and a short list of
    grammatical or emphatic doubles ("that that", "had had", "long long") are
    kept. Language detection ignores the fillers, and non-English text is only
-   trimmed. Repairs and restarts are left alone. History keeps the raw output.
+   trimmed. "I mean", "like", "basically", "sort of", repairs and restarts are
+   left alone. A closed list covers fillers, but repairs need a trained model
+   and deleting hedges changes meaning ("it basically works"). History keeps
+   the raw output. On the 38 saved Parakeet transcripts available on 2026-10-08,
+   the cleaner removed all 47 uh/um and 4 mm tokens and otherwise only collapsed
+   four one-word stutters; no set-off "you know" occurred.
 6. **Measure streaming separately.** Partial text is provisional. Finalize with
    sufficient context, and measure final WER, first-text latency, stop-to-final
    latency and dropped/repeated boundary words. Re-transcribing the full growing

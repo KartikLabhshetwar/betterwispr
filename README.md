@@ -52,7 +52,7 @@ signed/notarized distribution release.
    changed in System Settings → Privacy & Security.
 4. Focus a text field in another app. Hold **Option–Space** while you speak and
    release it to finish. Choose **Press to toggle** in Settings to press once to
-   start and again to finish instead. The capsule shows microphone activity while capturing and processing
+   start and again to finish instead, or record a different shortcut. The capsule shows microphone activity while capturing and processing
    state while transcribing. Recognition starts after recording stops; this
    version does not display continuously decoded words during capture.
 5. If automatic paste cannot safely target the previous app, copy the result

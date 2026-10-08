@@ -32,10 +32,36 @@ import Testing
     #expect(settings.selectedModelID == "parakeet-v3")
     #expect(settings.dictationMode == .hold)
     #expect(settings.copyToClipboard)
+    #expect(settings.shortcut == .optionSpace)
     var toggled = settings
     toggled.dictationMode = .toggle
     toggled.copyToClipboard = false
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
+}
+
+@Test func shortcutsNeedACommandKeyOrFunctionKeyAndRoundTripThroughSettings() throws {
+    #expect(DictationShortcut.optionSpace.displayName == "⌥ Space")
+    #expect(DictationShortcut.optionSpace.spokenName == "Option Space")
+    let everything = try #require(DictationShortcut(keyCode: 40, modifiers: [.command, .shift, .option, .control], key: "K"))
+    #expect(everything.displayName == "⌃⌥⇧⌘ K")
+    #expect(everything.spokenName == "Control Option Shift Command K")
+    #expect(DictationShortcut(keyCode: 2, modifiers: .shift, key: "D") == nil)
+    #expect(DictationShortcut(keyCode: 2, modifiers: [], key: "D") == nil)
+    #expect(DictationShortcut(keyCode: 2, modifiers: .control, key: "") == nil)
+    #expect(DictationShortcut(keyCode: 96, modifiers: [], key: "F5")?.displayName == "F5")
+    #expect(DictationShortcut(keyCode: 96, modifiers: .shift, key: "F5")?.spokenName == "Shift F5")
+    #expect(ShortcutModifiers([.option, .control]).symbols == "⌃⌥")
+
+    var settings = AppSettings()
+    settings.shortcut = try #require(DictationShortcut(keyCode: 2, modifiers: [.control, .shift], key: "D"))
+    let decoded = try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(settings))
+    #expect(decoded.shortcut == settings.shortcut)
+    #expect(decoded.shortcut.displayName == "⌃⇧ D")
+    let functionKey = try JSONDecoder().decode(DictationShortcut.self, from: Data(#"{"keyCode":96,"modifiers":0,"key":"F5"}"#.utf8))
+    #expect(functionKey.displayName == "F5")
+    #expect(throws: DecodingError.self) {
+        try JSONDecoder().decode(DictationShortcut.self, from: Data(#"{"keyCode":2,"modifiers":512,"key":"D"}"#.utf8))
+    }
 }
 
 @Test func cleanerDropsMidSentenceFillersAndKeepsPrecedingPunctuation() {
@@ -55,6 +81,33 @@ import Testing
 @Test func cleanerMovesTerminalPunctuationFromFiller() {
     #expect(TranscriptCleaner.clean("We are done for today uh.", language: "en") == "We are done for today.")
     #expect(TranscriptCleaner.clean("Is the build ready um?", language: "en") == "Is the build ready?")
+}
+
+@Test func cleanerDropsMmFillers() {
+    #expect(TranscriptCleaner.clean("mm I think so", language: "en") == "I think so")
+    #expect(TranscriptCleaner.clean("Mm, that works.", language: "en") == "That works.")
+    #expect(TranscriptCleaner.clean("We could, mmm, try it", language: "en") == "We could, try it")
+    #expect(TranscriptCleaner.clean("mm-hmm, that sounds right", language: "en") == "mm-hmm, that sounds right")
+    #expect(TranscriptCleaner.clean("Cut it to 5 mm, mm, thanks", language: "en") == "Cut it to 5 mm, thanks")
+}
+
+@Test func cleanerDropsYouKnowOnlyWhenSetOffOnBothSides() {
+    #expect(TranscriptCleaner.clean("It was, you know, fine.", language: "en") == "It was fine.")
+    #expect(TranscriptCleaner.clean("You know, I think so.", language: "en") == "I think so.")
+    #expect(TranscriptCleaner.clean("That is what I want, you know.", language: "en") == "That is what I want.")
+    #expect(TranscriptCleaner.clean("It works. You know, it is fast.", language: "en") == "It works. It is fast.")
+    #expect(TranscriptCleaner.clean("That is what I want, you know", language: "en") == "That is what I want")
+}
+
+@Test func cleanerKeepsYouKnowThatIsNotSetOff() {
+    #expect(TranscriptCleaner.clean("You know the answer.", language: "en") == "You know the answer.")
+    #expect(TranscriptCleaner.clean("Do you know, honestly?", language: "en") == "Do you know, honestly?")
+    #expect(TranscriptCleaner.clean("If you know, tell me.", language: "en") == "If you know, tell me.")
+    #expect(TranscriptCleaner.clean("Well, you know what I mean.", language: "en") == "Well, you know what I mean.")
+    #expect(TranscriptCleaner.clean("It is hard, you know?", language: "en") == "It is hard, you know?")
+    #expect(TranscriptCleaner.clean("Do you know?", language: "en") == "Do you know?")
+    #expect(TranscriptCleaner.clean("Tuesday, I mean, Wednesday", language: "en") == "Tuesday, I mean, Wednesday")
+    #expect(TranscriptCleaner.clean("Du weißt, you know, es ist gut.", language: "de") == "Du weißt, you know, es ist gut.")
 }
 
 @Test func cleanerRemovesRepeatedPhrases() {

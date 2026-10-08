@@ -1,17 +1,9 @@
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  ClockCounterClockwiseIcon,
-  CpuIcon,
-  CursorTextIcon,
-  ShieldCheckIcon,
-  TextAaIcon,
-  type Icon,
-} from "@phosphor-icons/react";
+import { ArrowRightIcon, CheckIcon } from "@phosphor-icons/react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import DownloadCTA, { ClosingCTA } from "@/components/download-cta";
 import HeroDemo from "@/components/hero-demo";
+import FeatureBento from "@/components/feature-bento";
 import { comparisons } from "@/lib/comparisons";
 import { pageHead } from "@/lib/seo";
 
@@ -24,34 +16,6 @@ export const Route = createFileRoute("/")({
       "/",
     ),
 });
-
-const FEATURES: { icon: Icon; title: string; body: string }[] = [
-  {
-    icon: ShieldCheckIcon,
-    title: "Your speech stays with you",
-    body: "Recognition runs on your Mac. No account, no API key and no cloud transcription fallback.",
-  },
-  {
-    icon: CursorTextIcon,
-    title: "Stay in the app you’re using",
-    body: "Dictate into a message, a document or a prompt. BetterWispr returns the text to the app you were using.",
-  },
-  {
-    icon: CpuIcon,
-    title: "Choose the model that fits",
-    body: "Use supported Apple speech, Parakeet or Whisper models. Install a model explicitly, then use it offline.",
-  },
-  {
-    icon: TextAaIcon,
-    title: "Make room for your vocabulary",
-    body: "Add names and technical terms as hints. Set phrase replacements for words you want spelled a certain way.",
-  },
-  {
-    icon: ClockCounterClockwiseIcon,
-    title: "Keep the original, too",
-    body: "Review raw and corrected text in local history. Turn history off when you don’t want new dictations saved.",
-  },
-];
 
 const FAQS = [
   [
@@ -130,6 +94,16 @@ function HomeComponent() {
         <HeroDemo />
       </section>
 
+      <section aria-labelledby="features" className="page-shell pb-24">
+        <h2
+          id="features"
+          className="mx-auto max-w-[680px] text-center text-3xl tracking-tight text-zinc-900"
+        >
+          Speak instead of typing, in any app on your Mac
+        </h2>
+        <FeatureBento />
+      </section>
+
       <section
         id="how-it-works"
         className="page-shell pb-24"
@@ -176,6 +150,8 @@ function HomeComponent() {
           <div>
             <p className="eyebrow">Local by design</p>
             <Tagline />
+          </div>
+          <div>
             <p className="mt-6 max-w-lg text-base text-zinc-600">
               Models run on your Mac. Downloads happen when you choose to
               install them. Your speech doesn’t need a round trip to a
@@ -188,17 +164,6 @@ function HomeComponent() {
               How your data is handled
               <ArrowRightIcon />
             </Link>
-          </div>
-          <div className="space-y-8">
-            {FEATURES.map(({ icon: FeatureIcon, title, body }) => (
-              <div key={title} className="flex gap-4">
-                <FeatureIcon className="mt-1 size-5 shrink-0" />
-                <div>
-                  <h3 className="text-base font-semibold">{title}</h3>
-                  <p className="mt-2 text-sm text-zinc-600">{body}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

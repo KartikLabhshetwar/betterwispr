@@ -16,6 +16,21 @@
   }
 }
 
+@keyframes keypress {
+  0%,
+  20%,
+  80%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 2px 0 var(--color-zinc-300);
+  }
+  30%,
+  70% {
+    transform: translateY(2px);
+    box-shadow: 0 0 0 var(--color-zinc-300);
+  }
+}
+
 @keyframes reveal {
   from {
     opacity: 0;

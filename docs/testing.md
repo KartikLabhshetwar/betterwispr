@@ -290,6 +290,9 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   about 4 seconds. Expect a "Learned" toast and a Learned entry in Vocabulary.
   Repeat in Slack and Notes and record whether the app exposes its text field to
   Accessibility (Electron apps may not).
+- [ ] Dictate into a chat field such as Messages or Slack, fix a word, wait about
+  a second and press Return. Expect a "Learned" toast. Fixing and sending
+  within a fraction of a second learns nothing, by design.
 - [ ] Fix a word with the pencil in History. The raw transcription stays
   unchanged and the word appears in Vocabulary as Learned.
 - [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.

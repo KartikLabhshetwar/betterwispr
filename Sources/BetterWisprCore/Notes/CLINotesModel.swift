@@ -20,6 +20,7 @@ public enum NotesCLI: String, Codable, CaseIterable, Sendable {
 struct CLINotesModel: NotesLanguageModel {
     let cli: NotesCLI
     let model: String
+    var instructions = NotesWriter.instructions
 
     func respond(to prompt: String) async throws -> String {
         try await response(to: prompt).text
@@ -42,7 +43,7 @@ struct CLINotesModel: NotesLanguageModel {
         case .claudeCode:
             arguments = ["--print", "--output-format", "json", "--no-session-persistence", "--safe-mode",
                          "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
-                         "--system-prompt", NotesWriter.instructions]
+                         "--system-prompt", instructions]
         case .codex:
             arguments = ["--no-daemon", "exec", "--ignore-user-config", "--skip-git-repo-check", "--ephemeral",
                          "--sandbox", "read-only", "--color", "never", "-c", "approval_policy=\"never\"",
@@ -56,7 +57,7 @@ struct CLINotesModel: NotesLanguageModel {
             throw MeetingNotesError.unavailable("Enter a model ID of at most 200 characters without control characters.")
         }
         let output = try await Self.run(executable, arguments: arguments + (chosen.isEmpty ? [] : ["--model", chosen]),
-                                        input: "\(NotesWriter.instructions)\n\n\(prompt)", cli: cli, finalMessage: cli == .codex)
+                                        input: "\(instructions)\n\n\(prompt)", cli: cli, finalMessage: cli == .codex)
         if cli == .claudeCode {
             guard let result = try? JSONDecoder().decode(ClaudeResult.self, from: Data(output.utf8)),
                   !result.is_error, let text = result.result, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {

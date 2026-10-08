@@ -52,6 +52,7 @@ public enum Ollama {
 
 struct OllamaNotesModel: NotesLanguageModel {
     let name: String
+    var instructions = NotesWriter.instructions
 
     private static var schema: [String: Any] {
         let list: [String: Any] = ["type": "array", "items": ["type": "string"]]
@@ -72,7 +73,7 @@ struct OllamaNotesModel: NotesLanguageModel {
     private func chat(_ prompt: String, format: [String: Any]? = nil) async throws -> String {
         var body: [String: Any] = [
             "model": name, "stream": false, "think": false,
-            "messages": [["role": "system", "content": NotesWriter.instructions], ["role": "user", "content": prompt]],
+            "messages": [["role": "system", "content": instructions], ["role": "user", "content": prompt]],
             "options": ["temperature": 0.3, "num_ctx": 8192],
         ]
         if let format { body["format"] = format }

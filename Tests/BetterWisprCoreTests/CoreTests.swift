@@ -216,3 +216,20 @@ private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> D
     #expect(CorrectionWatcher.edit(of: "ping kv now", from: "Hi. ping kv now", to: "Hey. ping kv now") == nil)
     #expect(CorrectionWatcher.edit(of: "ping kv now", from: "ping kv now", to: "ping kv now please") == nil)
 }
+
+@Test func correctionWatcherLearnsSettledOrSentTextOnly() {
+    var typing = SettledText("cloud code")
+    #expect(["Claude Co", "Claude Co", "Claude Co", "Claude Code"].compactMap { typing.observe($0) }.isEmpty)
+    #expect(["Claude Code", "Claude Code", "Claude Code"].compactMap { typing.observe($0) }.isEmpty)
+    #expect(typing.observe("Claude Code") == "Claude Code")
+    #expect(typing.observe("Claude Code") == nil)
+
+    var sent = SettledText("cloud code")
+    #expect(sent.observe("Claude Code") == nil)
+    #expect(sent.observe("Claude Code") == nil)
+    #expect(sent.observe("") == "Claude Code")
+
+    var rushed = SettledText("cloud code")
+    #expect(rushed.observe("Claude Cod") == nil)
+    #expect(rushed.observe("") == nil)
+}

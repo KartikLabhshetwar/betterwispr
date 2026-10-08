@@ -22,6 +22,9 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var dictationMode: DictationMode = .hold
     public var shortcut: DictationShortcut = .optionSpace
     public var learnCorrections: Bool = true
+    public var cleanup: CleanupLevel = .light
+    /// Missing contexts use `.formal`, which leaves the transcript as recognized.
+    public var styles: [StyleContext: StyleTone] = [:]
     /// Nil follows the macOS default input.
     public var microphone: AudioInputDevice?
     /// The Ollama model that writes meeting notes; nil uses Apple Intelligence.
@@ -51,6 +54,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     }
 
     public init() {}
+
+    public func tone(for context: StyleContext) -> StyleTone { styles[context] ?? .formal }
 
     public func cliModel(_ cli: NotesCLI) -> String { cli == .claudeCode ? claudeNotesModel : codexNotesModel }
 
@@ -87,6 +92,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         shortcut = try container.decodeIfPresent(DictationShortcut.self, forKey: .shortcut) ?? .optionSpace
         microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
         learnCorrections = try container.decodeIfPresent(Bool.self, forKey: .learnCorrections) ?? true
+        cleanup = try container.decodeIfPresent(CleanupLevel.self, forKey: .cleanup) ?? .light
+        styles = try container.decodeIfPresent([StyleContext: StyleTone].self, forKey: .styles) ?? [:]
         notesModel = try container.decodeIfPresent(String.self, forKey: .notesModel)
         completedOnboardingVersion = try container.decodeIfPresent(Int.self, forKey: .completedOnboardingVersion) ?? 0
         onboardingStep = try container.decodeIfPresent(Int.self, forKey: .onboardingStep) ?? 0

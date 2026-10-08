@@ -3,11 +3,14 @@ import Foundation
 /// Reuses the speech connection metadata, destination validation and Keychain implementation.
 final class APINotesModel: NotesLanguageModel {
     let connection: SpeechConnection
+    let instructions: String
     private let keys: SpeechAPIKeyStore
     private let session: URLSession
 
-    init(connection: SpeechConnection, keys: SpeechAPIKeyStore = .notes, configuration: URLSessionConfiguration = .ephemeral) {
+    init(connection: SpeechConnection, instructions: String = NotesWriter.instructions, keys: SpeechAPIKeyStore = .notes,
+         configuration: URLSessionConfiguration = .ephemeral) {
         self.connection = connection
+        self.instructions = instructions
         self.keys = keys
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
@@ -36,7 +39,7 @@ final class APINotesModel: NotesLanguageModel {
         if !key.isEmpty { request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization") }
         var body: [String: Any] = [
             "model": connection.modelID, "stream": false,
-            "messages": [["role": "system", "content": NotesWriter.instructions], ["role": "user", "content": prompt]],
+            "messages": [["role": "system", "content": instructions], ["role": "user", "content": prompt]],
         ]
         if json { body["response_format"] = ["type": "json_object"] }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

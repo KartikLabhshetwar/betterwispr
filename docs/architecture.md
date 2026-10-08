@@ -15,14 +15,14 @@ organization, not separate packages or a plugin loader.
 Sources/
   BetterWispr/
     App/              Lifecycle, session coordination, global shortcut, capsule and toast panels, updater
-    Features/         Dashboard, meetings, history, models, vocabulary, settings and capsule UI
+    Features/         Dashboard, insights, meetings, history, models, vocabulary, style, settings and capsule UI
     Design/           Small shared view components and the brand mark, which also renders the app icon
   BetterWisprCore/
-    Domain/           AppSettings, DictationShortcut, Transcript, VocabularyEntry and Meeting value types
+    Domain/           AppSettings, writing styles and app categories, usage insights, Transcript, VocabularyEntry and Meeting value types
     Persistence/      SavedState, per-meeting files and atomic local JSON storage
     Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
-    Transcription/    Deterministic English filler/stutter cleanup and explicit vocabulary replacements
+    Transcription/    English filler/stutter cleanup, optional notes-model polish, writing styles and vocabulary replacements
     Notes/            Meeting notes with Apple Intelligence, Ollama, signed-in CLIs and explicit API connections
     Integrations/     Clipboard and guarded paste delivery
   BetterWisprCLI/      Developer entry point for model and file smoke tests
@@ -40,9 +40,20 @@ Sources/
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running.
-5. Remove English filled pauses and unpunctuated stutters, then apply
-   user-defined vocabulary substitutions once. Keep both raw and final text;
-   save a transcript only when history is enabled.
+5. Post-process the recognized text in a fixed order. Auto cleanup **None**
+   only trims; **Light** (the default) removes English filled pauses and
+   unpunctuated stutters. Apply voice commands for English and Auto. For English
+   text, **Medium** then asks the notes model the user chose in Models (Apple
+   Intelligence, Ollama, a signed-in CLI or an API connection) for a clarity edit
+   with `TranscriptPolisher` instructions. The edit is bounded by a timeout and
+   rejected when it answers the dictation, adds new words or changes length too
+   much; any failure keeps the Light text, and Medium never picks a different
+   model than the one selected.
+   Next apply the writing tone chosen for the destination app's style context
+   (`AppCategory` maps bundle IDs; browsers count as Other because the website is
+   not visible). Vocabulary runs last so it can restore names a tone lowercased.
+   Keep both raw and final text, plus the destination bundle ID and vocabulary
+   fix count for Insights; save a transcript only when history is enabled.
 6. Deliver through clipboard/guarded paste when enabled. Only paste if the
    original destination is still suitable; never treat a changed focus as consent
    to paste elsewhere. With "Copy to clipboard" on, leave the transcript on the

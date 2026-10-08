@@ -243,6 +243,10 @@ final class AppModel {
         let model = selectedModel
         let language = settings.language == "auto" ? nil : settings.language
         let entries = vocabulary
+        let cleanup = settings.cleanup
+        let writingSettings = settings
+        let appBundleID = targetApplication?.bundleIdentifier
+        let tone = settings.tone(for: AppCategory(bundleID: appBundleID).style)
         phase = .transcribing
         statusMessage = model.engine == .api ? "Transcribing with \(model.name)…" : "Transcribing on your Mac…"
         operation = Task { [weak self] in
@@ -256,13 +260,23 @@ final class AppModel {
                 let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints)
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
-                let cleaned = TranscriptCleaner.clean(raw, language: language)
-                let spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(cleaned) : cleaned
-                let text = VocabularyProcessor.apply(entries, to: spoken)
+                let cleaned = cleanup == .none ? raw.trimmingCharacters(in: .whitespacesAndNewlines) : TranscriptCleaner.clean(raw, language: language)
+                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(cleaned) : cleaned
+                let english = TranscriptCleaner.isEnglish(spoken, language: language)
+                if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
+                    self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
+                    let polished = await TranscriptPolisher.polish(spoken, settings: writingSettings)
+                    try Task.checkCancellation()
+                    guard self.generation == token else { return }
+                    spoken = polished ?? spoken
+                }
+                if english { spoken = StyleFormatter.apply(tone, to: spoken) }
+                let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
                 guard !text.isEmpty else { self.fail(.noSpeech); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
-                                            modelName: model.name, language: language ?? "auto")
+                                            modelName: model.name, language: language ?? "auto",
+                                            appBundleID: appBundleID, vocabularyFixes: fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if self.settings.saveHistory {
                     self.history.insert(transcript, at: 0)
@@ -560,6 +574,17 @@ final class AppModel {
             return
         }
         if settings.learnCorrections { learn(CorrectionLearner.corrections(from: transcript.text, to: text)) }
+    }
+
+    func restoreOriginal(_ transcript: Transcript) {
+        let original = transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !original.isEmpty, let index = history.firstIndex(where: { $0.id == transcript.id }), history[index].text != original else { return }
+        let previous = history
+        history[index].text = original
+        do { try persist() } catch {
+            history = previous
+            ToastWindow.shared.show(Toast(failure: "Couldn’t restore the original", error))
+        }
     }
 
     private func learn(_ corrections: [LearnedCorrection]) {

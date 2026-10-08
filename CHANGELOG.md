@@ -10,16 +10,23 @@ All notable changes to BetterWispr are listed here. The format follows
 - More local models in Models: Parakeet Ultra (a further-trained TDT v3 with punctuation), Parakeet TDT-CTC 110M (a small English model), Parakeet Japanese, Whisper Large v3 Turbo (compressed) and Whisper Small. Each downloads only when you choose Download.
 - Help > Show Welcome Guide replays the welcome guide.
 - `BetterWisprCLI --download-model` shows install progress.
+- Style page with a writing tone for each kind of app. Personal messages offer Formal, Casual and Very casual. Work messages, Email and Other offer Formal, Casual and Excited. Casual drops most commas and the final period, Very casual also lowercases sentence starts, and Excited ends the last sentence with an exclamation mark. BetterWispr picks the tone from the app you dictate into, so Slack gets your work style and Mail your email style, while browsers and AI apps use Other. Styles change English dictation only, run on your Mac, and default to Formal, which leaves your text as it was.
+- Auto cleanup on the Style page. None keeps your words as recognized, still applying voice commands and Vocabulary. Light, the default and the previous behavior, removes filler words like "um" and "you know" and stutters. Medium also edits English dictation for clarity and conciseness with the notes model chosen in Models (Apple Intelligence, Ollama, Claude Code, Codex or an API connection), so it works with whichever one you already use for meeting notes. Apple Intelligence and Ollama run on your Mac. Claude Code, Codex and API connections send the dictation to that provider and add a few seconds. Other languages, very short dictations and edits that fail, take too long, answer the dictation or add new content keep the Light result. The Style page uses standard macOS grouped settings, and choosing Medium shows the notes model it will use.
+- Insights page with your words per minute compared with average typing speed, words cleaned up, vocabulary fixes, total words dictated, the kinds of apps you dictate into, and a streak calendar with your current and longest streak. Insights are computed on your Mac from saved history, and the Share button offers a one-line summary through the macOS share menu.
+- Use Original in History, under Original transcription, puts back what you said when cleanup or a style changed it.
 
 ### Changed
 - Parakeet installs fetch the model in one pass instead of one pass per file, and the phrase booster downloads alongside it by default. Model sizes in Models include the booster, which downloads once and is shared by every Parakeet model. If the booster download fails, the model still installs and Vocabulary offers it again.
 - Model downloads run separately from dictation. You can dictate with the current model while another downloads, and When it finishes, BetterWispr switches to the new model, unless you picked a different one meanwhile or are mid-dictation.
 - Download progress only moves forward and covers the whole install, from the download to setup on this Mac. Models, the welcome guide and Vocabulary offer Cancel during a download and Retry after a failure.
 - The welcome guide's completion is saved with your workspace and versioned, so a reset workspace shows the guide again. Quitting midway reopens the guide on the same step. The 0.1.0 preference flag is migrated once and then removed.
+- New dictations save the app they were sent to and how many words Vocabulary respelled, for Insights. Dictations saved by 0.1.0 load unchanged and count toward every total except app usage.
 
 ### Fixed
 - The welcome guide's speech model download no longer stops when Escape, the capsule, the menu or a shortcut release cancels dictation, and a failed download now shows its error in the guide.
 - Parakeet Japanese never applies the English phrase booster.
+- Insights counts the words the Parakeet phrase booster spells from your Vocabulary while it recognizes speech. Before, those dictations came out right but counted no vocabulary fixes.
+- Learn from corrections catches a fix you send right away, as in chat apps that clear the field on send. BetterWispr now checks the field every half second and learns from text that stayed unchanged for half a second before the field emptied. A fix you leave in place is still learned after two seconds without changes.
 
 ## [0.1.0] - 2026-10-08
 

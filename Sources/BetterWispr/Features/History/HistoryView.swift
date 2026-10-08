@@ -31,6 +31,7 @@ struct HistoryView: View {
                                 onCopy: { model.copyTranscript(transcript) },
                                 onDelete: { transcriptToDelete = transcript },
                                 onEdit: { model.updateTranscript(transcript, text: $0) },
+                                onRestore: { model.restoreOriginal(transcript) },
                                 expanded: true
                             )
                         }
@@ -66,6 +67,7 @@ struct TranscriptRow: View {
     let onCopy: () -> Void
     var onDelete: (() -> Void)?
     var onEdit: ((String) -> Void)?
+    var onRestore: (() -> Void)?
     var expanded = false
     @State private var draft: String?
 
@@ -127,6 +129,10 @@ struct TranscriptRow: View {
                     Text(transcript.rawText)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                    if let onRestore, transcript.text != transcript.rawText.trimmingCharacters(in: .whitespacesAndNewlines) {
+                        Button("Use Original", action: onRestore)
+                            .help("Replace the cleaned-up text with exactly what was transcribed")
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -56,7 +56,13 @@ public protocol SpeechProvider: AnyObject {
     /// their explicitly selected connection authorizes network use during transcription.
     func prepare(model: SpeechModel, download: Bool) async throws
     func transcribe(audioURL: URL, language: String?, vocabulary: [String]) async throws -> String
+    /// Vocabulary terms the provider itself corrected during the last transcription.
+    var vocabularyFixes: Int { get }
     func cancel()
+}
+
+extension SpeechProvider {
+    public var vocabularyFixes: Int { 0 }
 }
 
 extension SpeechModel {

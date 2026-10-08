@@ -20,14 +20,19 @@ public enum TranscriptCleaner {
         let ends = ranges.dropFirst().map(\.lowerBound) + [text.endIndex]
         let tokens = zip(ranges, ends).map { Token(word: String(text[$0]), trailing: String(text[$0.upperBound..<$1])) }
         let spoken = tokens.map(\.word).filter { !fillers.contains($0.lowercased()) }.joined(separator: " ")
-        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
-            ?? NLLanguageRecognizer.dominantLanguage(for: spoken)?.rawValue
-        guard code == nil || code == "en" else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard isEnglish(spoken, language: language) else { return text.trimmingCharacters(in: .whitespacesAndNewlines) }
         let leading = text[..<(ranges.first?.lowerBound ?? text.endIndex)]
         let rebuilt = String(leading) + destutter(dropFillers(tokens)).map { $0.word + $0.trailing }.joined()
         var result = rebuilt.replacing(/\ {2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         if result.hasSuffix(",") { result.removeLast() }
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Uses the chosen language, or detects it when the language is automatic; undetectable text counts as English.
+    public static func isEnglish(_ text: String, language: String?) -> Bool {
+        let code = language.map { Locale(identifier: $0).language.languageCode?.identifier }
+            ?? NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue
+        return code == nil || code == "en"
     }
 
     private static func dropFillers(_ tokens: [Token]) -> [Token] {

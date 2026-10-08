@@ -2,17 +2,19 @@ import BetterWisprCore
 import SwiftUI
 
 enum AppPage: String, CaseIterable, Identifiable {
-    case overview, meetings, history, models, vocabulary, settings, about
+    case overview, insights, meetings, history, models, vocabulary, style, settings, about
 
     var id: String { rawValue }
     var title: String { self == .meetings ? "Notetaker" : rawValue.capitalized }
     var symbol: String {
         switch self {
         case .overview: "square.grid.2x2.fill"
+        case .insights: "chart.bar.fill"
         case .meetings: "note.text"
         case .history: "clock.fill"
         case .models: "cpu.fill"
         case .vocabulary: "character.book.closed.fill"
+        case .style: "textformat"
         case .settings: "gearshape.fill"
         case .about: "info"
         }
@@ -20,10 +22,12 @@ enum AppPage: String, CaseIterable, Identifiable {
     var color: Color {
         switch self {
         case .overview: .blue
+        case .insights: .teal
         case .meetings: .yellow
         case .history: .orange
         case .models: .purple
         case .vocabulary: .green
+        case .style: .pink
         case .settings: .gray
         case .about: .indigo
         }
@@ -55,10 +59,12 @@ struct DashboardView: View {
             Group {
                 switch model.selectedPage {
                 case .overview: OverviewView(model: model)
+                case .insights: InsightsView(history: model.history, savesHistory: model.settings.saveHistory)
                 case .meetings: MeetingsView(model: model)
                 case .history: HistoryView(model: model)
                 case .models: ModelsView(model: model)
                 case .vocabulary: VocabularyView(model: model)
+                case .style: StyleView(model: model)
                 case .settings: SettingsView(model: model)
                 case .about: AboutView(updater: model.updater, shortcut: model.settings.shortcut)
                 }

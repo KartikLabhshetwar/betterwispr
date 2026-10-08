@@ -39,7 +39,7 @@ public enum MeetingNotesGenerator {
         case .ollama: return .available
         case .cli(let cli):
             guard !settings.cliModel(cli).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return .unavailable("Choose a \(cli.name) model in Models before generating notes.")
+                return .unavailable("Choose a \(cli.name) model in Models.")
             }
             return cli.executable == nil ? .unavailable("Install \(cli.name) and sign in from Terminal with \(cli.loginCommand), then try again.") : .available
         case .connection(let id):
@@ -66,30 +66,30 @@ public enum MeetingNotesGenerator {
         if #available(macOS 26.0, *) {
             switch SystemLanguageModel.default.availability {
             case .available: return .available
-            case .unavailable(.deviceNotEligible): return .unavailable("This Mac doesn’t support Apple Intelligence. Choose Claude Code, Codex, Ollama or an API connection in Models to write notes here. Your transcript and notes are still saved.")
+            case .unavailable(.deviceNotEligible): return .unavailable("This Mac doesn’t support Apple Intelligence. Choose Claude Code, Codex, Ollama or an API connection in Models.")
             case .unavailable(.appleIntelligenceNotEnabled): return .unavailable("Turn on Apple Intelligence in System Settings, or choose another notes model in Models.")
             case .unavailable(.modelNotReady): return .unavailable("Apple Intelligence is still downloading its model. Try again soon, or choose another notes model in Models.")
-            case .unavailable: return .unavailable("Apple Intelligence isn’t available right now. Choose another notes model in Models, or try again later. Your transcript and notes are still saved.")
+            case .unavailable: return .unavailable("Apple Intelligence isn’t available right now. Choose another notes model in Models, or try again later.")
             }
         }
         #endif
-        return .unavailable("Apple Intelligence needs macOS 26. Choose Claude Code, Codex, Ollama or an API connection in Models. Your transcript and notes are still saved.")
+        return .unavailable("Apple Intelligence needs macOS 26. Choose Claude Code, Codex, Ollama or an API connection in Models.")
     }
 
-    private static func languageModel(_ settings: AppSettings) throws -> any NotesLanguageModel {
+    static func languageModel(_ settings: AppSettings, instructions: String = NotesWriter.instructions) throws -> any NotesLanguageModel {
         switch settings.notesSelection {
-        case .ollama(let name): return OllamaNotesModel(name: name)
+        case .ollama(let name): return OllamaNotesModel(name: name, instructions: instructions)
         case .connection(let id):
             guard let connection = settings.notesConnections.first(where: { $0.id == id }) else {
                 throw MeetingNotesError.unavailable("Choose a notes connection in Models.")
             }
-            return APINotesModel(connection: connection)
+            return APINotesModel(connection: connection, instructions: instructions)
         case .cli(let cli):
-            return CLINotesModel(cli: cli, model: settings.cliModel(cli))
+            return CLINotesModel(cli: cli, model: settings.cliModel(cli), instructions: instructions)
         case .apple: break
         }
         #if canImport(FoundationModels)
-        if #available(macOS 26.0, *) { return AppleNotesModel() }
+        if #available(macOS 26.0, *) { return AppleNotesModel(instructions: instructions) }
         #endif
         throw MeetingNotesError.unavailable(appleAvailability.message)
     }
@@ -207,14 +207,15 @@ struct GeneratedNotes {
 
 @available(macOS 26.0, *)
 struct AppleNotesModel: NotesLanguageModel {
+    var instructions = NotesWriter.instructions
     private static let options = GenerationOptions(temperature: 0.3)
 
     func respond(to prompt: String) async throws -> String {
-        try await LanguageModelSession(instructions: NotesWriter.instructions).respond(to: prompt, options: Self.options).content
+        try await LanguageModelSession(instructions: instructions).respond(to: prompt, options: Self.options).content
     }
 
     func draft(_ prompt: String) async throws -> NotesDraft {
-        let notes = try await LanguageModelSession(instructions: NotesWriter.instructions)
+        let notes = try await LanguageModelSession(instructions: instructions)
             .respond(to: prompt, generating: GeneratedNotes.self, options: Self.options).content
         return NotesDraft(title: notes.title, overview: notes.overview, keyPoints: notes.keyPoints,
                           decisions: notes.decisions, actionItems: notes.actionItems)

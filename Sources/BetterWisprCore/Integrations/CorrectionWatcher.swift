@@ -18,23 +18,22 @@ public final class CorrectionWatcher {
             guard let field = Self.focusedField(pid: pid) else { return }
             var inserted = inserted
             var baseline: String?
-            var previous: String?
-            for _ in 0..<15 {
+            var settled = SettledText("")
+            for _ in 0..<60 {
                 guard !Task.isCancelled, !IsSecureEventInputEnabled(), let value = Self.value(of: field), value.count <= 100_000 else { break }
-                defer { previous = value }
-                guard let base = baseline else {
-                    if value.contains(inserted) { baseline = value }
-                    try? await Task.sleep(for: .seconds(2))
-                    continue
-                }
-                if value.isEmpty { break }
-                if value != base, value == previous, let edited = Self.edit(of: inserted, from: base, to: value) {
-                    let found = CorrectionLearner.corrections(from: inserted, to: edited)
-                    if !found.isEmpty { onCorrections(found) }
-                    inserted = edited
+                if let base = baseline {
+                    if let text = settled.observe(value), text != base, let edited = Self.edit(of: inserted, from: base, to: text) {
+                        let found = CorrectionLearner.corrections(from: inserted, to: edited)
+                        if !found.isEmpty { onCorrections(found) }
+                        inserted = edited
+                        baseline = text
+                    }
+                    if value.isEmpty { break }
+                } else if value.contains(inserted) {
                     baseline = value
+                    settled = SettledText(value)
                 }
-                try? await Task.sleep(for: .seconds(2))
+                try? await Task.sleep(for: .milliseconds(500))
             }
             if self?.task?.isCancelled == false { self?.task = nil }
         }
@@ -76,5 +75,20 @@ public final class CorrectionWatcher {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(field, kAXValueAttribute as CFString, &value) == .success else { return nil }
         return value as? String
+    }
+}
+
+/// Decides when text in a field polled every half second is final enough to learn from.
+struct SettledText {
+    private var last: String
+    private var polls = 1
+
+    init(_ value: String) { last = value }
+
+    /// Returns text left unchanged for two seconds, or the text that was in the field for at least half a second before it emptied.
+    mutating func observe(_ value: String) -> String? {
+        if value.isEmpty { return polls >= 2 ? last : nil }
+        if value == last { polls += 1 } else { last = value; polls = 1 }
+        return polls == 5 ? value : nil
     }
 }

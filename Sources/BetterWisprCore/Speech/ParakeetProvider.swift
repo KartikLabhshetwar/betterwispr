@@ -5,6 +5,7 @@ import Foundation
 public final class ParakeetProvider: SpeechProvider {
     public var onProgress: (@MainActor @Sendable (Double) -> Void)?
     public var onPartialTranscript: (@MainActor @Sendable (String) -> Void)?
+    public private(set) var vocabularyFixes = 0
     private let modelsDirectory: URL
     private var manager: AsrManager?
     private var loadedModelID: String?
@@ -187,10 +188,11 @@ public final class ParakeetProvider: SpeechProvider {
         try Task.checkCancellation()
         let hint = language.flatMap { Locale(identifier: $0).language.languageCode?.identifier }.flatMap(Language.init(rawValue:))
         let terms = loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary) : []
+        vocabularyFixes = 0
         let task = Task {
             let text: String
             if let session = await self.boostingSession(for: terms) {
-                text = try await Self.boostedTranscript(of: audioURL, language: hint, manager: manager, session: session)
+                (text, self.vocabularyFixes) = try await Self.boostedTranscript(of: audioURL, language: hint, manager: manager, session: session)
             } else {
                 var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
                 text = try await manager.transcribe(audioURL, decoderState: &state, language: hint).text
@@ -221,18 +223,19 @@ public final class ParakeetProvider: SpeechProvider {
     @concurrent
     private nonisolated static func boostedTranscript(
         of audioURL: URL, language: Language?, manager: AsrManager, session: VocabularyBoostingSession
-    ) async throws -> String {
+    ) async throws -> (text: String, fixes: Int) {
         let samples = try AudioConverter().resampleAudioFile(audioURL)
         try Task.checkCancellation()
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         let result = try await manager.transcribe(samples, decoderState: &state, language: language)
         try Task.checkCancellation()
         guard let rescored = await session.rescore(text: result.text, tokenTimings: result.tokenTimings ?? [], audioSamples: samples),
-              rescored.wasModified else { return result.text }
+              rescored.wasModified else { return (result.text, 0) }
         let replacements = rescored.replacements.compactMap { item in
             item.shouldReplace ? item.replacementWord.map { (original: item.originalWord, replacement: $0) } : nil
         }
-        return restoringPunctuation(original: result.text, rescored: rescored.text, replacements: replacements)
+        return (restoringPunctuation(original: result.text, rescored: rescored.text, replacements: replacements),
+                replacements.count { $0.original != $0.replacement })
     }
 }
 

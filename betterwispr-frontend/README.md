@@ -66,27 +66,47 @@ Bun's automatic env loading is disabled in `bunfig.toml`; the framework integrat
 
 Run standalone Node/Bun tools that use Varlock from the owning app directory so they load that app's schema and env files. `env:generate` only generates TypeScript files; it does not initialize environment values in a subsequent command.
 
-## Deployment
+## Production website
 
-### Alchemy
-
-- Target: web on Cloudflare + server on Cloudflare
-- Configure provider accounts: `cd packages/infra && pnpm exec alchemy profile edit`
-- Dev: pnpm run dev
-- Deploy: pnpm run deploy
-- Destroy: pnpm run destroy
-
-`alchemy profile edit` stores the selected Axiom, Cloudflare, Neon, PlanetScale, and/or Prisma provider profiles under `~/.alchemy`; no provider-specific setup command is required by this scaffold.
-
-Deploys are staged and default to a personal `dev_<username>` stage. For production, run the deploy with an explicit stage from `packages/infra`:
+The public marketing site is the existing Cloudflare Worker **betterwispr** at
+**https://betterwispr.com**. Its configuration is `apps/web/wrangler.jsonc`.
+The Alchemy scaffold is separate and does not own this production worker.
 
 ```bash
-cd packages/infra && pnpm exec alchemy deploy --stage production
+pnpm run build
+pnpm run check-types
+pnpm --filter web test
+pnpm run deploy
 ```
 
-### Production origins
+`deploy` builds and verifies the static pages, then deploys the website with a
+pinned Wrangler CLI. It uses the local Cloudflare login (`pnpm dlx
+wrangler@4.148.0 login`) or `CLOUDFLARE_API_TOKEN` from the environment. Never
+commit credentials. Custom domain, worker name and account must match the
+existing production site.
 
-- Required after the first deploy: set `CORS_ORIGIN` in `apps/server/.env` to the exact deployed web origin, such as `https://app.example.com`, then deploy the server again.
+The web build prerenders all public routes, including comparison pages, so
+search engines and social previews receive complete HTML and page metadata.
+It also generates `sitemap.xml` and a branded `404.html`. Unknown paths return
+404 instead of silently serving the homepage. The client hydrates the same
+React routes for navigation and interactions.
+
+Comparison content and dated official sources live in
+`apps/web/src/lib/comparisons.ts`. Recheck sources when updating claims.
+The download destination stays in `apps/web/src/lib/links.ts`.
+`apps/web/public/og-image.png` is the product social image, generated with the
+built-in image tool: “BetterWispr; Hold to talk. Release to type.; Local
+dictation for Mac.; warm off-white, near-black typography, recording capsule
+and Option/Space keys.” Its dimensions are declared in the root route metadata.
+
+### Local preview
+
+```bash
+pnpm run dev:web
+# Or serve the built site with production asset routing:
+cd apps/web
+pnpm dlx wrangler@4.148.0 dev --port 3003
+```
 
 ## Project Structure
 

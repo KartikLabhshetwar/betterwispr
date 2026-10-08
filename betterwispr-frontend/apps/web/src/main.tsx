@@ -2,6 +2,7 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import ReactDOM from "react-dom/client";
 
 import Loader from "./components/loader";
+import Document from "./components/document";
 import { routeTree } from "./routeTree.gen";
 
 const router = createRouter({
@@ -24,7 +25,14 @@ if (!rootElement) {
   throw new Error("Root element not found");
 }
 
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
-  root.render(<RouterProvider router={router} />);
+await router.load();
+if (rootElement.innerHTML) {
+  ReactDOM.hydrateRoot(
+    document,
+    <Document>
+      <RouterProvider router={router} />
+    </Document>,
+  );
+} else {
+  ReactDOM.createRoot(rootElement).render(<RouterProvider router={router} />);
 }

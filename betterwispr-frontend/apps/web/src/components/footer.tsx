@@ -1,26 +1,35 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-
 import BrandMark from "@/components/brand-mark";
+import { comparisons } from "@/lib/comparisons";
 import { DOWNLOAD_URL, GITHUB_URL } from "@/lib/links";
 
-const LINK = "text-sm text-zinc-500 transition-colors duration-700 ease-fluid hover:text-zinc-900";
+const LINK =
+  "text-sm text-zinc-600 transition-colors duration-700 ease-fluid hover:text-zinc-900";
 
 export default function Footer() {
   return (
     <footer className="border-t border-zinc-200">
-      <div className="mx-auto grid max-w-[1100px] gap-12 px-6 py-16 sm:grid-cols-[1fr_auto_auto] sm:gap-24">
+      <div className="page-shell grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1.5fr_1fr]">
         <div className="max-w-xs">
-          <Link to="/" className="flex w-max items-center gap-2 rounded-lg text-sm font-semibold text-zinc-900">
-            <BrandMark className="size-6" />
+          <Link
+            to="/"
+            className="flex w-max items-center gap-2 rounded-lg text-sm font-semibold"
+          >
+            <BrandMark className="size-8" />
             BetterWispr
           </Link>
-          <p className="mt-4 text-sm text-zinc-500">
-            Local dictation for macOS. Your voice is transcribed on your Mac and never leaves it.
+          <p className="mt-4 text-sm text-zinc-600">
+            A quieter way to get your thoughts down. Local dictation for macOS.
           </p>
-          <p className="mt-6 text-xs text-zinc-400">
-            © {new Date().getFullYear()} BetterWispr. Built by{" "}
-            <a href="https://x.com/code_kartik" className="underline underline-offset-2 hover:text-zinc-900">
+          <p className="mt-6 text-xs text-zinc-500">
+            © {new Date().getFullYear()} BetterWispr.
+            <br />
+            Built by{" "}
+            <a
+              href="https://x.com/code_kartik"
+              className="underline underline-offset-2 hover:text-zinc-900"
+            >
               Kartik Labhshetwar
             </a>
             .
@@ -28,32 +37,59 @@ export default function Footer() {
         </div>
         <FooterColumn title="Product">
           <a href={DOWNLOAD_URL} className={LINK}>
-            Download
+            Download for macOS
           </a>
+          <Link to="/" hash="how-it-works" className={LINK}>
+            How it works
+          </Link>
           <Link to="/changelog" className={LINK}>
             Changelog
           </Link>
-        </FooterColumn>
-        <FooterColumn title="Source">
           <a href={GITHUB_URL} className={LINK}>
             GitHub
           </a>
+        </FooterColumn>
+        <FooterColumn title="Compare">
+          {comparisons.map((item) => (
+            <Link
+              to="/compare/$slug"
+              params={{ slug: item.slug }}
+              key={item.slug}
+              className={LINK}
+            >
+              vs {item.name}
+            </Link>
+          ))}
+        </FooterColumn>
+        <FooterColumn title="About">
+          <Link to="/privacy" className={LINK}>
+            Privacy
+          </Link>
+          <Link to="/terms" className={LINK}>
+            Software terms
+          </Link>
           <a href={`${GITHUB_URL}/issues`} className={LINK}>
             Report an issue
           </a>
-          <a href={`${GITHUB_URL}/blob/main/LICENSE`} className={LINK}>
-            Apache 2.0 license
-          </a>
+          <Link to="/compare" className={LINK}>
+            Comparison guide
+          </Link>
         </FooterColumn>
       </div>
     </footer>
   );
 }
 
-function FooterColumn({ title, children }: { title: string; children: ReactNode }) {
+function FooterColumn({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs font-medium tracking-widest text-zinc-400 uppercase">{title}</p>
+      <p className="eyebrow mb-1">{title}</p>
       {children}
     </div>
   );

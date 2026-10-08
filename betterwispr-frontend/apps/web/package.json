@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender.mjs",
     "serve": "vite preview",
     "start": "vite",
-    "check-types": "vite build && tsc --noEmit",
+    "check-types": "tsc --noEmit",
     "dev:bare": "vite dev",
-    "env:generate": "varlock codegen"
+    "env:generate": "varlock codegen",
+    "test": "node scripts/check-site.mjs",
+    "deploy": "pnpm run build && pnpm run test && pnpm dlx wrangler@4.148.0 deploy"
   },
   "dependencies": {
     "@betterwispr-frontend/ui": "workspace:*",

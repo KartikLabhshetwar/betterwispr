@@ -1,4 +1,9 @@
-import { HeadContent, Link, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Link,
+  Outlet,
+  createRootRouteWithContext,
+} from "@tanstack/react-router";
 
 import Footer from "@/components/footer";
 import Header from "@/components/header";
@@ -24,7 +29,20 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       { property: "og:type", content: "website" },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
-      { name: "twitter:card", content: "summary" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:site_name", content: "BetterWispr" },
+      { property: "og:image", content: "https://betterwispr.com/og-image.png" },
+      { property: "og:image:width", content: "1730" },
+      { property: "og:image:height", content: "909" },
+      {
+        property: "og:image:alt",
+        content:
+          "BetterWispr. Hold to talk. Release to type. Local dictation for Mac.",
+      },
+      {
+        name: "twitter:image",
+        content: "https://betterwispr.com/og-image.png",
+      },
     ],
     links: [{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
   }),
@@ -42,7 +60,7 @@ function RootComponent() {
       </a>
       <div className="flex min-h-svh flex-col bg-white text-zinc-900 antialiased">
         <Header />
-        <main id="main" className="flex-1 pt-14">
+        <main id="main" className="flex-1">
           <Outlet />
         </main>
         <Footer />
@@ -53,9 +71,11 @@ function RootComponent() {
 
 function NotFound() {
   return (
-    <section className="mx-auto flex max-w-[680px] flex-col items-center px-6 py-32 text-center">
+    <section className="mx-auto flex max-w-[680px] flex-col items-center px-6 py-24 text-center">
       <p className="font-mono text-sm text-zinc-400">404</p>
-      <h1 className="mt-4 text-4xl tracking-tight text-zinc-900">Nothing was said here</h1>
+      <h1 className="mt-4 text-4xl tracking-tight text-zinc-900">
+        Nothing was said here
+      </h1>
       <p className="mt-4 text-base text-zinc-500">
         This page does not exist. It may have moved, or the link is out of date.
       </p>

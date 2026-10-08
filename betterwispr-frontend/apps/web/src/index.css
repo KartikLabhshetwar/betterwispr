@@ -56,3 +56,48 @@
     }
   }
 }
+
+@layer components {
+  .page-shell {
+    @apply mx-auto w-full max-w-[1100px] px-6;
+  }
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-widest text-zinc-500;
+  }
+  .download-cta {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 font-semibold transition-all duration-700 ease-fluid hover:bg-zinc-700 active:scale-[0.98];
+    background-color: #181818;
+    color: #fff;
+  }
+  .comparison-link {
+    @apply grid grid-cols-[1fr_auto] items-center gap-6 border-b border-zinc-200 py-8 transition-colors duration-700 ease-fluid hover:bg-zinc-50 sm:grid-cols-[auto_1fr_auto] lg:grid-cols-[auto_1fr_auto_auto];
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  .legal-page {
+    @apply mx-auto max-w-[680px] px-6 py-20;
+  }
+  .legal-page h1 {
+    @apply mt-4 text-5xl tracking-tight;
+  }
+  .legal-page h2 {
+    @apply mt-10 text-xl font-semibold;
+  }
+  .legal-page p:not(.eyebrow) {
+    @apply mt-4 text-base text-zinc-600;
+  }
+  .legal-page a {
+    @apply text-zinc-900 underline underline-offset-4 hover:text-zinc-600;
+  }
+}

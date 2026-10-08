@@ -1,0 +1,13 @@
+{
+  "name": "betterwispr",
+  "account_id": "1e536ab3dd1abed5113cda639440d191",
+  "compatibility_date": "2026-10-08",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "betterwispr.com", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+  },
+}

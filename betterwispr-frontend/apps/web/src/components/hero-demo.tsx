@@ -15,12 +15,20 @@ const CYCLE_MS = TYPING_MS + HOLD_MS;
 const DICTATION_WPM = Math.round(WORDS / (PASTED_AT / 60_000));
 
 const fract = (value: number) => value - Math.floor(value);
-const KEY_WEIGHTS = Array.from(SENTENCE, (_, index) => 0.5 + fract(Math.sin(index * 12.9898) * 43758.5453));
+const KEY_WEIGHTS = Array.from(
+  SENTENCE,
+  (_, index) => 0.5 + fract(Math.sin(index * 12.9898) * 43758.5453),
+);
 const WEIGHT_SUM = KEY_WEIGHTS.reduce((sum, weight) => sum + weight, 0);
 let keyClock = 0;
-const KEY_AT = KEY_WEIGHTS.map((weight) => (keyClock += (weight / WEIGHT_SUM) * TYPING_MS));
+const KEY_AT = KEY_WEIGHTS.map(
+  (weight) => (keyClock += (weight / WEIGHT_SUM) * TYPING_MS),
+);
 
-const BARS = Array.from({ length: 11 }, (_, index) => 1 - Math.abs(index - 5) / 7);
+const BARS = Array.from(
+  { length: 11 },
+  (_, index) => 1 - Math.abs(index - 5) / 7,
+);
 
 type Phase = "listening" | "transcribing" | "pasted";
 
@@ -32,34 +40,54 @@ const PHASE_LABEL: Record<Phase, string> = {
 
 /** Hero visual: one sentence typed by hand and dictated with BetterWispr, on a shared clock. */
 export default function HeroDemo() {
-  const [elapsed, setElapsed] = useState(() => (window.matchMedia(REDUCED_MOTION).matches ? CYCLE_MS - 1 : 0));
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (window.matchMedia(REDUCED_MOTION).matches) return;
+    if (window.matchMedia(REDUCED_MOTION).matches) {
+      setElapsed(CYCLE_MS - 1);
+      return;
+    }
     const start = performance.now();
-    const timer = window.setInterval(() => setElapsed((performance.now() - start) % CYCLE_MS), 50);
+    const timer = window.setInterval(
+      () => setElapsed((performance.now() - start) % CYCLE_MS),
+      50,
+    );
     return () => window.clearInterval(timer);
   }, []);
 
   const typed = KEY_AT.filter((at) => at <= elapsed).length;
   const typingClock = Math.min(elapsed, TYPING_MS);
-  const typingWpm = typingClock < 1000 ? 0 : Math.round(typed / 5 / (typingClock / 60_000));
-  const phase: Phase = elapsed < SPOKEN_AT ? "listening" : elapsed < PASTED_AT ? "transcribing" : "pasted";
+  const typingWpm =
+    typingClock < 1000 ? 0 : Math.round(typed / 5 / (typingClock / 60_000));
+  const phase: Phase =
+    elapsed < SPOKEN_AT
+      ? "listening"
+      : elapsed < PASTED_AT
+        ? "transcribing"
+        : "pasted";
 
   return (
     <figure
       role="img"
-      aria-label={`The same sentence typed by hand at ${TYPING_WPM} words per minute and dictated with BetterWispr at ${DICTATION_WPM} words per minute`}
+      aria-label="Illustrative animation of typing and dictation; not a performance benchmark"
       className="mx-auto max-w-[880px] rounded-3xl bg-paper px-4 py-12 sm:px-16 sm:py-16"
     >
       <div className="mx-auto flex max-w-xl flex-col gap-6">
-        <DemoWindow title="Typing" clock={typingClock} stat={`${typingWpm} wpm`}>
+        <DemoWindow
+          title="Typing"
+          clock={typingClock}
+          stat={`${typingWpm} wpm`}
+        >
           <SentenceSlot>
             {SENTENCE.slice(0, typed)}
             <Caret />
           </SentenceSlot>
         </DemoWindow>
-        <DemoWindow title="BetterWispr" clock={Math.min(elapsed, PASTED_AT)} stat={PHASE_LABEL[phase]}>
+        <DemoWindow
+          title="BetterWispr"
+          clock={Math.min(elapsed, PASTED_AT)}
+          stat={PHASE_LABEL[phase]}
+        >
           <SentenceSlot>
             {phase === "pasted" && SENTENCE}
             <Caret />
@@ -70,13 +98,24 @@ export default function HeroDemo() {
         </DemoWindow>
       </div>
       <figcaption className="mt-8 text-center text-xs text-zinc-500">
-        Simulated at {TYPING_WPM} wpm typing and {SPEAKING_WPM} wpm speaking, with time for transcription.
+        Illustration, not a benchmark. Simulated at {TYPING_WPM} wpm typing and{" "}
+        {SPEAKING_WPM} wpm speaking, with time for transcription.
       </figcaption>
     </figure>
   );
 }
 
-function DemoWindow({ title, clock, stat, children }: { title: string; clock: number; stat: string; children: ReactNode }) {
+function DemoWindow({
+  title,
+  clock,
+  stat,
+  children,
+}: {
+  title: string;
+  clock: number;
+  stat: string;
+  children: ReactNode;
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white text-left shadow-sm">
       <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
@@ -109,12 +148,16 @@ function SentenceSlot({ children }: { children: ReactNode }) {
 }
 
 function Caret() {
-  return <span className="ml-0.5 inline-block h-5 w-0.5 translate-y-1 bg-ink" />;
+  return (
+    <span className="ml-0.5 inline-block h-5 w-0.5 translate-y-1 bg-ink" />
+  );
 }
 
 function Capsule({ phase }: { phase: Phase }) {
   if (phase === "pasted") {
-    return <span className="h-2 w-10 rounded-full border border-white/50 bg-black/60" />;
+    return (
+      <span className="h-2 w-10 rounded-full border border-white/50 bg-black/60" />
+    );
   }
   return (
     <span
@@ -124,7 +167,10 @@ function Capsule({ phase }: { phase: Phase }) {
         <span
           key={index}
           className="w-1 animate-[wave_1.1s_var(--ease-fluid)_infinite] rounded-full bg-white/95 transition-opacity duration-700 ease-fluid motion-reduce:animate-none"
-          style={{ height: `${6 + 18 * envelope}px`, animationDelay: `${index * -0.1}s` }}
+          style={{
+            height: `${6 + 18 * envelope}px`,
+            animationDelay: `${index * -0.1}s`,
+          }}
         />
       ))}
     </span>

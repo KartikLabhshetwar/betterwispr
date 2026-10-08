@@ -302,7 +302,7 @@ private struct CapsuleGlass: View {
     }
 }
 
-private struct Waveform: View {
+struct Waveform: View {
     enum Mode: Equatable {
         case waiting, processing
         case listening(VoiceLevels)
@@ -310,6 +310,7 @@ private struct Waveform: View {
 
     let mode: Mode
     let animated: Bool
+    var color: Color = .white
     private static let count = 5
 
     var body: some View {
@@ -326,7 +327,7 @@ private struct Waveform: View {
         HStack(spacing: 2.5) {
             ForEach(0..<Self.count, id: \.self) { index in
                 Capsule()
-                    .fill(.white.opacity(mode == .waiting ? 0.4 : 0.95))
+                    .fill(color.opacity(mode == .waiting ? 0.4 : 0.95))
                     .frame(width: 2, height: 3 + 11 * height(of: index, at: date))
             }
         }

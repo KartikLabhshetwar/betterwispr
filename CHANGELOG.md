@@ -13,7 +13,8 @@ All notable changes to BetterWispr are listed here. The format follows
 - Native macOS dictation app with a global ⌥ Space shortcut, paste into the focused app and transcript history.
 - Local speech models: Apple speech, Parakeet TDT v3 (25 European languages) and v2 (English) through FluidAudio, and Whisper large-v3 turbo through WhisperKit.
 - Compact recording overlay with an idle pill, a hover tooltip showing the chosen shortcut and a dictate button.
-- Three-step welcome guide on first launch: intro, permissions, model and first dictation. Replay it from the menu bar.
+- Welcome guide on first launch. It fills the main window, walks through permissions, the recommended speech model and a first dictation, and runs only once.
+- Disk image window with BetterWispr and Applications side by side on a warm paper background, a hand-drawn arrow between them and the hint "Drag to Applications". `scripts/dmg-background.swift` renders it at 1x and 2x so it stays sharp on Retina displays, and Finder's labels read in Light and Dark Mode.
 - Personal vocabulary with spelling hints and whole-phrase replacements, plus local model management.
 - Optional local phrase booster for Parakeet vocabulary. Download it explicitly from the Vocabulary page to help recognize names and technical terms. The English-only booster runs with English or automatic language selection, preserves punctuation around replaced words, and loads installed assets offline.
 - Hold-to-talk dictation, now the default: hold ⌥ Space while speaking and release to finish. "Press to toggle" keeps the previous behavior and is set in Settings.
@@ -34,6 +35,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - `VERSION` file and this changelog. The app bundle version is stamped from `VERSION` at build time.
 
 ### Changed
+- The menu bar menu shows whether BetterWispr is ready, listening or transcribing, switches the speech model and microphone, and opens Settings and update checks. Show capsule and Show welcome guide are gone.
 - Start Notetaker on the dashboard now docks the meeting card beside your call, the same as starting from the capsule or the menu bar.
 - The dashboard no longer opens the live transcript while you record. It keeps the list of notes and opens the finished note once recording and notes are done.
 - The app bundle's `CFBundleVersion` now follows `VERSION` instead of a fixed `1`, so Sparkle can tell releases apart.

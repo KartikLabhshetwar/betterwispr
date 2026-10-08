@@ -11,7 +11,7 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-bettershot-notary}"
 ENTITLEMENTS="Resources/BetterWispr.entitlements"
 RELEASE_DIR="$PROJECT_DIR/release"
 APP_PATH="$PROJECT_DIR/.build/release/BetterWispr.app"
-DMG_PATH="$RELEASE_DIR/BetterWispr-${VERSION}_arm64.dmg"
+DMG_PATH="$RELEASE_DIR/BetterWispr.dmg"
 
 echo "=== BetterWispr v$VERSION Release Build ==="
 rm -rf "$RELEASE_DIR"

@@ -25,12 +25,12 @@ create-dmg \
     --volname "BetterWispr" \
     --background "$WORK_DIR/background.tiff" \
     --window-pos 200 140 \
-    --window-size 660 468 \
+    --window-size 642 406 \
     --icon-size 128 \
-    --text-size 14 \
-    --icon "BetterWispr.app" 180 230 \
+    --text-size 13 \
+    --icon "BetterWispr.app" 164 160 \
     --hide-extension "BetterWispr.app" \
-    --app-drop-link 480 230 \
+    --app-drop-link 478 160 \
     "$WORK_DIR/BetterWispr.dmg" "$WORK_DIR/staging"
 
 hdiutil verify "$WORK_DIR/BetterWispr.dmg"

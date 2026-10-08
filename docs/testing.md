@@ -77,6 +77,15 @@ CLI. Neither recognizes microphone audio.
 - [ ] Deny Accessibility. Dictation and manual copy remain usable; automatic
   insertion explains its permission requirement rather than pretending it worked.
 
+## Disk image and first launch
+
+- [ ] Run `bash scripts/create-dmg.sh .build/debug/BetterWispr.app /tmp/BetterWispr.dmg`
+  and open the DMG in Light and Dark Mode. BetterWispr and Applications sit either
+  side of the arrow, their Finder labels are readable, and the install line stays
+  visible with Finder's path bar shown.
+- [ ] Drag BetterWispr to Applications and open it. The welcome guide appears once.
+  Quit and relaunch; the dashboard opens and the menu bar menu offers no way to replay it.
+
 ## Recording, capsule and cancellation
 
 - [ ] Focus a TextEdit document, press **Option–Space**, speak a distinctive sentence,

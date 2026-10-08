@@ -50,7 +50,6 @@ final class AppModel {
     var microphones: [AudioInputDevice] = []
     var defaultMicrophone: AudioInputDevice?
     var onPresentationChange: (() -> Void)?
-    var onShowCapsule: (() -> Void)?
     var onShowDashboard: (() -> Void)?
     var onShowNotetaker: ((UUID) -> Void)?
 
@@ -662,8 +661,6 @@ final class AppModel {
         microphones = AudioInputs.available()
         defaultMicrophone = AudioInputs.systemDefault()
     }
-
-    func showCapsule() { onShowCapsule?() }
 
     func dismissFailure() {
         if failure != nil { phase = .idle }

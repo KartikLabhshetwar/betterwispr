@@ -96,7 +96,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         started = true
         capsule = CapsuleController(model: model)
         model.onPresentationChange = { [weak self] in self?.capsule?.update() }
-        model.onShowCapsule = { [weak self] in self?.capsule?.show() }
         notetaker = NotetakerController(model: model)
         model.onShowNotetaker = { [weak self] in self?.notetaker?.show($0) }
         model.registerShortcut()

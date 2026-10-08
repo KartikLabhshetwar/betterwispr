@@ -31,12 +31,12 @@ import Testing
     let settings = try JSONDecoder().decode(AppSettings.self, from: Data(saved.utf8))
     #expect(settings.selectedModelID == "parakeet-v3")
     #expect(settings.dictationMode == .hold)
-    #expect(settings.copyToClipboard)
+    #expect(!settings.copyToClipboard)
     #expect(settings.shortcut == .optionSpace)
     #expect(settings.microphone == nil)
     var toggled = settings
     toggled.dictationMode = .toggle
-    toggled.copyToClipboard = false
+    toggled.copyToClipboard = true
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }

@@ -9,7 +9,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var speechConnections: [SpeechConnection] = []
     public var language: String = "auto"
     public var autoPaste: Bool = true
-    public var copyToClipboard: Bool = true
+    public var copyToClipboard: Bool = false
     public var saveHistory: Bool = true
     public var showCapsule: Bool = true
     public var launchAtLogin: Bool = false
@@ -30,7 +30,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         speechConnections = try container.decodeIfPresent([SpeechConnection].self, forKey: .speechConnections) ?? []
         language = try container.decode(String.self, forKey: .language)
         autoPaste = try container.decode(Bool.self, forKey: .autoPaste)
-        copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? true
+        copyToClipboard = try container.decodeIfPresent(Bool.self, forKey: .copyToClipboard) ?? false
         saveHistory = try container.decode(Bool.self, forKey: .saveHistory)
         showCapsule = try container.decode(Bool.self, forKey: .showCapsule)
         launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)

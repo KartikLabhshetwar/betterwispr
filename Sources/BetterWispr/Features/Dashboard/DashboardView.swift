@@ -5,7 +5,7 @@ enum AppPage: String, CaseIterable, Identifiable {
     case overview, meetings, history, models, vocabulary, settings, about
 
     var id: String { rawValue }
-    var title: String { self == .meetings ? "Meeting Notes" : rawValue.capitalized }
+    var title: String { self == .meetings ? "Notetaker" : rawValue.capitalized }
     var symbol: String {
         switch self {
         case .overview: "square.grid.2x2.fill"
@@ -36,24 +36,18 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationSplitView {
-            Group {
-                if model.selectedPage == .meetings {
-                    MeetingsSidebar(model: model)
-                } else {
-                    List(selection: Binding<AppPage?>(
-                        get: { model.selectedPage },
-                        set: { if let page = $0 { model.selectedPage = page } }
-                    )) {
-                        ForEach(AppPage.allCases) { page in
-                            Label {
-                                Text(page.title)
-                            } icon: {
-                                SymbolTile(symbol: page.symbol, color: page.color)
-                            }
-                            .badge(page == .history ? model.history.count : 0)
-                            .tag(page)
-                        }
+            List(selection: Binding<AppPage?>(
+                get: { model.selectedPage },
+                set: { if let page = $0 { model.selectedPage = page } }
+            )) {
+                ForEach(AppPage.allCases) { page in
+                    Label {
+                        Text(page.title)
+                    } icon: {
+                        SymbolTile(symbol: page.symbol, color: page.color)
                     }
+                    .badge(page == .history ? model.history.count : 0)
+                    .tag(page)
                 }
             }
             .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)

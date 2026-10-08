@@ -7,6 +7,8 @@ All notable changes to BetterWispr are listed here. The format follows
 ## [0.1.0] - 2026-10-08
 
 ### Added
+- Voice commands for English and Auto language: "comma", "question mark", "full stop", "add a period", "new line", "new paragraph", "scratch that" and "sorry, remove that" delete the last sentence, and "at the rate KV" or "at sign KV" types "@KV". Commands are rule-based and run on your Mac.
+- Learn from corrections: fix a misheard word in History with the pencil, or in the text field within 30 seconds of a paste, and BetterWispr adds it to Vocabulary with a Learned badge and a toast. Turn it off in Settings.
 - Native macOS dictation app with a global ⌥ Space shortcut, paste into the focused app and transcript history.
 - Local speech models: Apple speech, Parakeet TDT v3 (25 European languages) and v2 (English) through FluidAudio, and Whisper large-v3 turbo through WhisperKit.
 - Compact recording overlay with an idle pill, a hover tooltip showing the chosen shortcut and a dictate button.

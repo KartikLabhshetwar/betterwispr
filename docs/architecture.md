@@ -60,10 +60,13 @@ behavior that unit tests cannot establish.
 
 `MeetingModel` owns meetings and is separate from dictation. It loads its own
 speech provider with `download: false` and releases it when the meeting ends.
-The meeting sidebar exposes the same model selection as dictation; both use
-`SpeechModel.makeProvider()` with independent provider instances. The model name
-is captured when recording starts. Personal thoughts, the transcript, and the
-generated summary have separate tabs backed by the existing meeting fields.
+The Notetaker page's settings menu exposes the same model and microphone
+selection as dictation; both use `SpeechModel.makeProvider()` with independent
+provider instances. The model name is captured when recording starts. The page
+lists notes by day beside the current note (the one recording, otherwise the
+latest); `MeetingModel.selectedID` opens one full page, and nil returns to the
+list. Personal thoughts, the transcript, and the generated summary have separate
+tabs backed by the existing meeting fields.
 
 1. Starting a meeting saves an empty `Meeting`, checks microphone permission and
    starts `MeetingRecorder`. The microphone becomes "Me". On macOS 14.2 and later

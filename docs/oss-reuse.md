@@ -74,6 +74,24 @@ use the existing site typography, Lucide icons, typed X post data, source links,
 empty-list hiding, pause controls and reduced-motion support. Sample quotes and
 Unsplash portraits appear only in the explicitly labeled demo, not as endorsements.
 
+`Sources/BetterWisprCore/Transcription/VoiceCommands.swift` adapts spoken
+punctuation, line breaks and "scratch that" from Scribe
+[`mac/Sources/Scribe/VoiceCommands.swift`](https://github.com/kumard3/scribe/blob/3c69a914a2767f5d3a3917f7b8b609b082d09164/mac/Sources/Scribe/VoiceCommands.swift),
+revision `3c69a914a2767f5d3a3917f7b8b609b082d09164`, MIT. The upstream license
+and copyright are retained in the source. Changes delete back to the previous
+sentence, accept "remove that" only when set off by punctuation or an apology,
+keep phrases like "the Oxford comma" as prose and turn "at the rate KV" into "@KV".
+
+`Sources/BetterWisprCore/Transcription/CorrectionLearner.swift` ports
+[`src/utils/correctionLearner.js`](https://github.com/OpenWhispr/openwhispr/blob/4881a74d7273e3d12ca91a0b46204ad80ea03e9a/src/utils/correctionLearner.js)
+from OpenWhispr, revision `4881a74d7273e3d12ca91a0b46204ad80ea03e9a`, MIT,
+copyright 2024 OpenWhispr Team, retained in the source. It keeps the word-level
+LCS diff, the rewrite cutoff, the common-word list and the 0.65 edit-distance
+ratio, and adds multi-word substitutions and case-only fixes such as "kv" to "KV".
+`Sources/BetterWisprCore/Integrations/CorrectionWatcher.swift` is written for
+BetterWispr after the arm-after-paste approach used by Scribe and OpenWhispr;
+no upstream code is copied into it.
+
 ## Runtime engines and alternatives reviewed
 
 | Project | Upstream terms | Use in this project / useful pattern |

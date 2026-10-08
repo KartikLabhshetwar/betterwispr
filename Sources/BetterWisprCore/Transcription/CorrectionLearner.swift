@@ -36,7 +36,7 @@ public enum CorrectionLearner {
 
     /// Whether the heard phrase is an everyday word that must not be rewritten everywhere.
     public static func isCommon(_ phrase: String) -> Bool {
-        commonWords.contains(phrase.lowercased()) || phrase.count < 3
+        commonWords.contains(phrase.lowercased())
     }
 
     static func tokenize(_ text: String) -> [String] {

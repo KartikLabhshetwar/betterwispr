@@ -23,6 +23,7 @@ enum MeetingActivity: Equatable {
 @MainActor @Observable
 final class MeetingModel {
     var meetings: [Meeting] = []
+    /// The note open in the dashboard; nil shows the list of notes.
     var selectedID: UUID?
     var activity: MeetingActivity = .idle
     var levels: (me: Float, them: Float) = (0, 0)
@@ -53,7 +54,6 @@ final class MeetingModel {
         Self.removeLeftoverAudio()
         let loaded = store.load()
         meetings = loaded.meetings
-        selectedID = meetings.first?.id
         if !loaded.unreadable.isEmpty {
             let count = loaded.unreadable.count
             message = "\(count) meeting \(count == 1 ? "file" : "files") in \(store.directory.path) couldn’t be read and \(count == 1 ? "was" : "were") left untouched."
@@ -63,8 +63,6 @@ final class MeetingModel {
         recorder.onMicrophone = { [weak self] in self?.microphone = $0 }
         recorder.onError = { [weak self] in self?.message = "Part of the recording couldn’t be saved: \($0.localizedDescription)" }
     }
-
-    var selected: Meeting? { selectedID.flatMap(meeting) }
 
     func meeting(_ id: UUID) -> Meeting? { meetings.first { $0.id == id } }
 
@@ -179,7 +177,7 @@ final class MeetingModel {
             return
         }
         meetings.removeAll { $0.id == id }
-        if selectedID == id { selectedID = meetings.first?.id }
+        if selectedID == id { selectedID = nil }
     }
 
     func copy(_ id: UUID, transcriptOnly: Bool = false) {

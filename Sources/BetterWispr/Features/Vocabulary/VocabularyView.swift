@@ -36,7 +36,7 @@ struct VocabularyView: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(model.vocabulary) { entry in
-                    LabeledContent(entry.phrase) {
+                    LabeledContent {
                         HStack(spacing: 10) {
                             Text(entry.replacement.isEmpty ? entry.phrase : entry.replacement)
                                 .foregroundStyle(.primary)
@@ -48,6 +48,19 @@ struct VocabularyView: View {
                             .help("Remove \(entry.phrase)")
                             .accessibilityLabel("Remove \(entry.phrase)")
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(entry.phrase)
+                            if entry.learned {
+                                Text("Learned")
+                                    .font(.caption2.weight(.medium))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(.tint.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(.tint)
+                                    .help("Added from a correction you made")
+                            }
+                        }
                     }
                 }
             } header: {
@@ -55,6 +68,11 @@ struct VocabularyView: View {
                     Text("Your Vocabulary")
                 } else {
                     Text("^[\(model.vocabulary.count) entry](inflect: true)")
+                }
+            } footer: {
+                if model.settings.learnCorrections {
+                    Text("Entries marked Learned come from fixes you made to a dictation, in History or right after BetterWispr pasted it. Remove any you don’t want.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }

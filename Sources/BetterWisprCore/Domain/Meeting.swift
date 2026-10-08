@@ -127,18 +127,20 @@ public struct MeetingSection: Equatable, Sendable {
     public var title: String
     public var meetings: [Meeting]
 
-    /// Groups newest-first meetings the way Notes does: recent days, then one section per month.
+    /// Groups newest-first meetings by day, titled like "Today, Oct 8" or "Tue, Oct 6".
     public static func group(_ meetings: [Meeting], now: Date = .now, calendar: Calendar = .current) -> [MeetingSection] {
         let today = calendar.startOfDay(for: now)
+        var style = Date.FormatStyle.dateTime.month(.abbreviated).day()
+        style.calendar = calendar
+        style.timeZone = calendar.timeZone
         var sections: [MeetingSection] = []
         for meeting in meetings {
             let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: meeting.createdAt), to: today).day ?? 0
+            let day = calendar.isDate(meeting.createdAt, equalTo: now, toGranularity: .year) ? style : style.year()
             let title = switch days {
-            case ...0: "Today"
-            case 1: "Yesterday"
-            case 2...7: "Previous 7 Days"
-            case 8...30: "Previous 30 Days"
-            default: meeting.createdAt.formatted(.dateTime.month(.wide).year())
+            case ...0: "Today, \(meeting.createdAt.formatted(day))"
+            case 1: "Yesterday, \(meeting.createdAt.formatted(day))"
+            default: meeting.createdAt.formatted(day.weekday(.abbreviated))
             }
             if sections.last?.title == title { sections[sections.count - 1].meetings.append(meeting) }
             else { sections.append(MeetingSection(title: title, meetings: [meeting])) }

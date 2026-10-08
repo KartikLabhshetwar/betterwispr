@@ -32,6 +32,8 @@ struct MeetingDetailView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.top, 30)
+                .frame(maxWidth: 820, alignment: .leading)
+                .frame(maxWidth: .infinity)
                 Divider()
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -84,12 +86,12 @@ struct MeetingDetailView: View {
     }
 
     private func dateLabel(_ meeting: Meeting) -> some View {
-        Text(Calendar.current.isDateInToday(meeting.createdAt) ? "Today" : meeting.createdAt.formatted(date: .abbreviated, time: .omitted))
+        Text(meeting.createdAt.noteDay)
             .font(.callout)
             .foregroundStyle(.secondary)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 7))
+            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.quaternary))
             .help(meeting.createdAt.formatted(date: .long, time: .shortened))
     }
 
@@ -223,9 +225,20 @@ struct MeetingDetailView: View {
 
     private func thoughts(_ meeting: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Your thoughts, in your words.")
+            if meeting.summary != nil {
+                HStack(spacing: 6) {
+                    Text("Your summary is ready.")
+                    Button("Check it out →") { tab = .summary }
+                        .buttonStyle(.plain)
+                        .underline()
+                }
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.tertiary)
+            } else {
+                Text("Your thoughts, in your words.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
             TextEditor(text: text(\.notes))
                 .font(.system(size: 15))
                 .lineSpacing(6)

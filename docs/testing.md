@@ -158,6 +158,23 @@ CLI. Neither recognizes microphone audio.
   with an Allow button. Grant it, rebuild with `scripts/build-app.sh`, and check
   that paste still works without granting again.
 
+### Voice commands and learned corrections
+
+- [ ] With English or Auto language, say "hello comma how are you question mark".
+  Expect "Hello, how are you?" or the model's casing of it.
+- [ ] Say "Send it Monday. Sorry, remove that. Send it Tuesday." Only "Send it
+  Tuesday." is pasted. "Please remove that file" stays as spoken.
+- [ ] In Slack, say "ping at the rate KV". Expect "ping @KV". Whether Slack then
+  opens its mention picker is Slack's behavior; record what happens.
+- [ ] Dictate a name into TextEdit, fix the spelling within 30 seconds and wait
+  about 4 seconds. Expect a "Learned" toast and a Learned entry in Vocabulary.
+  Repeat in Slack and Notes and record whether the app exposes its text field to
+  Accessibility (Electron apps may not).
+- [ ] Fix a word with the pencil in History. The raw transcription stays
+  unchanged and the word appears in Vocabulary as Learned.
+- [ ] Turn off "Learn from my corrections" and repeat. Nothing is learned.
+- [ ] Type in a password field after dictating. Nothing is read or learned.
+
 ## Offline models and failure recovery
 
 - [ ] Install a Whisper model/tokenizer explicitly. Verify progress, local storage
@@ -248,8 +265,9 @@ Live capture, summary generation, compact-window layout, and the OS checks below
 were not exercised in this UI pass.
 
 - [ ] Resize to the minimum window size; all three tabs and recording controls
-  stay usable. Hide/show the native sidebar, search notes, and return to dictation.
-- [ ] Select an installed model in the meeting sidebar, start a meeting, and
+  stay usable, and the current-note column hides instead of squeezing the list.
+  Search notes, open a note, step with the arrows, and return with the back button.
+- [ ] Select an installed model in the Notetaker settings menu, start a meeting, and
   confirm the header identifies that model. Missing models must require an
   explicit installation in Models; starting a meeting never downloads them.
 

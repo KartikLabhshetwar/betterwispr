@@ -56,6 +56,22 @@ struct SettingsView: View {
                     Text("Copy to clipboard")
                     Text("Keep each dictation ready to paste again. When off, your clipboard is left as it was.")
                 }
+                Toggle(isOn: setting(\.learnCorrections)) {
+                    Text("Learn from my corrections")
+                    Text("When you fix a misheard word in History, or in the text field within 30 seconds of a paste, it is added to Vocabulary.")
+                }
+            }
+
+            Section {
+                LabeledContent("“comma”, “question mark”, “full stop”", value: ", ? .")
+                LabeledContent("“add a period”, “add a colon”", value: ". :")
+                LabeledContent("“new line”, “new paragraph”", value: "Line breaks")
+                LabeledContent("“scratch that”, “sorry, remove that”", value: "Deletes the last sentence")
+                LabeledContent("“at the rate KV”, “at sign KV”", value: "@KV")
+            } header: {
+                Text("Voice Commands")
+            } footer: {
+                Text("Say these while dictating in English or Auto language. Words like “the Oxford comma” stay as written.")
             }
 
             Section("Workspace") {

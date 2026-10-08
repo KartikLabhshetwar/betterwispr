@@ -111,15 +111,17 @@ import Testing
     #expect(meeting.snippet == "My own line")
 }
 
-@Test func meetingSectionsGroupRecentDaysThenMonths() throws {
+@Test func meetingSectionsGroupByDay() throws {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = try #require(TimeZone(identifier: "UTC"))
     let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 8, hour: 12)))
-    let ages = [0, 1, 3, 20, 60, 61]
-    let meetings = ages.map { Meeting(createdAt: now.addingTimeInterval(-Double($0) * 86_400), modelName: "Whisper", language: "en") }
+    let ages: [Double] = [0, 0.1, 1, 2, 2.2, 400]
+    let meetings = ages.map { Meeting(createdAt: now.addingTimeInterval(-$0 * 86_400), modelName: "Whisper", language: "en") }
     let sections = MeetingSection.group(meetings, now: now, calendar: calendar)
 
-    #expect(sections.map(\.title).prefix(4) == ["Today", "Yesterday", "Previous 7 Days", "Previous 30 Days"])
-    #expect(sections.count == 5)
-    #expect(sections.last?.meetings.count == 2)
+    #expect(sections.map(\.meetings.count) == [2, 1, 2, 1])
+    #expect(sections[0].title.hasPrefix("Today, "))
+    #expect(sections[1].title.hasPrefix("Yesterday, "))
+    #expect(!sections[2].title.contains("2026"))
+    #expect(sections[3].title.contains("2025"))
 }

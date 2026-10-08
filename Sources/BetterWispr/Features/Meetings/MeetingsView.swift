@@ -22,14 +22,21 @@ struct MeetingsView: View {
                 .padding(12)
                 .background(.orange.opacity(0.1))
             }
-            if let id = meetings.selectedID, meetings.meeting(id) != nil {
-                MeetingDetailView(model: model, id: id).id(id)
+            if let meeting = meetings.selectedID.flatMap(meetings.meeting) {
+                noteBar(meeting)
+                MeetingDetailView(model: model, id: meeting.id).id(meeting.id)
             } else {
-                emptyState
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 0) {
+                        NotesHome(model: model, onDelete: { meetingToDelete = $0 }).frame(minWidth: 460)
+                        Divider()
+                        CurrentNote(model: model).frame(width: 300)
+                    }
+                    NotesHome(model: model, onDelete: { meetingToDelete = $0 })
+                }
             }
         }
         .background(Color(nsColor: .textBackgroundColor))
-        .toolbar { toolbar }
         .alert("Delete this meeting?", isPresented: Binding(
             get: { meetingToDelete != nil },
             set: { if !$0 { meetingToDelete = nil } }
@@ -44,72 +51,69 @@ struct MeetingsView: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Image(systemName: "note.text")
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(.secondary)
-            Text("Be in the conversation.")
-                .font(.system(size: 36, weight: .regular, design: .serif))
-            Text("Keep your thoughts, follow the transcript, and leave with a summary.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .lineSpacing(4)
-            Button(action: model.startMeeting) {
-                Label("Start meeting", systemImage: "mic.fill")
+    private func noteBar(_ meeting: Meeting) -> some View {
+        let index = meetings.meetings.firstIndex { $0.id == meeting.id }
+        return HStack(spacing: 4) {
+            Button { meetings.selectedID = nil } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 30, height: 30)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(meetings.activity != .idle || model.isBusy)
-            Label(model.selectedModel.name, systemImage: "waveform")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: 420, alignment: .leading)
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    @ToolbarContentBuilder private var toolbar: some ToolbarContent {
-        ToolbarItemGroup {
-            if meetings.activity.capturingID != nil {
-                Button(action: meetings.stop) {
-                    Label("Stop meeting", systemImage: "stop.fill")
+            .buttonStyle(.plain)
+            .help("All notes")
+            .accessibilityLabel("All notes")
+            Spacer()
+            Menu {
+                Button { meetings.generateNotes(meeting.id) } label: {
+                    Label(meeting.summary == nil ? "Generate summary" : "Regenerate summary", systemImage: "sparkles")
                 }
-                .help("Stop recording")
-            }
-            Button(action: model.startMeeting) {
-                Label("New meeting", systemImage: "square.and.pencil")
-            }
-            .help("Start a new meeting")
-            .disabled(meetings.activity != .idle || model.isBusy)
-            if let meeting = meetings.selected {
-                Button { meetings.copy(meeting.id) } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                .disabled(!meeting.hasContent || meetings.activity != .idle || meetings.notesAvailability != .available)
+                Button { meetings.copy(meeting.id, transcriptOnly: true) } label: {
+                    Label("Copy transcript", systemImage: "text.quote")
                 }
+                .disabled(meeting.segments.isEmpty)
+                Divider()
+                Button(role: .destructive) { meetingToDelete = meeting.id } label: {
+                    Label("Delete meeting…", systemImage: "trash")
+                }
+                .disabled(meetings.isActive(meeting.id))
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .padding(.horizontal, 8)
+            .help("More meeting actions")
+            .accessibilityLabel("More meeting actions")
+            Button { meetings.copy(meeting.id) } label: { Label("Copy", systemImage: "doc.on.doc") }
                 .help("Copy notes and transcript")
-                Menu {
-                    Button { meetings.generateNotes(meeting.id) } label: {
-                        Label(meeting.summary == nil ? "Generate summary" : "Regenerate summary", systemImage: "sparkles")
-                    }
-                    .disabled(!meeting.hasContent || meetings.activity != .idle || meetings.notesAvailability != .available)
-                    Divider()
-                    Button(role: .destructive) { meetingToDelete = meeting.id } label: {
-                        Label("Delete meeting…", systemImage: "trash")
-                    }
-                    .disabled(meetings.isActive(meeting.id))
-                } label: {
-                    Label("More", systemImage: "ellipsis")
-                }
-                .help("More meeting actions")
+            Group {
+                Button { meetings.selectedID = index.map { meetings.meetings[$0 - 1].id } } label: { Image(systemName: "chevron.left") }
+                    .disabled(index.map { $0 == 0 } ?? true)
+                    .help("Newer note")
+                    .accessibilityLabel("Newer note")
+                Button { meetings.selectedID = index.map { meetings.meetings[$0 + 1].id } } label: { Image(systemName: "chevron.right") }
+                    .disabled(index.map { $0 + 1 == meetings.meetings.count } ?? true)
+                    .help("Older note")
+                    .accessibilityLabel("Older note")
+                Button { model.onShowNotetaker?(meeting.id) } label: { Image(systemName: "rectangle.righthalf.inset.filled") }
+                    .help("Open beside your call")
+                    .accessibilityLabel("Open beside your call")
             }
+            .frame(width: 30, height: 30)
         }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 20)
+        .padding(.top, 14)
     }
 }
 
-struct MeetingsSidebar: View {
+private struct NotesHome: View {
     @Bindable var model: AppModel
+    let onDelete: (UUID) -> Void
     @State private var query = ""
+    @State private var searching = false
 
     private var meetings: MeetingModel { model.meetings }
     private var filtered: [Meeting] {
@@ -117,134 +121,222 @@ struct MeetingsSidebar: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                Button { model.selectedPage = .overview } label: {
-                    Label("Back to dictation", systemImage: "chevron.left")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                HStack {
-                    Text("Meeting notes").font(.title2.weight(.semibold))
-                    Spacer()
-                    Button(action: model.startMeeting) {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Start a new meeting")
-                    .accessibilityLabel("Start a new meeting")
-                    .disabled(meetings.activity != .idle || model.isBusy)
-                }
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                header
+                if searching {
                     TextField("Search notes", text: $query)
-                        .textFieldStyle(.plain)
+                        .textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Search meeting notes")
-                    if !query.isEmpty {
-                        Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("Clear search")
+                }
+                if filtered.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(query.isEmpty ? "Be in the conversation." : "No matching notes")
+                            .font(.system(size: 26, design: .serif))
+                        Text(query.isEmpty ? "Keep your thoughts, follow the transcript, and leave with a summary." : "Try another title or phrase.")
+                            .foregroundStyle(.secondary)
                     }
-                }
-                .padding(8)
-                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            }
-            .padding(16)
-
-            if filtered.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(query.isEmpty ? "A little space for every conversation." : "No matching notes")
-                        .fontWeight(.medium)
-                    Text(query.isEmpty ? "Your meetings will appear here." : "Try another title or phrase.")
-                        .foregroundStyle(.secondary)
-                }
-                .font(.callout)
-                .padding(16)
-                Spacer()
-            } else {
-                MeetingList(meetings: meetings, filtered: filtered)
-            }
-
-            Divider()
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Transcription model").font(.caption.weight(.medium)).foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Manage…") { model.selectedPage = .models }
-                        .buttonStyle(.link)
-                        .font(.caption)
-                }
-                Picker("Transcription model", selection: Binding(
-                    get: { model.selectedModel.id },
-                    set: { id in
-                        if let speechModel = model.models.first(where: { $0.id == id }) {
-                            model.selectModel(speechModel)
+                    .padding(.top, 20)
+                } else {
+                    ForEach(MeetingSection.group(filtered), id: \.title) { section in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(section.title)
+                                .font(.caption.weight(.semibold))
+                                .tracking(1)
+                                .textCase(.uppercase)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 10)
+                                .padding(.bottom, 6)
+                            ForEach(section.meetings) { meeting in
+                                NoteRow(meetings: meetings, meeting: meeting, onDelete: onDelete)
+                            }
                         }
                     }
-                )) {
-                    ForEach(model.models) { speechModel in
-                        Text(speechModel.name + (model.isModelInstalled(speechModel) ? "" : " · Download in Models"))
-                            .tag(speechModel.id)
-                            .disabled(!model.isModelInstalled(speechModel))
-                    }
                 }
-                .labelsHidden()
-                .disabled(model.isBusy || meetings.activity != .idle)
-                Text("Used for dictation and new meetings.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Label(model.selectedModel.engine == .api ? "Audio sent to your selected endpoint" : "On-device transcription",
-                      systemImage: model.selectedModel.engine == .api ? "network" : "lock")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            .padding(16)
+            .padding(.horizontal, 36)
+            .padding(.vertical, 32)
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var header: some View {
+        let capturing = meetings.activity.capturingID != nil
+        return HStack(spacing: 14) {
+            Text("Notetaker").font(.system(size: 26, weight: .semibold))
+            Spacer(minLength: 8)
+            Button { searching.toggle(); query = "" } label: { Image(systemName: "magnifyingglass") }
+                .buttonStyle(.borderless)
+                .help("Search notes")
+                .accessibilityLabel("Search notes")
+            NotetakerSettings(model: model)
+            Button {
+                if capturing { meetings.stop() } else { model.startMeeting() }
+            } label: {
+                Label(capturing ? "Stop Notetaker" : "Start Notetaker", systemImage: capturing ? "stop.circle" : "record.circle")
+                    .font(.system(size: 14, weight: .medium))
+                    .padding(.horizontal, 14)
+                    .frame(height: 34)
+                    .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!capturing && (meetings.activity != .idle || model.isBusy))
         }
     }
 }
 
-private struct MeetingList: View {
-    @Bindable var meetings: MeetingModel
-    let filtered: [Meeting]
+private struct NotetakerSettings: View {
+    @Bindable var model: AppModel
 
     var body: some View {
-        List(selection: $meetings.selectedID) {
-            ForEach(MeetingSection.group(filtered), id: \.title) { section in
-                Section(section.title) {
-                    ForEach(section.meetings) { meeting in
-                        MeetingRow(meeting: meeting, activity: meetings.activity).tag(meeting.id)
-                    }
+        Menu {
+            Picker("Transcription model", selection: Binding(
+                get: { model.selectedModel.id },
+                set: { id in
+                    if let speechModel = model.models.first(where: { $0.id == id }) { model.selectModel(speechModel) }
+                }
+            )) {
+                ForEach(model.models) { speechModel in
+                    Text(speechModel.name + (model.isModelInstalled(speechModel) ? "" : " · Download in Models"))
+                        .tag(speechModel.id)
+                        .disabled(!model.isModelInstalled(speechModel))
                 }
             }
+            .pickerStyle(.inline)
+            .disabled(model.isBusy || model.meetings.activity != .idle)
+            Text(model.selectedModel.engine == .api ? "Audio sent to your selected endpoint" : "On-device transcription")
+            Button("Manage models…") { model.selectedPage = .models }
+            Divider()
+            MicrophonePicker(model: model) { Text("Microphone") }
+                .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "gearshape")
         }
-        .listStyle(.sidebar)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Transcription model and microphone")
+        .accessibilityLabel("Notetaker settings")
     }
 }
 
-private struct MeetingRow: View {
+private struct NoteRow: View {
+    let meetings: MeetingModel
     let meeting: Meeting
-    let activity: MeetingActivity
+    let onDelete: (UUID) -> Void
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 6) {
-                Text(meeting.displayTitle).fontWeight(.medium).lineLimit(1)
-                if activity.meetingID == meeting.id {
-                    Image(systemName: activity.capturingID == meeting.id ? "waveform" : "hourglass")
-                        .foregroundStyle(activity.capturingID == meeting.id ? .red : .secondary)
-                        .accessibilityLabel(activity.capturingID == meeting.id ? "Recording" : "Processing")
+        HStack(spacing: 14) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .frame(width: 38, height: 38)
+                .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(meeting.displayTitle).font(.system(size: 15)).lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(meeting.createdAt.formatted(date: .omitted, time: .shortened))
+                    if let status {
+                        Text("•")
+                        Text(status).foregroundStyle(meetings.activity.capturingID == meeting.id ? .green : .secondary)
+                    } else if canSummarize {
+                        Text("•")
+                        Button("Generate summary") { meetings.generateNotes(meeting.id) }
+                            .buttonStyle(.plain)
+                            .underline()
+                    }
                 }
-            }
-            Text(meeting.snippet.isEmpty ? "No transcript yet" : meeting.snippet)
                 .font(.callout)
                 .foregroundStyle(.secondary)
-                .lineLimit(2)
-            Text(meeting.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(hovering ? Color.primary.opacity(0.05) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .onTapGesture { meetings.selectedID = meeting.id }
+        .contextMenu {
+            Button("Open") { meetings.selectedID = meeting.id }
+            Button("Copy notes and transcript") { meetings.copy(meeting.id) }
+            Divider()
+            Button("Delete meeting…", role: .destructive) { onDelete(meeting.id) }
+                .disabled(meetings.isActive(meeting.id))
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { meetings.selectedID = meeting.id }
+    }
+
+    private var status: String? {
+        switch meetings.activity {
+        case .recording(meeting.id): "Recording"
+        case .starting(meeting.id): "Starting"
+        case .finishing(meeting.id): "Transcribing"
+        case .generating(meeting.id): "Writing summary"
+        default: nil
+        }
+    }
+
+    private var canSummarize: Bool {
+        meeting.summary == nil && meeting.hasContent && meetings.activity == .idle && meetings.notesAvailability == .available
+    }
+}
+
+/// The meeting in progress, or the latest one, shown beside the list of notes.
+private struct CurrentNote: View {
+    let model: AppModel
+
+    private var meetings: MeetingModel { model.meetings }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let meeting = (meetings.activity.meetingID ?? meetings.meetings.first?.id).flatMap(meetings.meeting) {
+                Button { meetings.selectedID = meeting.id } label: {
+                    Text(meeting.displayTitle)
+                        .font(.system(size: 20, weight: .semibold))
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
+                .help("Open note")
+                Text("\(meeting.createdAt.noteDay) • \(meeting.createdAt.formatted(date: .omitted, time: .shortened))")
+                    .foregroundStyle(.secondary)
+                if meetings.activity.capturingID == meeting.id {
+                    HStack(spacing: 8) {
+                        Circle().fill(.green).frame(width: 8, height: 8).accessibilityHidden(true)
+                        Text("Recording · \(durationLabel(meetings.elapsed))").monospacedDigit()
+                    }
+                    .font(.callout)
+                    .padding(.top, 6)
+                    Button("Open beside your call") { model.onShowNotetaker?(meeting.id) }
+                        .buttonStyle(.link)
+                } else if !meeting.snippet.isEmpty {
+                    Text(meeting.snippet)
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(4)
+                        .lineLimit(8)
+                        .padding(.top, 6)
+                }
+            } else {
+                Text("Your current note appears here.").foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 28)
+        .padding(.vertical, 40)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension Date {
+    /// "Today" for today's notes, otherwise a short day such as "Oct 6".
+    var noteDay: String {
+        Calendar.current.isDateInToday(self) ? "Today"
+            : formatted(Calendar.current.isDate(self, equalTo: .now, toGranularity: .year) ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
     }
 }
 

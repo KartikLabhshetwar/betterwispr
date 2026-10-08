@@ -24,14 +24,21 @@ struct HistoryView: View {
                 }
             } else {
                 Form {
-                    Section("^[\(filteredHistory.count) dictation](inflect: true)") {
+                    Section {
                         ForEach(filteredHistory) { transcript in
                             TranscriptRow(
                                 transcript: transcript,
                                 onCopy: { model.copyTranscript(transcript) },
                                 onDelete: { transcriptToDelete = transcript },
+                                onEdit: { model.updateTranscript(transcript, text: $0) },
                                 expanded: true
                             )
+                        }
+                    } header: {
+                        Text("^[\(filteredHistory.count) dictation](inflect: true)")
+                    } footer: {
+                        if model.settings.learnCorrections {
+                            Text("Fix a misheard word with the pencil and BetterWispr adds it to Vocabulary, so it is spelled right next time.")
                         }
                     }
                 }
@@ -58,7 +65,9 @@ struct TranscriptRow: View {
     let transcript: Transcript
     let onCopy: () -> Void
     var onDelete: (() -> Void)?
+    var onEdit: ((String) -> Void)?
     var expanded = false
+    @State private var draft: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -76,6 +85,11 @@ struct TranscriptRow: View {
                 Button(action: onCopy) { Image(systemName: "doc.on.doc") }
                     .help("Copy dictation")
                     .accessibilityLabel("Copy dictation")
+                if onEdit != nil, draft == nil {
+                    Button { draft = transcript.text } label: { Image(systemName: "pencil") }
+                        .help("Fix dictation")
+                        .accessibilityLabel("Fix dictation")
+                }
                 if let onDelete {
                     Button(action: onDelete) { Image(systemName: "trash") }
                         .help("Delete dictation")
@@ -85,10 +99,29 @@ struct TranscriptRow: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .buttonStyle(.borderless)
-            Text(transcript.text)
-                .lineLimit(expanded ? nil : 3)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let draft, let onEdit {
+                TextEditor(text: Binding(get: { draft }, set: { self.draft = $0 }))
+                    .font(.body)
+                    .frame(minHeight: 60)
+                    .accessibilityLabel("Dictation text")
+                HStack {
+                    Spacer()
+                    Button("Cancel") { self.draft = nil }
+                        .keyboardShortcut(.cancelAction)
+                    Button("Save") {
+                        onEdit(draft)
+                        self.draft = nil
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .controlSize(.small)
+            } else {
+                Text(transcript.text)
+                    .lineLimit(expanded ? nil : 3)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if expanded && transcript.text != transcript.rawText {
                 DisclosureGroup("Original transcription") {
                     Text(transcript.rawText)

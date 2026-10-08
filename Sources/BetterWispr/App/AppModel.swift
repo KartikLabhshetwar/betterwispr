@@ -56,6 +56,7 @@ final class AppModel {
 
     @ObservationIgnored private let store = LocalStore()
     @ObservationIgnored private let recorder = AudioRecorder()
+    @ObservationIgnored private let correctionWatcher = CorrectionWatcher()
     @ObservationIgnored private let globalShortcut = GlobalShortcut()
     @ObservationIgnored private var microphoneObserver: AudioInputObserver?
     @ObservationIgnored private var shortcutWarning: String?
@@ -155,6 +156,7 @@ final class AppModel {
 
     private func startRecording(held: Bool) {
         guard !isBusy else { return }
+        correctionWatcher.stop()
         guard isModelInstalled(selectedModel) else {
             selectedPage = .models
             fail(DictationFailure(title: "Download a model first.", message: "Download \(selectedModel.name) in Models before recording."))
@@ -234,7 +236,9 @@ final class AppModel {
                 let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints)
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
-                let text = VocabularyProcessor.apply(entries, to: TranscriptCleaner.clean(raw, language: language))
+                let cleaned = TranscriptCleaner.clean(raw, language: language)
+                let spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(cleaned) : cleaned
+                let text = VocabularyProcessor.apply(entries, to: spoken)
                 guard !text.isEmpty else { self.fail(.noSpeech); return }
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
@@ -254,7 +258,11 @@ final class AppModel {
                     self.phase = .idle
                     self.statusMessage = ""
                     switch result {
-                    case .pasted, nil: break
+                    case .pasted:
+                        if self.settings.learnCorrections, let app = self.targetApplication {
+                            self.correctionWatcher.watch(text, in: app) { [weak self] in self?.learn($0) }
+                        }
+                    case nil: break
                     case let result?: ToastWindow.shared.show(Toast(result))
                     }
                 }
@@ -268,6 +276,7 @@ final class AppModel {
 
     func cancelRecording() {
         generation = UUID()
+        correctionWatcher.stop()
         operation?.cancel()
         operation = nil
         ticker?.cancel()
@@ -510,6 +519,41 @@ final class AppModel {
         } catch {
             history = previous
             ToastWindow.shared.show(Toast(failure: "Couldn’t delete dictation", error))
+        }
+    }
+
+    func updateTranscript(_ transcript: Transcript, text: String) {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, text != transcript.text, let index = history.firstIndex(where: { $0.id == transcript.id }) else { return }
+        let previous = history
+        history[index].text = text
+        do { try persist() } catch {
+            history = previous
+            ToastWindow.shared.show(Toast(failure: "Couldn’t save edit", error))
+            return
+        }
+        if settings.learnCorrections { learn(CorrectionLearner.corrections(from: transcript.text, to: text)) }
+    }
+
+    private func learn(_ corrections: [LearnedCorrection]) {
+        let known = Set(vocabulary.flatMap { [$0.phrase.lowercased(), $0.replacement.lowercased()] })
+        let previous = vocabulary
+        var added: [String] = []
+        for correction in corrections where vocabulary.count < 200
+            && !known.contains(correction.heard.lowercased()) && !known.contains(correction.corrected.lowercased()) {
+            vocabulary.append(CorrectionLearner.isCommon(correction.heard)
+                ? VocabularyEntry(phrase: correction.corrected, replacement: "", learned: true)
+                : VocabularyEntry(phrase: correction.heard, replacement: correction.corrected, learned: true))
+            added.append("“\(correction.corrected)”")
+        }
+        guard !added.isEmpty else { return }
+        do {
+            try persist()
+            ToastWindow.shared.show(Toast(title: "Learned \(added.joined(separator: ", "))",
+                                          message: "BetterWispr will spell it this way next time. Manage it in Vocabulary.",
+                                          systemImage: "sparkles"))
+        } catch {
+            vocabulary = previous
         }
     }
 

@@ -17,6 +17,8 @@ BetterWispr is a private, offline speech-to-text app and an open-source alternat
 - **Dictate anywhere**: hold-to-talk or press-to-toggle, with a shortcut you choose.
 - **On-device models**: Apple speech, Parakeet v3 (25 European languages), Parakeet v2 (English) and Whisper large-v3 turbo.
 - **Vocabulary**: spelling hints and phrase replacements for names and jargon.
+- **Learns your corrections**: fix a misheard word once (in History, or right after it's pasted) and it's spelled right next time.
+- **Voice commands**: say "comma", "new line", "scratch that" or "sorry, remove that", and "at the rate KV" for "@KV".
 - **Meetings**: live transcript of you and the other side, plus on-device summaries and action items with Apple Intelligence.
 - **History**: raw and corrected transcripts, stored locally (can be turned off).
 - **Bring your own model**: optional Sarvam AI, Smallest AI or any OpenAI-compatible endpoint.

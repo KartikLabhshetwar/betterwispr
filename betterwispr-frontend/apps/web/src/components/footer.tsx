@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import BrandMark from "@/components/brand-mark";
 import { comparisons } from "@/lib/comparisons";
-import { DOWNLOAD_URL, GITHUB_URL } from "@/lib/links";
+import { DOWNLOAD_URL, GITHUB_URL, INTEL_DOWNLOAD_URL } from "@/lib/links";
 
 const LINK =
   "text-sm text-zinc-600 transition-colors duration-700 ease-fluid hover:text-zinc-900";
@@ -37,7 +37,10 @@ export default function Footer() {
         </div>
         <FooterColumn title="Product">
           <a href={DOWNLOAD_URL} className={LINK}>
-            Download for macOS
+            Download for Apple Silicon
+          </a>
+          <a href={INTEL_DOWNLOAD_URL} className={LINK}>
+            Download for Intel
           </a>
           <Link to="/" hash="how-it-works" className={LINK}>
             How it works

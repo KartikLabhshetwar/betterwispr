@@ -30,6 +30,12 @@ dependency for in-app updates. No Sparkle source is copied; its license ships in
 the app bundle. `scripts/build-app.sh` removes Sparkle's XPC services because
 they exist only for sandboxed apps and BetterWispr is not sandboxed.
 
+`scripts/release.sh` follows the separate-architecture signing and notarization
+workflow in the sibling BetterShot project's `scripts/release.sh`
+(BSD-3-Clause, copyright 2026 Kartik Labhshetwar, the same author). BetterWispr
+uses SwiftPM builds, verifies the executable architecture and publishes a
+Sparkle feed for both downloads instead of BetterShot's Xcode build commands.
+
 `Sources/BetterWispr/App/ToastWindow.swift` adapts `ToastWindow` and its glass
 surface from BetterShot (`Sources/Views/ToastWindow.swift` and
 `Sources/Views/GlassSurface.swift`), BSD-3-Clause, copyright 2026 Kartik

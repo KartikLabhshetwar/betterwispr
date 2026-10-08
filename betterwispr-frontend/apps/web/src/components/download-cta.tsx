@@ -1,22 +1,35 @@
 import { track } from "@databuddy/sdk";
 
 import AppleLogo from "@/components/apple-logo";
-import { DOWNLOAD_URL } from "@/lib/links";
+import { DOWNLOAD_URL, GITHUB_URL, INTEL_DOWNLOAD_URL } from "@/lib/links";
 
 export default function DownloadCTA({
   compact = false,
 }: {
   compact?: boolean;
 }) {
-  return (
+  const primary = (
     <a
-      href={DOWNLOAD_URL}
+      href={compact ? `${GITHUB_URL}/releases/latest` : DOWNLOAD_URL}
       onClick={() => track("download_started")}
       className={`download-cta ${compact ? "text-sm" : "text-base"}`}
     >
       <AppleLogo className={compact ? "size-4" : "size-5"} />
-      {compact ? "Download" : "Download for macOS"}
+      {compact ? "Download" : "Download for Apple Silicon"}
     </a>
+  );
+  if (compact) return primary;
+  return (
+    <div className="inline-flex flex-col items-center gap-3">
+      {primary}
+      <a
+        href={INTEL_DOWNLOAD_URL}
+        onClick={() => track("download_started")}
+        className="text-sm text-zinc-600 underline underline-offset-4 hover:text-zinc-900"
+      >
+        Download for Intel
+      </a>
+    </div>
   );
 }
 

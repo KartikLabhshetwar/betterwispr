@@ -49,6 +49,12 @@ for (const path of paths) {
     ),
     `${path}: working CTA destination configuration`,
   );
+  for (const arch of ["arm64", "x86_64"]) {
+    assert.ok(
+      html.includes(`href="https://github.com/opennookorg/betterwispr/releases/latest/download/BetterWispr-${arch}.dmg"`),
+      `${path}: ${arch} download available`,
+    );
+  }
   for (const [, href] of html.matchAll(/href="(\/[^"#]*)/g)) {
     assert.ok(
       paths.includes(href) ||
@@ -174,8 +180,11 @@ try {
   assert.ok(hero, "The homepage renders its hero");
   assert.deepEqual(
     [...hero.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((match) => match[1]),
-    ["https://github.com/opennookorg/betterwispr/releases/latest"],
-    "The hero has only the macOS download action",
+    [
+      "https://github.com/opennookorg/betterwispr/releases/latest/download/BetterWispr-arm64.dmg",
+      "https://github.com/opennookorg/betterwispr/releases/latest/download/BetterWispr-x86_64.dmg",
+    ],
+    "The hero offers separate Apple Silicon and Intel downloads",
   );
 } finally {
   await vite.close();

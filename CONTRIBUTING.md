@@ -102,7 +102,25 @@ release artifacts. Both setup and shipping accept a `NOTARY_PROFILE` environment
 override if you deliberately use a different Keychain profile.
 
 `make ship` builds, signs with Developer ID, notarizes and staples
-`release/BetterWispr.dmg`, checks Gatekeeper, signs it for Sparkle and writes
-`release/appcast.xml`. Wait for **Release Complete**, then publish both on a
-GitHub release tagged `v<version>` using the `gh release create` command the
-script prints. `make ship` prepares the files; it does not publish them.
+separate `release/BetterWispr-arm64.dmg` (Apple Silicon) and
+`release/BetterWispr-x86_64.dmg` (Intel) files. It checks each executable's
+architecture and Gatekeeper acceptance, then signs both downloads for Sparkle
+and writes `release/appcast.xml`. The feed lists the Apple Silicon item first
+with Sparkle's `arm64` hardware requirement, so Intel receives the Intel build.
+The stable DMG filenames keep the website's latest-download links working.
+Wait for **Release Complete**, then publish all three files on a GitHub release
+tagged `v<version>` using the command the script prints. `make ship` prepares
+the files; it does not publish them.
+
+`make ship` reuses saved credentials and does not ask for an Apple ID or
+app-specific password. A macOS Keychain popup is a separate permission for
+`codesign` or Sparkle's `sign_update` to access its signing key. Choose
+**Always Allow** for the trusted tool to remember that permission, as described
+in [Apple's Keychain guidance](https://support.apple.com/guide/keychain-access/kyca1243/mac).
+Unlike BetterShot's current release script, BetterWispr also signs Sparkle
+updates. No signing passwords or private keys are exported into project files.
+
+To build one architecture locally, use `./scripts/build-app.sh release arm64`
+or `./scripts/build-app.sh release x86_64`. Bundles are kept in their respective
+SwiftPM architecture directories. With no architecture argument, local build
+and run commands continue to use the host architecture.

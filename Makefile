@@ -22,7 +22,7 @@ dev: test run ## Local testing: build, run all checks, then launch the debug app
 setup-notary: ## Save BetterWispr notarization credentials in Keychain (once)
 	@bash scripts/release.sh --setup-notary
 
-ship: ## Notarized release: build, sign, notarize, staple DMG (Apple Silicon)
+ship: ## Build, sign, notarize and staple separate Apple Silicon and Intel DMGs
 	@bash scripts/release.sh
 
 build: ## Debug app bundle

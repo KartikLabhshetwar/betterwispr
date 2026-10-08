@@ -33,11 +33,10 @@ Swift 6.3.3; built-in MacBook Pro microphone, Parakeet TDT v3, automatic languag
   release app and a copy extracted from its DMG confirmed Escape returns to
   idle without adding history or leaving new temporary audio files.
 - Developer ID signatures, hardened runtime, bundled framework signatures and
-  DMG integrity passed. **Release remains blocked:** `scripts/release.sh` failed
+  DMG integrity passed. **The initial run was blocked:** `scripts/release.sh` failed
   at notarization with HTTP 403: a required Apple developer agreement is missing
-  or expired. The account holder must resolve it, then rerun the release script.
-  `release/BetterWispr.dmg` is signed but unnotarized; no stapling or appcast was
-  produced, and no release was published.
+  or expired. That run produced a signed but unnotarized `release/BetterWispr.dmg`;
+  no stapling or appcast was produced, and no release was published.
 
 Still pending: real speech through the global hold/toggle shortcut into another
 app, paste and clipboard restoration, denied permissions, live system-audio
@@ -48,6 +47,30 @@ cleaned up, but crash/forced-quit cleanup was not exercised.
 
 Local logs are in `.build/release-check/`. The signed, unnotarized DMG SHA-256 is
 `b7c46f85a8a17b3cc9dec80eb348cd45bda0d0e7a58d9ddcae75eafe9b7c7a48`.
+
+Shipping workflow follow-up on 2026-10-08:
+
+- `make test` passed, including the new release-script checks. Shell syntax
+  checks passed for both release and DMG scripts.
+- Real DMG packaging completed and `hdiutil verify` passed for
+  `.build/release-check/BetterWispr-packaging-check.dmg`.
+- Real `make ship` stopped at preflight because `betterwispr-notary` has not
+  been configured in Keychain. Existing artifacts were unchanged. No live
+  notarization or stapling was completed in this follow-up.
+
+After credential setup, the script's misleading setup advice for agreement
+errors was corrected. Shell syntax and release-script checks passed, including
+missing credentials, HTTP 401, agreement-specific HTTP 403, other HTTP 403 and
+network failures. A subsequent real `make ship` passed Apple's access check and
+completed successfully:
+
+- Apple accepted submission `27bcf9d0-0416-42c9-838f-5cb4c66effaf`.
+- Stapling succeeded and Gatekeeper reported `Notarized Developer ID`.
+- `release/appcast.xml` was generated; its file length and Sparkle signature
+  were verified against the final DMG.
+- Final `release/BetterWispr.dmg` SHA-256:
+  `a5e6584c55491a04334c6b5bfdf8654fea4cc85fdb5c28d536e0fb56b6abd4f4`.
+  These files are ready for publishing; no GitHub release was published.
 
 ## Validation record — 2026-10-08
 

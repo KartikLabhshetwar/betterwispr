@@ -2,13 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 configuration="${1:-debug}"
-if [[ "$configuration" != debug && "$configuration" != release ]]; then
-    echo 'Usage: scripts/build-app.sh [debug|release]' >&2
+architecture="${2:-$(uname -m)}"
+if [[ $# -gt 2 || ( "$configuration" != debug && "$configuration" != release ) || ( "$architecture" != arm64 && "$architecture" != x86_64 ) ]]; then
+    echo 'Usage: scripts/build-app.sh [debug|release] [arm64|x86_64]' >&2
     exit 2
 fi
-swift build -c "$configuration" --product BetterWispr
-binary_dir="$(swift build -c "$configuration" --show-bin-path)"
-app="$PWD/.build/$configuration/BetterWispr.app"
+swift build -c "$configuration" --arch "$architecture" --product BetterWispr
+binary_dir="$(swift build -c "$configuration" --arch "$architecture" --show-bin-path)"
+app="$binary_dir/BetterWispr.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 # SwiftPM checkout licenses/resources can be read-only after the first copy.
 chmod -R u+w "$app"

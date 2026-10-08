@@ -27,10 +27,21 @@ public struct VocabularyEntry: Codable, Identifiable, Equatable, Sendable {
     public var id: UUID
     public var phrase: String
     public var replacement: String
+    /// True when the entry came from a correction the user made, not typed in Vocabulary.
+    public var learned: Bool
 
-    public init(id: UUID = UUID(), phrase: String, replacement: String) {
+    public init(id: UUID = UUID(), phrase: String, replacement: String, learned: Bool = false) {
         self.id = id
         self.phrase = phrase
         self.replacement = replacement
+        self.learned = learned
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        phrase = try container.decode(String.self, forKey: .phrase)
+        replacement = try container.decode(String.self, forKey: .replacement)
+        learned = try container.decodeIfPresent(Bool.self, forKey: .learned) ?? false
     }
 }

@@ -191,3 +191,24 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(CorrectionLearner.corrections(from: "hello there", to: "hello there!").isEmpty)
     #expect(CorrectionLearner.corrections(from: "send the report today", to: "please call me tomorrow instead").isEmpty)
 }
+
+@Test func olderWorkspaceDecodesLearningFieldsWithDefaults() throws {
+    let entry = try JSONDecoder().decode(VocabularyEntry.self, from: Data(#"{"id":"\#(UUID().uuidString)","phrase":"kv","replacement":"KV"}"#.utf8))
+    #expect(entry.learned == false)
+    var settings = try jsonDroppingKey(AppSettings(), "learnCorrections")
+    #expect(try JSONDecoder().decode(AppSettings.self, from: settings).learnCorrections)
+    settings = try JSONEncoder().encode(VocabularyEntry(phrase: "kv", replacement: "KV", learned: true))
+    #expect(try JSONDecoder().decode(VocabularyEntry.self, from: settings).learned)
+}
+
+private func jsonDroppingKey(_ value: some Encodable, _ key: String) throws -> Data {
+    var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as! [String: Any]
+    object[key] = nil
+    return try JSONSerialization.data(withJSONObject: object)
+}
+
+@Test func correctionWatcherOnlyReadsEditsInsideTheDictation() {
+    #expect(CorrectionWatcher.edit(of: "ping kv now", from: "Hi. ping kv now", to: "Hi. ping KV now") == "ping KV now")
+    #expect(CorrectionWatcher.edit(of: "ping kv now", from: "Hi. ping kv now", to: "Hey. ping kv now") == nil)
+    #expect(CorrectionWatcher.edit(of: "ping kv now", from: "ping kv now", to: "ping kv now please") == nil)
+}

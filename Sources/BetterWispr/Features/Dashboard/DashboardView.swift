@@ -71,6 +71,9 @@ struct DashboardView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 760, minHeight: 520)
+        .onExitCommand {
+            if model.isBusy { model.cancelRecording() }
+        }
         .onAppear {
             model.onShowDashboard = { [openWindow] in
                 openWindow(id: "dashboard")

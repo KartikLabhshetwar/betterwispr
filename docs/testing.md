@@ -6,6 +6,49 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Release check — 2026-10-08, version 0.1.0
+
+Base commit: `490ae9787842548c49bd70ad93a200f53062add0`, plus the dashboard
+Escape-cancellation fix. Apple M5 MacBook Pro (32 GB), macOS 26.6.2 (25G83),
+Swift 6.3.3; built-in MacBook Pro microphone, Parakeet TDT v3, automatic language.
+
+- `swift package clean` removed generated builds, module caches and app bundles.
+  Dependency checkouts, installed speech models and saved user data were retained.
+- `swift build`, `swift test`, `swift build -c release`, `swift test -c release`
+  and both app packaging configurations passed. Each test suite passed 60 test
+  functions and skipped the one opt-in live test. Python evaluator checks passed.
+- `BETTERWISPR_LIVE_NOTES=1 swift test --skip-build --filter
+  liveNotesProvidersGenerateFromSyntheticMeeting` passed all three synthetic
+  cases: Claude Code, Codex and the local Ollama-compatible API. The release app's
+  own **Test notes model** also succeeded with Claude Code.
+- Fresh debug and release CLI processes, with networking denied by
+  `sandbox-exec`, transcribed synthetic speech with Parakeet v3 and returned
+  empty text for digital silence. Missing audio, unavailable Whisper Turbo,
+  unknown models and repeated CLI options failed with the expected errors.
+  Whisper Turbo is not installed; its recognition was not exercised.
+- The native app opened, restored saved settings/history/meetings and displayed
+  Models, Vocabulary, Settings and all three meeting-detail tabs. Microphone
+  recording and menu cancellation worked. Escape initially failed to cancel;
+  the dashboard now handles the native exit command. Retesting the rebuilt
+  release app and a copy extracted from its DMG confirmed Escape returns to
+  idle without adding history or leaving new temporary audio files.
+- Developer ID signatures, hardened runtime, bundled framework signatures and
+  DMG integrity passed. **Release remains blocked:** `scripts/release.sh` failed
+  at notarization with HTTP 403: a required Apple developer agreement is missing
+  or expired. The account holder must resolve it, then rerun the release script.
+  `release/BetterWispr.dmg` is signed but unnotarized; no stapling or appcast was
+  produced, and no release was published.
+
+Still pending: real speech through the global hold/toggle shortcut into another
+app, paste and clipboard restoration, denied permissions, live system-audio
+meetings, microphone hot-plug, long recordings, Apple/Whisper recognition and
+minimum-supported-macOS checks. A pre-existing 4 KB dictation CAF from an earlier
+run remained in the temporary directory; normal cancellations in this run
+cleaned up, but crash/forced-quit cleanup was not exercised.
+
+Local logs are in `.build/release-check/`. The signed, unnotarized DMG SHA-256 is
+`b7c46f85a8a17b3cc9dec80eb348cd45bda0d0e7a58d9ddcae75eafe9b7c7a48`.
+
 ## Validation record — 2026-10-08
 
 Environment: Apple M5, macOS 26.6.2 (25G83), development working tree.
@@ -100,6 +143,10 @@ CLI. Neither recognizes microphone audio.
 - [ ] Repeat rapid start/stop, stop while preparation is pending, and cancel during
   recording/recognition. Only one session is active; no later transcript is pasted
   after cancellation and the microphone indicator turns off.
+- [ ] With the dashboard focused, click Start Dictating, then press Escape.
+  It returns to Start Dictating with "Cancelled.", adds no history entry and
+  removes the session's temporary audio. Escape still cancels shortcut capture
+  in Settings without changing the saved shortcut.
 - [ ] Hold mode: hold ⌥ Space, speak, release. The compact glass capsule shows only the waveform,
   with no cancel or finish buttons. Text is inserted once. Tap ⌥ Space
   briefly; the capsule expands into an error card, shows "Don’t tap. Hold ⌥ Space." and pastes nothing.

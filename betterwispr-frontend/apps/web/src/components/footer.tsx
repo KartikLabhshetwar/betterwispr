@@ -48,6 +48,20 @@ export default function Footer() {
               loading="lazy"
             />
           </a>
+          <a
+            href="https://www.trymacapps.com"
+            target="_blank"
+            rel="noopener"
+            className="mt-3 block w-max"
+          >
+            <img
+              src="https://www.trymacapps.com/badge.png"
+              alt="Featured on TryMacApps"
+              width={200}
+              height={67}
+              loading="lazy"
+            />
+          </a>
         </div>
         <FooterColumn title="Product">
           <a href={DOWNLOAD_URL} className={LINK}>

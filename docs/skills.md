@@ -33,3 +33,6 @@ target and compiler.
 
 BetterShot's screenshot-specific `AGENTS.md`, `.claude/settings.local.json`,
 worktrees, credentials and app source were not part of this skills import.
+
+`publish-release` is a local BetterWispr skill, not imported. It publishes a GitHub release after
+`make ship`, using `scripts/release-notes.py` to turn the `CHANGELOG.md` section into notes.

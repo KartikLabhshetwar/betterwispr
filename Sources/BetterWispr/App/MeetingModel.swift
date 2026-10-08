@@ -88,6 +88,7 @@ final class MeetingModel {
         work = Task { [weak self] in
             do {
                 if model.engine == .apple { try AppleSpeechProvider.checkAvailability(language: language) }
+                try model.connection?.validateLanguage(language)
                 let provider = model.makeProvider()
                 try await provider.prepare(model: model, download: false)
                 try Task.checkCancellation()
@@ -177,10 +178,11 @@ final class MeetingModel {
         if selectedID == id { selectedID = meetings.first?.id }
     }
 
-    func copy(_ id: UUID) {
-        guard let markdown = meeting(id)?.markdown else { return }
+    func copy(_ id: UUID, transcriptOnly: Bool = false) {
+        guard let meeting = meeting(id) else { return }
+        let text = transcriptOnly ? meeting.transcript : meeting.markdown
         Task {
-            do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(markdown, to: nil))) }
+            do { ToastWindow.shared.show(Toast(try await ClipboardIntegration().deliver(text, to: nil))) }
             catch { ToastWindow.shared.show(Toast(failure: "Couldn’t copy", error)) }
         }
     }

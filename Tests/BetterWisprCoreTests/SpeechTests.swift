@@ -3,6 +3,20 @@ import Testing
 @testable import BetterWisprCore
 
 @MainActor
+@Test(arguments: SpeechModel.catalog)
+func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechModel) {
+    let dictation = model.makeProvider()
+    let meeting = model.makeProvider()
+    #expect(dictation !== meeting)
+    switch model.engine {
+    case .apple: #expect(meeting is AppleSpeechProvider)
+    case .whisperKit: #expect(meeting is WhisperKitProvider)
+    case .parakeet: #expect(meeting is ParakeetProvider)
+    case .api: #expect(meeting is APISpeechProvider)
+    }
+}
+
+@MainActor
 @Test func offlineSpeechRejectsMissingAssets() async throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: "betterwispr-offline-test-\(UUID().uuidString)")
     let model = try #require(SpeechModel.catalog.first { $0.id == "whisper-turbo" })

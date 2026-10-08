@@ -98,6 +98,7 @@ import Testing
     #expect(markdown.contains("- [x] Send notes\n- [ ] Book room"))
     #expect(markdown.contains("## My notes\n\nBudget is fixed."))
     #expect(markdown.contains("[00:05] Them: Sounds good.\n[03:12] Me: Let's launch."))
+    #expect(meeting.transcript == "[00:05] Them: Sounds good.\n[03:12] Me: Let's launch.")
 }
 
 @Test func meetingFallsBackToNewMeetingTitleAndFirstSnippet() {

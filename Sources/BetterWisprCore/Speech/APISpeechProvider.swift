@@ -23,6 +23,7 @@ public final class APISpeechProvider: SpeechProvider {
 
     public func prepare(model: SpeechModel, download: Bool) async throws {
         guard transcriptionTask == nil else { throw SpeechError.busy }
+        connection = nil
         guard model.engine == .api, let connection = model.connection else { throw SpeechError.invalidModel }
         try Task.checkCancellation()
         _ = try connection.validatedURL()
@@ -75,6 +76,7 @@ public final class APISpeechProvider: SpeechProvider {
     nonisolated static func request(_ connection: SpeechConnection, key: String, wav: Data, language: String?) throws -> URLRequest {
         let url = try connection.validatedURL()
         try connection.validateAPIKey(key)
+        try connection.validateLanguage(language)
         let language = language.flatMap { $0 == "auto" ? nil : Locale(identifier: $0).language.languageCode?.identifier }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)
         request.httpMethod = "POST"
@@ -84,9 +86,6 @@ public final class APISpeechProvider: SpeechProvider {
                              forHTTPHeaderField: connection.api == .sarvam ? "api-subscription-key" : "Authorization")
         }
         if connection.api == .smallest {
-            guard let language else {
-                throw SpeechAPIError.configuration("Choose a spoken language in Settings for Smallest AI. This connection requires an explicit language.")
-            }
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
             components.queryItems = [URLQueryItem(name: "model", value: connection.modelID), URLQueryItem(name: "language", value: language)]
             request.url = components.url
@@ -97,10 +96,6 @@ public final class APISpeechProvider: SpeechProvider {
 
         var fields = [("model", connection.modelID)]
         if connection.api == .sarvam {
-            let supported = ["en", "hi", "bn", "kn", "ml", "mr", "od", "pa", "ta", "te", "gu", "as", "ur", "ne", "kok", "ks", "sd", "sa", "sat", "mni", "brx", "mai", "doi"]
-            if let language, !supported.contains(language) {
-                throw SpeechAPIError.configuration("Sarvam does not support the selected language. Choose a supported language or Detect automatically in Settings.")
-            }
             fields += [("language_code", language.map { "\($0)-IN" } ?? "unknown"), ("mode", "transcribe")]
         } else {
             fields.append(("response_format", "json"))

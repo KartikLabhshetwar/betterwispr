@@ -168,7 +168,7 @@ struct MeetingDetailView: View {
                 }
             default:
                 HStack {
-                    Label("On this Mac", systemImage: "lock")
+                    Label("Notes stored on this Mac", systemImage: "internaldrive")
                     Spacer()
                     Text(durationLabel(meeting.duration)).monospacedDigit()
                 }
@@ -311,7 +311,7 @@ struct MeetingDetailView: View {
                 }
                 .help("Find in transcript")
                 .accessibilityLabel("Find in transcript")
-                Button { meetings.copyTranscript(id) } label: { Image(systemName: "doc.on.doc") }
+                Button { meetings.copy(id, transcriptOnly: true) } label: { Image(systemName: "doc.on.doc") }
                     .disabled(meeting.segments.isEmpty)
                     .help("Copy transcript")
                     .accessibilityLabel("Copy transcript")
@@ -326,7 +326,7 @@ struct MeetingDetailView: View {
                     .padding(.bottom, 14)
             }
             if isRecording {
-                Text("Transcribed on this Mac with \(meeting.modelName).")
+                Text("Transcribing with \(meeting.modelName).")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 14)

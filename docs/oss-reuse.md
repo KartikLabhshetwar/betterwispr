@@ -67,6 +67,13 @@ accessible link label and singular-star wording. The existing GitHub action
 supplies BetterWispr's live count to the new compact header variant and retains
 a link when that count is unavailable. The hero keeps its original appearance.
 
+`betterwispr-frontend/apps/web/src/components/ui/cards.tsx` and `demo.tsx`
+adapt the card and two-row marquee snippets supplied in the integration request.
+The request did not include an upstream source page or license notice. Changes
+use the existing site typography, Lucide icons, typed X post data, source links,
+empty-list hiding, pause controls and reduced-motion support. Sample quotes and
+Unsplash portraits appear only in the explicitly labeled demo, not as endorsements.
+
 ## Runtime engines and alternatives reviewed
 
 | Project | Upstream terms | Use in this project / useful pattern |

@@ -91,13 +91,23 @@ CLI. Neither recognizes microphone audio.
 - [ ] Repeat rapid start/stop, stop while preparation is pending, and cancel during
   recording/recognition. Only one session is active; no later transcript is pasted
   after cancellation and the microphone indicator turns off.
-- [ ] Hold mode: hold ⌥ Space, speak, release. The capsule shows only the waveform,
+- [ ] Hold mode: hold ⌥ Space, speak, release. The compact glass capsule shows only the waveform,
   with no cancel or finish buttons. Text is inserted once. Tap ⌥ Space
-  briefly; the capsule shakes, shows "Don’t tap. Hold ⌥ Space." and pastes nothing.
+  briefly; the capsule expands into an error card, shows "Don’t tap. Hold ⌥ Space." and pastes nothing.
   Release before the bars move; it shows "Keep holding ⌥ Space." and pastes nothing.
-- [ ] Toggle mode: press ⌥ Space once and speak. The capsule shows cancel, the
-  waveform and a red stop mark. Clicking anywhere on the capsule finishes, as does
-  pressing ⌥ Space again. The cancel button discards the session and pastes nothing.
+- [ ] Toggle mode: press ⌥ Space once and speak. The glass capsule is 32 points tall,
+  with a neutral border, five white waveform bars and a white stop square in a gray circle.
+  Clicking anywhere on the capsule finishes, as does pressing ⌥ Space again.
+  Right-click and choose Cancel dictation; the session is discarded and nothing
+  is pasted. During preparation/transcription, the visible cancel button works.
+- [ ] Keep another app focused and hover the microphone, notetaker icon and chevron.
+  The tooltip changes to "Dictate" with the shortcut, "Start notetaker" and
+  "Open meeting notes" respectively. Move between them and then away; tooltips
+  update without flickering and the controls collapse without taking focus.
+- [ ] Trigger a dictation error and a notetaker error. Each replaces the pill with
+  one rounded glass card, with a warning/title row, message below and a dismiss
+  button. Accessibility errors keep the Allow action; errors during a meeting
+  retain Stop notetaker. Check reduced motion, reduced transparency and increased contrast.
 - [ ] In Settings, click the keyboard shortcut and press a new combination such as
   ⌃⌥D. ⌥ Space no longer starts dictation; the new shortcut works in hold and
   toggle mode and is still set after relaunch. While recording a shortcut, Esc
@@ -183,6 +193,37 @@ CLI. Neither recognizes microphone audio.
   overlapping phrases and literal `$`/backslash text. Confirm whole-word matching,
   no cascading replacements and access to the original transcription.
 
+## Bring your own model / API connections
+
+Automated coverage uses synthetic audio and stub HTTP responses. It checks old
+settings decoding, URL/key validation, the three request/response formats,
+48 kHz stereo CAF conversion to 16 kHz mono WAV, Sarvam chunk coverage, real
+Keychain insert/read/rotation/deletion using disposable test keys, redirect
+refusal, no requests in preparation, and cancellation of an in-flight request.
+These checks do not establish live provider acceptance or recognition quality.
+
+- [ ] Add Sarvam and Smallest connections using your own keys. Saving makes no
+  request. Select Use and dictate, then start a meeting with each provider.
+  For Smallest choose an explicit spoken language; Pulse Pro needs English.
+- [ ] Select an unsupported language or Smallest with automatic language. The
+  error appears before recording begins, and no audio is uploaded.
+- [ ] Dictate longer than 30 seconds with Sarvam. Confirm the full transcript and
+  inspect words around each 25-second boundary; fixed cuts may affect recognition.
+- [ ] Connect an OpenAI-compatible server over localhost HTTP without a key, then
+  an HTTPS endpoint with a Bearer key. Confirm both dictation and meeting chunks.
+- [ ] Relaunch with a selected connection. Its selection persists; its key is
+  absent from workspace JSON and history exports. Rotating/removing a key takes
+  effect on the next recording. Editing the URL requires a new key and selecting
+  Use again if the edited connection was active.
+- [ ] Try an invalid key, quota error, unsupported model, malformed JSON, stopped
+  local server and redirect. Surface a useful error without exposing response
+  bodies or credentials. Never switch to another endpoint automatically.
+- [ ] Cancel during upload/response and rapidly start another recording. No late
+  result enters history or gets pasted; temporary audio is removed. Quit during
+  an API meeting and verify the same cleanup.
+- [ ] Select a built-in model and disconnect networking. It still runs locally;
+  neither saved connections nor Keychain configuration trigger network requests.
+
 ## Updates
 
 - [ ] Settings shows the installed version under About. "Check for Updates…" in
@@ -198,25 +239,40 @@ CLI. Neither recognizes microphone audio.
 
 ## Meeting notes
 
-None of these have been run yet.
+UI validation on 2026-10-08: inspected the packaged native app in dark appearance
+with a temporary synthetic meeting. Verified the meeting sidebar, separate
+My thoughts / Transcript / Summary tabs, transcript search, the Parakeet v3
+selection, and persisted thoughts and action-item edits. Removed the synthetic
+meeting afterwards. `swift build`, all 40 Swift tests, and app packaging passed.
+Live capture, summary generation, compact-window layout, and the OS checks below
+were not exercised in this UI pass.
+
+- [ ] Resize to the minimum window size; all three tabs and recording controls
+  stay usable. Hide/show the native sidebar, search notes, and return to dictation.
+- [ ] Select an installed model in the meeting sidebar, start a meeting, and
+  confirm the header identifies that model. Missing models must require an
+  explicit installation in Models; starting a meeting never downloads them.
 
 - [ ] Close the dashboard and hover over the floating capsule. The meeting button
-  appears beside the microphone, with "Record meeting" on hover. Click it: the
+  appears in its own capsule beside the microphone, with "Start notetaker" on hover.
+  Its chevron opens Meetings without starting a recording. Click the record icon: the
   dashboard reopens to Meetings and recording starts. Move the pointer away: the
-  red Stop meeting button stays visible and stops capture when clicked. While
+  green outline and Stop notetaker button stay visible and stop capture when clicked.
+  The green outline appears only during notetaker recording, never during dictation
+  or while the notetaker is still starting. While
   finishing or writing notes, a second meeting cannot be started. With an
   uninstalled model selected, the button opens Models with the download message.
 - [ ] Start the first meeting on macOS 14.2 or later. macOS asks for system audio
   access with the `NSAudioCaptureUsageDescription` text. Allow it, play a video
-  call or any audio, and confirm "Them" bubbles appear and the Them meter moves.
+  call or any audio, and confirm "Them" transcript entries appear and the Them meter moves.
 - [ ] Deny system audio access, start a meeting and talk for 20 seconds. The
   banner shows the call audio hint, and Open Settings opens Screen & System
-  Audio Recording. Me bubbles still appear.
+  Audio Recording. Me transcript entries still appear.
 - [ ] Hold a call through headphones, then through the built-in speakers. With
   speakers, note how often the other side's words also appear as "Me" through
   the microphone. Record the result; do not assume either way.
 - [ ] Start a meeting on the built-in microphone, then connect AirPods or another
-  headset mid-meeting. Both meters keep moving and new Me and Them bubbles keep
+  headset mid-meeting. Both meters keep moving and new Me and Them entries keep
   appearing after the switch.
 - [ ] Record a meeting of 30 minutes or more. The transcript keeps up within a
   few chunks, memory stays bounded, notes are written, and the meeting file
@@ -228,7 +284,7 @@ None of these have been run yet.
   points, decisions and action items. Ticking an action item survives relaunch.
   A title you typed before the notes were written is kept.
 - [ ] With Apple Intelligence off or unsupported, stop a meeting. The transcript
-  and notes are saved, and Write Notes is disabled with the reason shown.
+  and notes are saved, and Generate summary is disabled with the reason shown.
 - [ ] Disconnect networking, then start, record, stop and summarize a meeting with
   an installed model. Everything works and a network monitor shows no requests.
 

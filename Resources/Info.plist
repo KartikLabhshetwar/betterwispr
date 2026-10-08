@@ -12,9 +12,11 @@
     <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
-    <key>NSAudioCaptureUsageDescription</key><string>BetterWispr records the other side of a meeting when you start meeting notes. Audio is transcribed on this Mac and temporary recordings are deleted afterwards.</string>
-    <key>NSMicrophoneUsageDescription</key><string>BetterWispr records your microphone when you start dictation. Audio is transcribed on this Mac and temporary recordings are deleted afterwards.</string>
+    <key>NSAudioCaptureUsageDescription</key><string>BetterWispr records the other side of a meeting when you start meeting notes. Audio is processed on this Mac or sent to the API connection you select. Temporary recordings are deleted afterwards.</string>
+    <key>NSMicrophoneUsageDescription</key><string>BetterWispr records your microphone when you start dictation. Audio is processed on this Mac or sent to the API connection you select. Temporary recordings are deleted afterwards.</string>
     <key>NSSpeechRecognitionUsageDescription</key><string>BetterWispr uses Apple's on-device speech recognition only when you choose the Apple model. Cloud recognition is never enabled.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict><key>NSAllowsLocalNetworking</key><true/></dict>
     <key>SUFeedURL</key><string>https://github.com/KartikLabhshetwar/betterwispr/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key><string>QAcU47kj1MAVrne6SZCZ9c8XhIE0pOP/v3dCIEn+wH0=</string>
 </dict>

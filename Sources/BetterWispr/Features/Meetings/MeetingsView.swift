@@ -51,7 +51,7 @@ struct MeetingsView: View {
                 .foregroundStyle(.secondary)
             Text("Be in the conversation.")
                 .font(.system(size: 36, weight: .regular, design: .serif))
-            Text("Keep your thoughts, follow the transcript, and leave with a summary. Everything stays on this Mac.")
+            Text("Keep your thoughts, follow the transcript, and leave with a summary.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .lineSpacing(4)

@@ -65,6 +65,52 @@
   }
 }
 
+@keyframes testimonial-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@layer components {
+  .testimonials-track {
+    animation: testimonial-scroll 40s linear infinite;
+  }
+  .testimonials-track-reverse {
+    animation-direction: reverse;
+  }
+  .testimonials-track .testimonial-card {
+    width: min(21rem, calc(100vw - 3rem));
+    height: auto;
+    flex-shrink: 0;
+  }
+  .testimonials-marquee:is(:hover, :focus-within, [data-paused="true"]) .testimonials-track {
+    animation-play-state: paused;
+  }
+  .testimonials-window:focus-within {
+    overflow-x: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .testimonials-track {
+    width: 100%;
+    animation: none !important;
+  }
+  .testimonials-group {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    padding-right: 0;
+  }
+  .testimonials-track .testimonial-card {
+    width: auto;
+  }
+  .testimonials-group[aria-hidden="true"],
+  .testimonials-controls {
+    display: none;
+  }
+}
+
 @layer base {
   h1,
   h2,

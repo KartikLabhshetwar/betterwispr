@@ -129,6 +129,37 @@ try {
     "Loading keeps a usable GitHub link without a fabricated count",
   );
   const homepage = await readFile("dist/index.html", "utf8");
+  const { default: Testimonials } = await vite.ssrLoadModule(
+    "/src/components/ui/cards.tsx",
+  );
+  const testimonial = {
+    name: "Test author",
+    handle: "@test_author",
+    quote: "An exact quote <preserved> & escaped.",
+    postUrl: "https://x.com/test_author/status/123456789",
+  };
+  const renderTestimonials = (testimonials) => renderToStaticMarkup(
+    createElement(Testimonials, { testimonials }),
+  );
+  const empty = renderTestimonials([]);
+  assert.equal(empty, "", "An empty testimonial list renders nothing");
+  const single = renderTestimonials([testimonial]);
+  assert.ok(single.includes(`href="${testimonial.postUrl}"`));
+  assert.ok(single.includes("An exact quote &lt;preserved&gt; &amp; escaped."));
+  assert.equal((single.match(/<blockquote/g) ?? []).length, 1);
+  assert.ok(!single.includes("testimonials-track"), "Small collections stay static");
+  for (const postUrl of ["javascript:alert(1)", "https://x.com.evil.test/a/status/1", "https://example.com/a/status/1", ""]) {
+    assert.ok(!renderTestimonials([{ ...testimonial, postUrl }]).includes("<a "), "Only X post URLs are linked");
+  }
+  const scrolling = renderTestimonials(Array.from({ length: 6 }, () => testimonial));
+  assert.equal((scrolling.match(/<blockquote/g) ?? []).length, 12);
+  assert.equal((scrolling.match(/aria-hidden="true" inert=""/g) ?? []).length, 2, "Marquee copies are hidden from assistive technology and keyboard navigation");
+  assert.ok(scrolling.includes('aria-pressed="false"'), "Scrolling has a pause control");
+  const { default: TestimonialsDemo } = await vite.ssrLoadModule("/src/components/ui/demo.tsx");
+  const demo = renderToStaticMarkup(createElement(TestimonialsDemo));
+  assert.ok(demo.includes("not real endorsements") && !demo.includes("<a "));
+  assert.ok(!homepage.includes('id="testimonials"'), "Testimonials stay off the homepage until requested");
+  assert.ok(!homepage.includes("Sample author"), "The homepage never imports fictional endorsements");
   const menuButton = homepage.match(
     /<button\b[^>]*aria-controls="navigation-links"[^>]*>/,
   )?.[0];
@@ -150,5 +181,5 @@ try {
   await vite.close();
 }
 console.log(
-  `Passed: ${paths.length} static pages, metadata, internal links, CTAs, comparison content, 404, OG image and GitHub stars.`,
+  `Passed: ${paths.length} static pages, metadata, internal links, CTAs, comparison content, 404, OG image, GitHub stars and testimonials.`,
 );

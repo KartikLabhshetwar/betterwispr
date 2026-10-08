@@ -100,6 +100,10 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         segments.insert(segment, at: segments.firstIndex { $0.start > segment.start } ?? segments.endIndex)
     }
 
+    public var transcript: String {
+        segments.map { "[\($0.timestamp)] \($0.speaker.label): \($0.text)" }.joined(separator: "\n")
+    }
+
     public var markdown: String {
         var blocks = ["# \(displayTitle)", createdAt.formatted(date: .long, time: .shortened)]
         if let summary {
@@ -113,7 +117,7 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         let notes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         if !notes.isEmpty { blocks.append("## My notes\n\n\(notes)") }
         if !segments.isEmpty {
-            blocks.append("## Transcript\n\n" + segments.map { "[\($0.timestamp)] \($0.speaker.label): \($0.text)" }.joined(separator: "\n"))
+            blocks.append("## Transcript\n\n" + transcript)
         }
         return blocks.joined(separator: "\n\n") + "\n"
     }

@@ -278,6 +278,7 @@ final class AppModel {
     }
 
     private func prepare(_ model: SpeechModel, download: Bool) async throws {
+        try model.connection?.validateLanguage(settings.language)
         if model.engine == .apple {
             try AppleSpeechProvider.checkAvailability(language: settings.language == "auto" ? nil : settings.language)
         }
@@ -423,13 +424,17 @@ final class AppModel {
         } else {
             settings.speechConnections.append(connection)
         }
+        if let oldConnection, oldConnection.keychainAccount != connection.keychainAccount,
+           settings.selectedModelID == connection.speechModel.id {
+            settings.selectedModelID = "apple"
+        }
         do { try persist() }
         catch {
             settings = previous
             try keys.save(previousKey ?? "", for: connection)
             throw error
         }
-        if settings.selectedModelID == connection.speechModel.id {
+        if previous.selectedModelID == connection.speechModel.id {
             provider?.cancel()
             loading?.task.cancel()
             provider = nil

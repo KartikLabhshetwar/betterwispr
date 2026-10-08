@@ -54,6 +54,37 @@ import { Button } from "@betterwispr-frontend/ui/components/button";
 
 If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
 
+### X testimonials
+
+The testimonial component is intentionally **not mounted on the landing page**.
+Keep it hidden until real reviews are available and its inclusion is requested.
+When ready, import `Testimonials` from `@/components/ui/cards` and pass an array
+of real feedback as its `testimonials` prop, preserving each author's wording:
+
+```tsx
+{ name: "Author's display name", handle: "@handle", quote: "Exact post text", postUrl: "https://x.com/handle/status/POST_ID", image: "/assets/author.jpg" }
+```
+
+Replace `POST_ID` with the numeric post ID. `image` is optional; cards fall back
+to an initial. Each card links to its source post. There is no X API, embed script,
+provider, or network fetch for testimonials. An empty list renders nothing;
+one to five posts use a responsive grid, and six or more use
+two scrolling rows with pause controls and a static reduced-motion layout.
+
+`apps/web/src/components/ui/cards.tsx` contains the reusable component.
+`apps/web/src/components/ui/demo.tsx` exports a labeled preview with fictional
+quotes and verified Unsplash image URLs; it is not imported by the homepage.
+Temporarily render `<TestimonialsDemo />` in a local page to preview populated rows.
+
+TypeScript, Tailwind CSS, shadcn, and Lucide are already installed, so no setup
+or new dependencies are needed. This monorepo's default shadcn UI path is
+`packages/ui/src/components`, not `/components/ui`. The new app-local
+`apps/web/src/components/ui` folder keeps these supplied marketing components
+discoverable at `@/components/ui/*` without moving shared primitives or changing
+their aliases. Shared styles remain in `packages/ui/src/styles/globals.css`;
+testimonial animation styles live in `apps/web/src/index.css`. The cards use the
+existing `cn` export from `@betterwispr-frontend/ui/lib/utils` and site fonts.
+
 ## Environment Configuration
 
 Each app owns its environment schema in `.env.schema`. Varlock generates `src/env.ts` during installation; run `pnpm run env:generate` after changing a schema. Commit schemas, and keep secrets in ignored env files or your deployment platform.

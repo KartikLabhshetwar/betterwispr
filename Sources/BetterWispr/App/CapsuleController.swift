@@ -9,7 +9,52 @@ private final class RecordingPanel: NSPanel {
 
 @MainActor @Observable
 final class CapsuleHover {
-    var isHovering = false
+    enum Target: Hashable { case surface, microphone, notetaker, meetingNotes, dictation }
+
+    private(set) var isHovering = false
+    private(set) var target: Target?
+    @ObservationIgnored private var regions: [Target: CGRect] = [:]
+    @ObservationIgnored private var location: CGPoint?
+
+    func update(regions: [Target: CGRect]) {
+        self.regions = regions
+        move(to: location)
+    }
+
+    func move(to point: CGPoint?) {
+        location = point
+        guard let point, let surface = regions[.surface] else {
+            isHovering = false
+            target = nil
+            return
+        }
+        // Keep the activation area stable while the small resting pill expands.
+        let width = max(120, surface.width)
+        let height = max(32, surface.height)
+        let activation = CGRect(x: surface.midX - width / 2 - 6, y: surface.maxY - height - 8,
+                                width: width + 12, height: height + 16)
+        isHovering = activation.contains(point)
+        let hit = [Target.microphone, .notetaker, .meetingNotes, .dictation].first { regions[$0]?.contains(point) == true }
+        // Crossing the narrow gap between controls must not flash the tooltip off.
+        target = hit ?? (isHovering && target.flatMap { regions[$0] } != nil ? target : nil)
+    }
+}
+
+struct CapsuleRegions: PreferenceKey {
+    static let defaultValue: [CapsuleHover.Target: CGRect] = [:]
+    static func reduce(value: inout [CapsuleHover.Target: CGRect], nextValue: () -> [CapsuleHover.Target: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
+extension View {
+    func capsuleRegion(_ target: CapsuleHover.Target) -> some View {
+        background {
+            GeometryReader { geometry in
+                Color.clear.preference(key: CapsuleRegions.self, value: [target: geometry.frame(in: .named("capsule"))])
+            }
+        }
+    }
 }
 
 private final class CapsuleHostingView: NSHostingView<CapsuleView> {
@@ -27,15 +72,13 @@ private final class CapsuleHostingView: NSHostingView<CapsuleView> {
     @MainActor @preconcurrency required init(rootView: CapsuleView) { fatalError("init(rootView:) is unavailable") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseMoved(with event: NSEvent) { track(event) }
-    override func mouseEntered(with event: NSEvent) { track(event) }
-    override func mouseExited(with event: NSEvent) { hover.isHovering = false }
+    override func mouseMoved(with event: NSEvent) { super.mouseMoved(with: event); track(event) }
+    override func mouseEntered(with event: NSEvent) { super.mouseEntered(with: event); track(event) }
+    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); hover.move(to: nil) }
 
     private func track(_ event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        let fromBottom = isFlipped ? bounds.maxY - point.y : point.y
-        let inside = abs(point.x - bounds.midX) < 80 && fromBottom < 52
-        if hover.isHovering != inside { hover.isHovering = inside }
+        hover.move(to: CGPoint(x: point.x, y: isFlipped ? point.y : bounds.maxY - point.y))
     }
 }
 
@@ -46,7 +89,7 @@ final class CapsuleController {
 
     init(model: AppModel) {
         self.model = model
-        panel = RecordingPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 160),
+        panel = RecordingPanel(contentRect: NSRect(x: 0, y: 0, width: 440, height: 240),
                                styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = true
         panel.level = .floating
@@ -62,11 +105,24 @@ final class CapsuleController {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(reposition),
             name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        observeMeetings()
     }
 
     func update() {
-        if model.settings.showCapsule || model.isBusy || model.failure != nil { show() }
+        if model.settings.showCapsule || model.isBusy || model.failure != nil || model.meetings.activity != .idle || model.meetings.message != nil { show() }
         else { panel.orderOut(nil) }
+    }
+
+    private func observeMeetings() {
+        withObservationTracking {
+            _ = model.meetings.activity
+            _ = model.meetings.message
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.update()
+                self?.observeMeetings()
+            }
+        }
     }
 
     func show() {

@@ -60,6 +60,10 @@ behavior that unit tests cannot establish.
 
 `MeetingModel` owns meetings and is separate from dictation. It loads its own
 speech provider with `download: false` and releases it when the meeting ends.
+The meeting sidebar exposes the same model selection as dictation; both use
+`SpeechModel.makeProvider()` with independent provider instances. The model name
+is captured when recording starts. Personal thoughts, the transcript, and the
+generated summary have separate tabs backed by the existing meeting fields.
 
 1. Starting a meeting saves an empty `Meeting`, checks microphone permission and
    starts `MeetingRecorder`. The microphone becomes "Me". On macOS 14.2 and later
@@ -112,12 +116,47 @@ The provider also exposes progress and provisional-text callbacks. Add its
 shared recorder, vocabulary processor, history and delivery path. Keep engine
 configuration inside its provider rather than branching across SwiftUI views.
 
-`download: false` must load local resources only. `download: true` authorizes an
+For built-in engines, `download: false` must load local resources only. `download: true` authorizes an
 explicit model setup operation, not future background network use. Validate
 files and required tokenizer tokens before marking a model installed. Report
 unsupported languages/assets clearly, prevent simultaneous operations, honor
 task cancellation and clear callbacks/resources when a session ends. Do not
 silently route failures to a cloud service.
+
+### User-configured API connections
+
+`SpeechConnection` metadata lives in `AppSettings.speechConnections`; old saved
+settings decode with an empty list. The built-in catalog stays static and local.
+`AppModel.models` adds each saved connection as a selectable `.api` speech model.
+`SpeechModel.makeProvider()` is shared by dictation and meetings.
+
+`APISpeechProvider.prepare` validates configuration and Keychain access without
+network requests. Only transcription through a selected connection uploads audio.
+It reuses WhisperKit's audio conversion to produce 16 kHz mono PCM WAV in memory,
+off the main actor. Sarvam receives sequential 25-second clips; other APIs receive
+the bounded dictation/meeting clip. Fixed cuts can affect words at boundaries.
+No partial transcript is delivered on failure. Cancellation stops URLSession
+requests; callers retain their generation checks before history and paste.
+
+Sarvam uses multipart uploads and `api-subscription-key`; Smallest uses binary WAV
+with Bearer authentication; custom endpoints use OpenAI-compatible multipart and
+JSON `text` responses. Smallest requires an explicit spoken language. New model
+IDs are editable without a catalog update if they retain the provider's wire
+format. Other formats need a concrete adapter, not a generic plugin system.
+
+Keys are stored as nonsynchronizing, device-only Keychain items bound to connection
+ID, API format and full endpoint. Connection edits cannot reuse a key at a different
+URL. Requests use ephemeral sessions without cookies, cached credentials or disk
+cache. HTTPS is required except for literal loopback destinations; every redirect
+is rejected. Provider response bodies are not included in errors. Vocabulary
+substitution remains local and hints are not uploaded. External providers control
+their own audio retention; local history settings do not control that retention.
+
+Wire formats checked against [Sarvam REST](https://docs.sarvam.ai/api-reference/speech-to-text/transcribe),
+[Smallest pre-recorded STT](https://docs.smallest.ai/models/speech-to-text/pre-recorded/quickstart),
+and [OpenAI transcription](https://developers.openai.com/api/reference/resources/audio/subresources/transcriptions/methods/create).
+Automated tests use synthetic audio and stub responses; live provider acceptance
+requires the user's own account and credentials.
 
 The Apple provider requires on-device recognition and uses the current locale
 when no language is supplied. WhisperKit uses locally loaded Core ML weights and

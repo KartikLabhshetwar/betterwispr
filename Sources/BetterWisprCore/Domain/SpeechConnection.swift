@@ -81,6 +81,25 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
             throw SpeechAPIError.configuration("The API key contains spaces or unsupported characters. Paste only the key.")
         }
     }
+
+    /// Checked before recording in both session coordinators, and again at the request boundary.
+    public func validateLanguage(_ language: String?) throws {
+        let code = language.flatMap { $0 == "auto" ? nil : Locale(identifier: $0).language.languageCode?.identifier }
+        if api == .smallest {
+            guard let code else {
+                throw SpeechAPIError.configuration("Choose a spoken language in Settings for Smallest AI. This connection requires an explicit language.")
+            }
+            if modelID == "pulse-pro", code != "en" {
+                throw SpeechAPIError.configuration("Pulse Pro requires English. Choose English in Settings or use the pulse model.")
+            }
+        }
+        if api == .sarvam, let code {
+            let supported = ["en", "hi", "bn", "kn", "ml", "mr", "od", "pa", "ta", "te", "gu", "as", "ur", "ne", "kok", "ks", "sd", "sa", "sat", "mni", "brx", "mai", "doi"]
+            guard supported.contains(code) else {
+                throw SpeechAPIError.configuration("Sarvam does not support the selected language. Choose a supported language or Detect automatically in Settings.")
+            }
+        }
+    }
 }
 
 public enum SpeechAPIError: LocalizedError, Sendable {

@@ -9,7 +9,9 @@ for file/model smoke tests. See `docs/architecture.md` before reorganizing.
 - Read the affected flow and callers before editing. Reuse the existing recorder,
   `SpeechProvider`, catalog, store and delivery path. Keep changes concrete; add
   modules or abstractions only for demonstrated needs.
-- Maintain local-only transcription. Download models/tokenizers only after an
+- Keep built-in transcription local-only and the default. API connections require
+  explicit user selection; never use one as a fallback. Keep API keys in Keychain.
+  Download models/tokenizers only after an
   explicit model installation action; cached-model loading must never silently
   access the network or fall back to cloud recognition.
 - Preserve microphone/speech/Accessibility checks, app-focus and clipboard

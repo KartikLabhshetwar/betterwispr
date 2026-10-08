@@ -1,0 +1,86 @@
+# Contributing to BetterWispr
+
+Thanks for helping out. Bug reports, fixes and focused features are all welcome.
+
+## Setup
+
+You need macOS 14+, a Swift 6.2+ toolchain and Xcode or the Command Line Tools.
+The first build downloads Swift package dependencies, so it needs internet.
+
+```sh
+git clone https://github.com/KartikLabhshetwar/betterwispr.git
+cd betterwispr
+make dev
+```
+
+`make dev` builds, runs every check and launches `.build/debug/BetterWispr.app`.
+Always launch through `make run` or `./scripts/run.sh` so macOS attaches
+microphone and Accessibility permissions to the app bundle.
+
+| Command | What it does |
+| --- | --- |
+| `make run` | Build and launch the debug app |
+| `make test` | `swift test` plus the evaluator checks |
+| `make lint` | Show compiler warnings |
+| `make offline-test MODEL=parakeet-v3` | Transcribe with networking denied |
+| `make help` | List every target |
+
+`scripts/build-app.sh` signs with your first code-signing identity, or
+`CODESIGN_IDENTITY` if set. With ad-hoc signing, macOS revokes Accessibility on
+every rebuild, so paste falls back to copy.
+
+Test a model without the UI:
+
+```sh
+swift run BetterWisprCLI --list-models
+swift run BetterWisprCLI --download-model parakeet-v3
+swift run BetterWisprCLI --transcribe-file audio.wav --model parakeet-v3 --language en
+```
+
+## Project layout
+
+```text
+Sources/BetterWispr/       App composition, SwiftUI features, design components
+Sources/BetterWisprCore/   Audio, speech providers, persistence, OS integrations
+Sources/BetterWisprCLI/    Model install and file transcription for smoke tests
+Tests/                     Swift tests and Python evaluation checks
+scripts/                   Build, run, release and evaluation scripts
+docs/                      Architecture, testing, accuracy and OSS provenance
+betterwispr-frontend/      Website (betterwispr.com)
+```
+
+Read [docs/architecture.md](docs/architecture.md) before adding a model,
+provider or integration.
+
+## Ground rules
+
+- **Local by default.** Built-in transcription stays on device. API providers are
+  opt-in only and are never used as a fallback. Models download only after an
+  explicit user action. API keys go in the Keychain.
+- **Don't break safety checks.** Keep the permission checks, app-focus and
+  clipboard safeguards, cancellation and audio cleanup. Never paste a stale result.
+- **Concurrency.** UI state stays on the main actor. Don't block audio callbacks
+  or silence Swift concurrency diagnostics without a documented reason.
+- **Data.** Keep raw and corrected transcripts separate. Schema changes to saved
+  data need a migration.
+- **No invented numbers.** Don't claim accuracy or benchmark results you haven't measured.
+- **Never commit** models, recordings, transcripts, keys or signing assets.
+- **Third-party code** keeps its license and is recorded in [docs/oss-reuse.md](docs/oss-reuse.md).
+
+## Pull requests
+
+1. Branch from `main` and keep the change focused.
+2. Run `make test` and `make lint`.
+3. For permission, shortcut, paste or offline behavior, follow the manual
+   checklist in [docs/testing.md](docs/testing.md) and say in the PR what you
+   tested by hand versus what only passed automated checks.
+4. Add an entry to [CHANGELOG.md](CHANGELOG.md) for
+   user-visible changes.
+5. Use conventional commit prefixes, e.g. `feat(core):`, `fix(app):`, `chore(web):`.
+
+## Releases (maintainers)
+
+`make ship` builds, signs with Developer ID, notarizes and staples
+`release/BetterWispr-<version>_arm64.dmg`, signs it for Sparkle and writes
+`release/appcast.xml`. Publish both on a GitHub release tagged `v<version>`
+using the `gh release create` command the script prints.

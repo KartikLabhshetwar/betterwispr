@@ -411,7 +411,6 @@ final class AppModel {
 
     func cancelInstallation() {
         installTask?.cancel()
-        installTask = nil
         installation = nil
         statusMessage = "Download cancelled."
     }
@@ -428,8 +427,13 @@ final class AppModel {
             guard let self, let current = self.installation, current.token == next.token else { return }
             self.installation?.progress = max(current.progress, min(1, progress))
         }
+        let previous = installTask
         installTask = Task { [weak self] in
+            await previous?.value
+            let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Downloading \(name)")
+            defer { ProcessInfo.processInfo.endActivity(activity) }
             do {
+                try Task.checkCancellation()
                 try await work(report)
                 guard let self, self.installation?.token == next.token else { return }
                 self.installation = nil

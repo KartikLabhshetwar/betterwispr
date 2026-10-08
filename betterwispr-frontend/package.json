@@ -12,7 +12,7 @@
     "check-types": "pnpm -r check-types",
     "dev:web": "pnpm --filter web dev:bare",
     "dev:server": "pnpm --filter hono dev:bare",
-    "deploy": "pnpm --filter web deploy",
+    "deploy": "pnpm --filter web run deploy",
     "destroy": "pnpm --filter @betterwispr-frontend/infra destroy",
     "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/",
     "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/"

@@ -85,20 +85,24 @@ struct VocabularyView: View {
                 Label("Phrase booster is on. Parakeet checks the spelling of these words on this Mac.", systemImage: "checkmark.circle")
                     .foregroundStyle(.secondary)
             } else {
+                let installation = model.installation?.id == AppModel.phraseBoosterID ? model.installation : nil
+                let installing = installation != nil && installation?.failure == nil
                 LabeledContent {
-                    if !model.isInstallingPhraseBooster {
-                        Button("Download") { model.installPhraseBooster() }
-                            .disabled(model.isBusy)
+                    if installing {
+                        Button("Cancel", action: model.cancelInstallation)
+                    } else {
+                        Button(installation == nil ? "Download" : "Retry") { model.installPhraseBooster() }
+                            .disabled(model.isInstalling)
                     }
                 } label: {
                     Text("Phrase booster")
-                    Text("Helps Parakeet spell the words in this list. About 100 MB, downloads once and runs on this Mac.")
+                    Text("Helps Parakeet spell the words in this list. About 100 MB. New Parakeet downloads include it.")
                 }
-                if model.isInstallingPhraseBooster {
-                    ProgressView().progressViewStyle(.linear)
-                    Text("Downloading the phrase booster…")
+                if let installation {
+                    if installing { ProgressView(value: installation.progress) }
+                    Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 }
             }
         }

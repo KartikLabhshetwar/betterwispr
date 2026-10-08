@@ -26,6 +26,10 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var microphone: AudioInputDevice?
     /// The Ollama model that writes meeting notes; nil uses Apple Intelligence.
     public var notesModel: String?
+    /// The newest onboarding the user finished or skipped; 0 shows it again.
+    public var completedOnboardingVersion: Int = 0
+    /// The onboarding page to resume after quitting midway.
+    public var onboardingStep: Int = 0
 
     public var notesSelection: NotesModelSelection {
         get {
@@ -84,5 +88,7 @@ public struct AppSettings: Codable, Equatable, Sendable {
         microphone = try container.decodeIfPresent(AudioInputDevice.self, forKey: .microphone)
         learnCorrections = try container.decodeIfPresent(Bool.self, forKey: .learnCorrections) ?? true
         notesModel = try container.decodeIfPresent(String.self, forKey: .notesModel)
+        completedOnboardingVersion = try container.decodeIfPresent(Int.self, forKey: .completedOnboardingVersion) ?? 0
+        onboardingStep = try container.decodeIfPresent(Int.self, forKey: .onboardingStep) ?? 0
     }
 }

@@ -1,3 +1,4 @@
+import FluidAudio
 import Foundation
 import Testing
 @testable import BetterWisprCore
@@ -82,7 +83,7 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
     }
     let boosterFilesBefore = phraseBoosterFiles()
     for model in SpeechModel.catalog where model.engine == .parakeet {
-        #expect(ParakeetProvider.version(for: model) != nil)
+        #expect(ParakeetProvider.source(for: model)?.repo.folderName == model.modelName)
         #expect(!ParakeetProvider.isInstalled(model, modelsDirectory: directory))
         do {
             try await ParakeetProvider(modelsDirectory: directory).prepare(model: model, download: false)
@@ -145,4 +146,24 @@ func meetingAndDictationModelsCreateTheMatchingSessionProvider(_ model: SpeechMo
         rescored: "four five",
         replacements: []
     ) == "four five")
+}
+
+@Test func phraseBoosterDownloadsIntoTheFolderItLoadsFrom() {
+    #expect(CtcModelVariant.ctc110m.repo.folderName == ParakeetProvider.phraseBoosterDirectory.lastPathComponent)
+}
+
+@Test func parakeetDownloadProgressCountsOnlyTheTransferHalf() {
+    #expect(ParakeetProvider.downloadedFraction(DownloadProgress(fractionCompleted: 0.25, phase: .listing)) == 0.5)
+    #expect(ParakeetProvider.downloadedFraction(DownloadProgress(fractionCompleted: 0.8, phase: .compiling(modelName: "Encoder"))) == 1)
+}
+
+@MainActor
+@Test func parallelDownloadsReportOneSizeWeightedFractionThatNeverMovesBack() {
+    var reported: [Double] = []
+    let shares = DownloadShares(megabytes: [400, 100]) { reported.append($0) }
+    shares.update(0, to: 0.5)
+    shares.update(0, to: 0.3)
+    shares.update(1, to: 1)
+    #expect(reported == [0.4, 0.4, 0.6])
+    #expect(DownloadShares(megabytes: [100, 0]) { _ in }.total == 0)
 }

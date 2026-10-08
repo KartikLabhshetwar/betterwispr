@@ -32,7 +32,7 @@ func run() async throws {
         return
     }
     if arguments == ["--download-phrase-booster"] {
-        try await ParakeetProvider().installPhraseBooster()
+        try await ParakeetProvider.installPhraseBooster()
         print("Installed the Parakeet phrase booster at \(ParakeetProvider.phraseBoosterDirectory.path).")
         return
     }
@@ -66,6 +66,9 @@ func run() async throws {
     }
     let clock = ContinuousClock()
     let started = clock.now
+    if options["--download-model"] != nil {
+        provider.onProgress = { FileHandle.standardError.write(Data("\rInstalling \(model.name): \(Int($0 * 100))%".utf8)) }
+    }
     try await provider.prepare(model: model, download: options["--download-model"] != nil)
     if let path = options["--transcribe-file"] {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
@@ -75,7 +78,7 @@ func run() async throws {
         print(transcript)
         FileHandle.standardError.write(Data("Completed in \(started.duration(to: clock.now)).\n".utf8))
     } else {
-        print("Installed \(model.name). Future transcription runs locally.")
+        print("\nInstalled \(model.name). Future transcription runs locally.")
     }
 }
 

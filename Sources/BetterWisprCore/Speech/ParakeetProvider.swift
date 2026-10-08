@@ -10,6 +10,7 @@ public final class ParakeetProvider: SpeechProvider {
     private var loadedModelID: String?
     private var preparing = false
     private var transcriptionTask: Task<String, any Error>?
+    private var loadedVersion: AsrModelVersion?
     private var phraseBooster: CtcModels?
     private var boostingSession: (terms: [String], session: VocabularyBoostingSession)?
 
@@ -19,10 +20,17 @@ public final class ParakeetProvider: SpeechProvider {
         self.modelsDirectory = modelsDirectory
     }
 
-    nonisolated static func version(for model: SpeechModel) -> AsrModelVersion? {
-        switch model.modelName {
-        case "parakeet-tdt-0.6b-v3": .v3
-        case "parakeet-tdt-0.6b-v2": .v2
+    nonisolated static let phraseBoosterMegabytes = 100.0
+
+    /// The FluidAudio version, repository and approximate download size behind a catalog model.
+    nonisolated static func source(for model: SpeechModel) -> (version: AsrModelVersion, repo: Repo, megabytes: Double)? {
+        guard model.engine == .parakeet else { return nil }
+        return switch model.modelName {
+        case "parakeet-tdt-0.6b-v3": (.v3, .parakeetV3, 471)
+        case "parakeet-tdt-0.6b-v2": (.v2, .parakeetV2, 460)
+        case "parakeet-ultra": (.ultra, .parakeetUltra, 630)
+        case "parakeet-tdt-ctc-110m": (.tdtCtc110m, .parakeetTdtCtc110m, 230)
+        case "parakeet-ja": (.tdtJa, .parakeetJa, 620)
         default: nil
         }
     }
@@ -33,10 +41,10 @@ public final class ParakeetProvider: SpeechProvider {
     }
 
     public static func isInstalled(_ model: SpeechModel, modelsDirectory: URL = WhisperKitProvider.defaultModelsDirectory) -> Bool {
-        guard model.engine == .parakeet, let version = version(for: model) else { return false }
+        guard let source = source(for: model) else { return false }
         let folder = folder(for: model, modelsDirectory: modelsDirectory)
         return FileManager.default.fileExists(atPath: folder.appending(path: ".betterwispr-installed").path)
-            && AsrModels.modelsExist(at: folder, version: version)
+            && AsrModels.modelsExist(at: folder, version: source.version)
     }
 
     /// FluidAudio's vocabulary session reads the CTC tokenizer from this fixed cache folder.
@@ -96,7 +104,7 @@ public final class ParakeetProvider: SpeechProvider {
     }
 
     public func prepare(model: SpeechModel, download: Bool) async throws {
-        guard model.engine == .parakeet, let version = Self.version(for: model) else { throw SpeechError.invalidModel }
+        guard let source = Self.source(for: model) else { throw SpeechError.invalidModel }
         guard !preparing, transcriptionTask == nil else { throw SpeechError.busy }
         if loadedModelID == model.id, manager != nil { onProgress?(1); return }
         preparing = true
@@ -106,49 +114,70 @@ public final class ParakeetProvider: SpeechProvider {
         if download && !Self.isInstalled(model, modelsDirectory: modelsDirectory) {
             try FileManager.default.createDirectory(at: folder.deletingLastPathComponent(), withIntermediateDirectories: true)
             onProgress?(0)
-            let progress = onProgress
-            try await AsrModels.download(to: folder, version: version) { value in
-                let fraction = value.fractionCompleted * 0.9
-                Task { @MainActor in progress?(fraction) }
-            }
+            try await Self.download(source, to: folder, withBooster: !Self.isPhraseBoosterInstalled(), progress: onProgress)
             try Task.checkCancellation()
         }
         guard download || Self.isInstalled(model, modelsDirectory: modelsDirectory) else { throw SpeechError.modelNotInstalled(model.name) }
         onProgress?(0.95)
         manager = nil
         loadedModelID = nil
-        let models = try await Task.detached { try AsrModels.loadLocal(from: folder, version: version) }.value
+        let models = try await Task.detached { try AsrModels.loadLocal(from: folder, version: source.version) }.value
         let asr = AsrManager()
         try await asr.loadModels(models)
         try Task.checkCancellation()
         if download {
             try Data(model.modelName.utf8).write(to: folder.appending(path: ".betterwispr-installed"), options: .atomic)
         }
-        if phraseBooster == nil, Self.isPhraseBoosterInstalled() {
-            phraseBooster = try? await CtcModels.loadDirect(from: Self.phraseBoosterDirectory)
-        }
+        await loadPhraseBoosterIfInstalled()
         manager = asr
         loadedModelID = model.id
+        loadedVersion = source.version
         onProgress?(1)
     }
 
-    /// Downloads the CTC phrase booster on an explicit user request and keeps it loaded for transcription.
-    public func installPhraseBooster() async throws {
-        guard !preparing, transcriptionTask == nil else { throw SpeechError.busy }
-        preparing = true
-        defer { preparing = false }
+    /// Fetches the model in one pass while the phrase booster downloads beside it; a booster failure leaves the model usable.
+    private static func download(
+        _ source: (version: AsrModelVersion, repo: Repo, megabytes: Double), to folder: URL, withBooster: Bool,
+        progress: (@MainActor @Sendable (Double) -> Void)?
+    ) async throws {
+        let shares = DownloadShares(megabytes: [source.megabytes, withBooster ? phraseBoosterMegabytes : 0]) { progress?($0 * 0.9) }
+        let variant = source.version == .v3 ? ParakeetEncoderPrecision.int8.rawValue : nil
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await ModelHub.download(source.repo, to: folder.deletingLastPathComponent(), variant: variant) { value in
+                    let fraction = downloadedFraction(value)
+                    Task { @MainActor in shares.update(0, to: fraction) }
+                }
+            }
+            if withBooster {
+                group.addTask {
+                    try? await installPhraseBooster { fraction in Task { @MainActor in shares.update(1, to: fraction) } }
+                }
+            }
+            try await group.waitForAll()
+        }
+    }
+
+    /// `ModelHub.download` reports file bytes in the first half of its range and reserves the rest for compilation it skips.
+    nonisolated static func downloadedFraction(_ progress: DownloadProgress) -> Double {
+        min(1, max(0, progress.fractionCompleted * 2))
+    }
+
+    /// Downloads and verifies the CTC phrase booster after an explicit installation action.
+    public nonisolated static func installPhraseBooster(progress: (@Sendable (Double) -> Void)? = nil) async throws {
+        let directory = phraseBoosterDirectory
+        try FileManager.default.createDirectory(at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try await ModelHub.download(CtcModelVariant.ctc110m.repo, to: directory.deletingLastPathComponent()) { progress?(downloadedFraction($0)) }
         try Task.checkCancellation()
-        let directory = Self.phraseBoosterDirectory
-        onProgress?(0)
-        try await CtcModels.download(to: directory)
-        try Task.checkCancellation()
-        let booster = try await CtcModels.loadDirect(from: directory)
+        _ = try await CtcModels.loadDirect(from: directory)
         _ = try await CtcTokenizer.load(from: directory)
         try Task.checkCancellation()
         try Data(directory.lastPathComponent.utf8).write(to: directory.appending(path: ".betterwispr-installed"), options: .atomic)
-        phraseBooster = booster
-        boostingSession = nil
-        onProgress?(1)
+    }
+
+    private func loadPhraseBoosterIfInstalled() async {
+        guard phraseBooster == nil, Self.isPhraseBoosterInstalled() else { return }
+        phraseBooster = try? await CtcModels.loadDirect(from: Self.phraseBoosterDirectory)
     }
 
     public func transcribe(audioURL: URL, language: String?, vocabulary: [String]) async throws -> String {
@@ -157,7 +186,7 @@ public final class ParakeetProvider: SpeechProvider {
         guard audioURL.isFileURL, FileManager.default.fileExists(atPath: audioURL.path) else { throw SpeechError.audioUnavailable }
         try Task.checkCancellation()
         let hint = language.flatMap { Locale(identifier: $0).language.languageCode?.identifier }.flatMap(Language.init(rawValue:))
-        let terms = hint == nil || hint == .english ? Self.boostingTerms(vocabulary) : []
+        let terms = loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary) : []
         let task = Task {
             let text: String
             if let session = await self.boostingSession(for: terms) {
@@ -179,7 +208,9 @@ public final class ParakeetProvider: SpeechProvider {
     }
 
     private func boostingSession(for terms: [String]) async -> VocabularyBoostingSession? {
-        guard !terms.isEmpty, let phraseBooster else { return nil }
+        guard !terms.isEmpty else { return nil }
+        await loadPhraseBoosterIfInstalled()
+        guard let phraseBooster else { return nil }
         if let boostingSession, boostingSession.terms == terms { return boostingSession.session }
         let vocabulary = CustomVocabularyContext(terms: terms.map { CustomVocabularyTerm(text: $0) })
         guard let session = try? await VocabularyBoostingSession(vocabulary: vocabulary, ctcModels: phraseBooster, config: VocabularyBoostingSession.itnDefaultConfig) else { return nil }
@@ -202,5 +233,29 @@ public final class ParakeetProvider: SpeechProvider {
             item.shouldReplace ? item.replacementWord.map { (original: item.originalWord, replacement: $0) } : nil
         }
         return restoringPunctuation(original: result.text, rescored: rescored.text, replacements: replacements)
+    }
+}
+
+/// Combines parallel downloads into one monotonic fraction weighted by their sizes.
+@MainActor
+final class DownloadShares {
+    private let megabytes: [Double]
+    private var fractions: [Double]
+    private let report: @MainActor (Double) -> Void
+
+    init(megabytes: [Double], report: @escaping @MainActor (Double) -> Void) {
+        self.megabytes = megabytes
+        fractions = megabytes.map { _ in 0 }
+        self.report = report
+    }
+
+    var total: Double {
+        let size = megabytes.reduce(0, +)
+        return size > 0 ? zip(fractions, megabytes).map { $0 * $1 }.reduce(0, +) / size : 0
+    }
+
+    func update(_ index: Int, to fraction: Double) {
+        fractions[index] = max(fractions[index], min(1, fraction))
+        report(total)
     }
 }

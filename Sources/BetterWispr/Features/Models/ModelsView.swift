@@ -16,7 +16,7 @@ struct ModelsView: View {
             } header: {
                 Text("On this Mac")
             } footer: {
-                Label("These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation.", systemImage: "internaldrive")
+                Label("These models process audio on your Mac. Parakeet and Whisper need an internet connection only for installation. Parakeet sizes include the 100 MB phrase booster, which downloads once and is shared.", systemImage: "internaldrive")
                     .foregroundStyle(.secondary)
             }
 
@@ -95,7 +95,8 @@ struct ModelsView: View {
 
     private func modelRow(_ speechModel: SpeechModel) -> some View {
         let selected = speechModel.id == model.selectedModel.id
-        let preparing = model.preparingModelID == speechModel.id
+        let installation = model.installation?.id == speechModel.id ? model.installation : nil
+        let installing = installation != nil && installation?.failure == nil
         let installed = model.isModelInstalled(speechModel)
 
         return HStack(alignment: .top, spacing: 12) {
@@ -123,32 +124,27 @@ struct ModelsView: View {
                 Text("\(speechModel.sizeLabel) · \(engineLabel(speechModel.engine))")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                if preparing {
-                    Group {
-                        if model.downloadProgress > 0 {
-                            ProgressView(value: min(1, max(0, model.downloadProgress)))
-                        } else {
-                            ProgressView().progressViewStyle(.linear)
-                        }
-                    }
-                    .padding(.top, 4)
-                    Text("Preparing \(speechModel.name)… This can take a few minutes on first use.")
+                if let installation {
+                    if installing { ProgressView(value: installation.progress).padding(.top, 4) }
+                    Text(installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(installing ? AnyShapeStyle(.secondary) : AnyShapeStyle(.red))
                 }
             }
             Spacer(minLength: 8)
-            if selected && installed && !preparing {
+            if installing {
+                Button("Cancel", action: model.cancelInstallation)
+            } else if selected && installed {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title3)
                     .foregroundStyle(.green)
                     .accessibilityLabel("Active model")
-            } else if !preparing {
-                Button(installed ? "Use" : "Download") {
-                    if installed { model.selectModel(speechModel) }
-                    else { model.installModel(speechModel) }
-                }
-                .disabled(model.isBusy)
+            } else if installed {
+                Button("Use") { model.selectModel(speechModel) }
+                    .disabled(model.isBusy)
+            } else {
+                Button(installation == nil ? "Download" : "Retry") { model.installModel(speechModel) }
+                    .disabled(model.isInstalling)
             }
         }
         .padding(.vertical, 4)

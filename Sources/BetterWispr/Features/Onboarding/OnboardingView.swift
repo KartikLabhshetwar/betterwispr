@@ -43,12 +43,17 @@ enum OnboardingStep: Int, CaseIterable {
 
 struct OnboardingView: View {
     @Bindable var model: AppModel
-    let finish: () -> Void
-    @State private var step = OnboardingStep.welcome
+    @State private var step: OnboardingStep
     @State private var forward = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(model: AppModel) {
+        self.model = model
+        _step = State(initialValue: OnboardingStep(rawValue: model.settings.onboardingStep) ?? .welcome)
+    }
+
     private var recommended: SpeechModel? { model.models.first { $0.id == "parakeet-v3" } }
+    private var installation: ModelInstallation? { model.installation?.id == recommended?.id ? model.installation : nil }
     private var shortcut: String { model.settings.shortcut.displayName }
 
     var body: some View {
@@ -149,14 +154,21 @@ struct OnboardingView: View {
     @ViewBuilder private var modelRow: some View {
         let selected = model.selectedModel
         LabeledContent {
-            if model.preparingModelID != nil {
-                ProgressView(value: min(1, max(0, model.downloadProgress))).frame(width: 120)
-            } else if let recommended, selected.id != recommended.id || !model.isModelInstalled(recommended) {
-                Button(model.isModelInstalled(recommended) ? "Use \(recommended.name)" : "Download \(recommended.sizeLabel)") {
-                    if model.isModelInstalled(recommended) { model.selectModel(recommended) }
-                    else { model.installModel(recommended) }
+            if let installation, installation.failure == nil {
+                HStack {
+                    ProgressView(value: installation.progress).frame(width: 120)
+                    Button("Cancel", action: model.cancelInstallation)
                 }
-                .disabled(model.isBusy)
+            } else if let recommended, selected.id != recommended.id || !model.isModelInstalled(recommended) {
+                if model.isModelInstalled(recommended) {
+                    Button("Use \(recommended.name)") { model.selectModel(recommended) }
+                        .disabled(model.isBusy)
+                } else {
+                    Button(installation == nil ? "Download \(recommended.sizeLabel)" : "Retry") {
+                        model.installModel(recommended)
+                    }
+                    .disabled(model.isInstalling)
+                }
             } else {
                 Label {
                     Text("Ready")
@@ -172,7 +184,9 @@ struct OnboardingView: View {
     }
 
     private var modelDetail: String {
-        if model.preparingModelID != nil { return "Downloading… \(Int(min(1, max(0, model.downloadProgress)) * 100))%" }
+        if let installation {
+            return installation.failure.map { "Download stopped: \($0)" } ?? installation.progressLabel
+        }
         if let recommended, model.selectedModel.id != recommended.id, model.isModelInstalled(model.selectedModel) {
             return "You’re using \(model.selectedModel.name). \(recommended.name) is recommended."
         }
@@ -214,13 +228,13 @@ struct OnboardingView: View {
     private var bottomBar: some View {
         HStack {
             if step == .welcome {
-                Button("Skip", action: finish)
+                Button("Skip", action: model.finishOnboarding)
             } else {
                 Button("Back") { go(to: OnboardingStep(rawValue: step.rawValue - 1)) }
             }
             Spacer()
             if step == .practice {
-                Button("Done", action: finish)
+                Button("Done", action: model.finishOnboarding)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
             } else {
@@ -250,6 +264,8 @@ struct OnboardingView: View {
         guard let target else { return }
         forward = target.rawValue > step.rawValue
         withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.45)) { step = target }
+        model.settings.onboardingStep = target.rawValue
+        model.saveSettings()
     }
 }
 

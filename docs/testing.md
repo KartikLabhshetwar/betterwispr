@@ -184,7 +184,14 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   side of the arrow, their Finder labels are readable, and the install line stays
   visible with Finder's path bar shown.
 - [ ] Drag BetterWispr to Applications and open it. The welcome guide appears once.
-  Quit and relaunch; the dashboard opens and the menu bar menu offers no way to replay it.
+  Quit on the model step and relaunch; the guide reopens on that step. Finish it,
+  quit and relaunch; the dashboard opens. Help > Show Welcome Guide replays it.
+- [ ] Upgrade from 0.1.0 after finishing its welcome guide. The dashboard opens and
+  `defaults read org.betterwispr.app onboardingCompleted` no longer finds the key.
+  Move the workspace folder aside and relaunch; the welcome guide appears.
+- [ ] In the welcome guide, download Parakeet TDT v3, then press ⌥ Space and Escape
+  while it downloads. The download continues, the percentage only rises, and the
+  model becomes active. Cancel a second download and retry it after a network drop.
 
 ## Recording, capsule and cancellation
 
@@ -301,7 +308,8 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   error instead of a stalled download or silent engine switch.
 - [ ] Using a disposable model copy, test a missing tokenizer file, truncated
   weights and failed/incomplete installation. Keep the working model untouched.
-- [ ] With Parakeet selected, download the phrase booster from Vocabulary. Verify
+- [ ] Install a Parakeet model and confirm the phrase booster arrives with it.
+  Delete only the booster folder, then download it from Vocabulary. Verify
   the progress state, the installed confirmation, and that a dictation with a
   listed name uses the listed spelling without relaunching. Cancel a booster
   download and confirm it is not reported as installed.

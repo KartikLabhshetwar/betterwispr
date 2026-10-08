@@ -4,17 +4,16 @@ import SwiftUI
 @main
 struct BetterWisprApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @AppStorage("onboardingCompleted") private var onboardingCompleted = false
 
     var body: some Scene {
         Window("BetterWispr", id: "dashboard") {
             ZStack {
-                if onboardingCompleted {
-                    DashboardView(model: delegate.model)
+                if delegate.model.needsOnboarding {
+                    OnboardingView(model: delegate.model)
+                        .windowChromeHidden()
                         .transition(.opacity)
                 } else {
-                    OnboardingView(model: delegate.model) { onboardingCompleted = true }
-                        .windowChromeHidden()
+                    DashboardView(model: delegate.model)
                         .transition(.opacity)
                 }
             }
@@ -23,7 +22,7 @@ struct BetterWisprApp: App {
                 delegate.model.refreshPermissions()
             }
             .frame(minWidth: 760, minHeight: 520)
-            .animation(.easeInOut(duration: 0.4), value: onboardingCompleted)
+            .animation(.easeInOut(duration: 0.4), value: delegate.model.needsOnboarding)
         }
         .defaultSize(width: 920, height: 680)
         .commands {
@@ -44,6 +43,9 @@ struct BetterWisprApp: App {
                     .keyboardShortcut(.escape, modifiers: [])
                     .disabled(!delegate.model.isBusy)
             }
+            CommandGroup(after: .help) {
+                WelcomeGuideButton(model: delegate.model)
+            }
         }
         MenuBarExtra {
             MenuContents(model: delegate.model)
@@ -58,6 +60,20 @@ struct BetterWisprApp: App {
                 }
             }
         }
+    }
+}
+
+private struct WelcomeGuideButton: View {
+    let model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Show Welcome Guide") {
+            model.showOnboarding()
+            openWindow(id: "dashboard")
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+        .disabled(model.needsOnboarding)
     }
 }
 

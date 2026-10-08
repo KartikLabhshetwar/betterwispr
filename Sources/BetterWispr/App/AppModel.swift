@@ -26,8 +26,22 @@ struct DictationFailure: Equatable {
     static let pasteBlocked = DictationFailure(title: "Copied, not pasted.", message: "Allow Accessibility so text lands at your cursor. Press ⌘V for now.", needsAccessibility: true)
 }
 
+struct ModelInstallation: Equatable {
+    let id: String
+    let token = UUID()
+    var progress = 0.0
+    var failure: String?
+
+    var progressLabel: String {
+        progress < 0.9 ? "Downloading… \(Int(progress / 0.9 * 100))%" : "Setting up on this Mac…"
+    }
+}
+
 @MainActor @Observable
 final class AppModel {
+    static let onboardingVersion = 1
+    static let phraseBoosterID = "phrase-booster"
+
     var selectedPage: AppPage = .overview
     var phase: RecordingPhase = .idle { didSet { onPresentationChange?() } }
     var statusMessage = ""
@@ -44,9 +58,7 @@ final class AppModel {
     var models: [SpeechModel] { SpeechModel.catalog + settings.speechConnections.map(\.speechModel) }
     let updater = AppUpdater()
     let meetings = MeetingModel()
-    var preparingModelID: String?
-    var downloadProgress: Double = 0
-    var isInstallingPhraseBooster = false
+    var installation: ModelInstallation?
     var phraseBoosterInstalled = false
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     var accessibilityGranted = AXIsProcessTrusted()
@@ -66,6 +78,7 @@ final class AppModel {
     @ObservationIgnored private var preparedModelID: String?
     @ObservationIgnored private var loading: (id: String, task: Task<Void, any Error>)?
     @ObservationIgnored private var operation: Task<Void, Never>?
+    @ObservationIgnored private var installTask: Task<Void, Never>?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var failureDismissal: Task<Void, Never>?
     @ObservationIgnored private var shortcutPressedAt: Date?
@@ -78,6 +91,8 @@ final class AppModel {
 
     var selectedModel: SpeechModel { models.first { $0.id == settings.selectedModelID } ?? models[0] }
     var isBusy: Bool { phase == .preparing || phase == .recording || phase == .transcribing }
+    var isInstalling: Bool { installation != nil && installation?.failure == nil }
+    var needsOnboarding: Bool { storageIsReadable && settings.completedOnboardingVersion < Self.onboardingVersion }
     var failure: DictationFailure? { if case .failed(let failure) = phase { failure } else { nil } }
     var totalWords: Int { history.reduce(0) { $0 + $1.wordCount } }
     var totalDuration: TimeInterval { history.reduce(0) { $0 + $1.duration } }
@@ -98,6 +113,7 @@ final class AppModel {
             storageIsReadable = false
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
+        migrateLegacyOnboarding()
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
         meetings.notesSettings = settings
@@ -178,7 +194,7 @@ final class AppModel {
         operation = Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.prepare(model, download: false)
+                try await self.prepare(model)
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
                 self.recorder.silenceThreshold = self.settings.silenceThreshold
@@ -290,41 +306,26 @@ final class AppModel {
         if let activeAudioURL { try? FileManager.default.removeItem(at: activeAudioURL) }
         activeAudioURL = nil
         // A cancelled preparation may leave a partially loaded provider; load cleanly next time.
-        if phase == .transcribing || isInstallingPhraseBooster || (preparedModelID == nil && loading == nil) {
+        if phase == .transcribing || (preparedModelID == nil && loading == nil) {
             provider = nil
             preparedModelID = nil
         }
-        preparingModelID = nil
-        isInstallingPhraseBooster = false
         voiceLevels = VoiceLevels()
         partialTranscript = ""
         phase = .idle
         statusMessage = "Cancelled."
-        refreshModels()
     }
 
-    private func prepare(_ model: SpeechModel, download: Bool) async throws {
+    private func prepare(_ model: SpeechModel) async throws {
         try model.connection?.validateLanguage(settings.language)
         if model.engine == .apple {
             try AppleSpeechProvider.checkAvailability(language: settings.language == "auto" ? nil : settings.language)
         }
         let token = generation
-        guard download else {
-            if preparedModelID != model.id || provider == nil { try await load(model).value }
-            try Task.checkCancellation()
-            guard generation == token, let provider else { throw CancellationError() }
-            observe(provider, token: token)
-            return
-        }
-        let next = model.makeProvider()
-        observe(next, token: token)
-        loading = nil
-        preparedModelID = nil
-        provider = next
-        try await next.prepare(model: model, download: true)
+        if preparedModelID != model.id || provider == nil { try await load(model).value }
         try Task.checkCancellation()
-        guard generation == token else { throw CancellationError() }
-        preparedModelID = model.id
+        guard generation == token, let provider else { throw CancellationError() }
+        observe(provider, token: token)
     }
 
     /// Loads an installed model once, sharing the in-flight load so a cancelled dictation never discards it.
@@ -351,78 +352,87 @@ final class AppModel {
     }
 
     private func observe(_ provider: any SpeechProvider, token: UUID) {
-        provider.onProgress = { [weak self] progress in
-            guard let self, self.generation == token else { return }
-            self.downloadProgress = progress
-        }
         provider.onPartialTranscript = { [weak self] text in
             guard let self, self.generation == token, self.phase == .transcribing else { return }
             self.partialTranscript = text
         }
     }
 
+    /// Downloads a local model beside dictation, then switches to it unless the user chose another model meanwhile.
     func installModel(_ model: SpeechModel) {
-        guard !isBusy, model.engine != .api else { return }
-        let token = UUID()
-        generation = token
-        preparingModelID = model.id
-        downloadProgress = 0
-        phase = .preparing
-        statusMessage = "Downloading \(model.name)…"
-        operation = Task { [weak self] in
+        guard !isInstalling, model.engine == .parakeet || model.engine == .whisperKit else { return }
+        let installer = model.makeProvider()
+        let selection = settings.selectedModelID
+        install(id: model.id, name: model.name) { report in
+            installer.onProgress = report
+            try await installer.prepare(model: model, download: true)
+        } completion: { [weak self] in
             guard let self else { return }
-            do {
-                try await self.prepare(model, download: true)
-                guard self.generation == token else { return }
-                self.refreshModels()
-                self.settings.selectedModelID = model.id
-                self.preparingModelID = nil
-                self.phase = .idle
-                self.statusMessage = "\(model.name) is ready for offline dictation."
-                self.saveSettings()
-            } catch {
-                guard self.generation == token else { return }
-                self.preparingModelID = nil
-                self.fail(DictationFailure(title: "Couldn’t prepare \(model.name).", message: error.localizedDescription))
+            installer.onProgress = nil
+            let boosterNote = model.engine == .parakeet && !self.phraseBoosterInstalled
+                ? " The phrase booster didn’t download. Get it in Vocabulary." : ""
+            if self.settings.selectedModelID == selection, !self.isBusy {
+                self.selectModel(model, prepared: installer)
+                self.statusMessage = "\(model.name) is ready for offline dictation.\(boosterNote)"
+            } else {
+                self.statusMessage = "\(model.name) is installed. Choose Use in Models to switch to it.\(boosterNote)"
             }
         }
     }
 
     func installPhraseBooster() {
-        guard !isBusy, selectedModel.engine == .parakeet else { return }
-        let token = UUID()
-        generation = token
-        isInstallingPhraseBooster = true
-        downloadProgress = 0
-        phase = .preparing
-        statusMessage = "Downloading the phrase booster…"
-        operation = Task { [weak self] in
-            guard let self else { return }
+        guard !isInstalling else { return }
+        install(id: Self.phraseBoosterID, name: "the phrase booster") { report in
+            try await ParakeetProvider.installPhraseBooster { fraction in Task { @MainActor in report(fraction * 0.9) } }
+        } completion: { [weak self] in
+            self?.statusMessage = "Parakeet now uses your vocabulary to spell names and terms."
+        }
+    }
+
+    func cancelInstallation() {
+        installTask?.cancel()
+        installTask = nil
+        installation = nil
+        statusMessage = "Download cancelled."
+    }
+
+    private func install(
+        id: String, name: String,
+        _ work: @escaping @MainActor (_ report: @escaping @MainActor @Sendable (Double) -> Void) async throws -> Void,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        let next = ModelInstallation(id: id)
+        installation = next
+        statusMessage = "Downloading \(name)…"
+        let report: @MainActor @Sendable (Double) -> Void = { [weak self] progress in
+            guard let self, self.installation?.token == next.token else { return }
+            self.installation?.progress = max(self.installation?.progress ?? 0, min(1, progress))
+        }
+        installTask = Task { [weak self] in
             do {
-                try? await self.loading?.task.value
-                let booster = self.provider as? ParakeetProvider ?? ParakeetProvider()
-                self.observe(booster, token: token)
-                try await booster.installPhraseBooster()
-                guard self.generation == token else { return }
-                self.isInstallingPhraseBooster = false
+                try await work(report)
+                guard let self, self.installation?.token == next.token else { return }
+                self.installation = nil
+                self.installTask = nil
                 self.refreshModels()
-                self.phase = .idle
-                self.statusMessage = "Parakeet now uses your vocabulary to spell names and terms."
+                completion()
             } catch {
-                guard self.generation == token else { return }
-                self.isInstallingPhraseBooster = false
-                self.fail(DictationFailure(title: "Couldn’t download the phrase booster.", message: error.localizedDescription))
+                guard let self, self.installation?.token == next.token else { return }
+                self.installTask = nil
+                self.refreshModels()
+                self.installation?.failure = error.localizedDescription
+                self.statusMessage = "Couldn’t download \(name): \(error.localizedDescription)"
             }
         }
     }
 
-    func selectModel(_ model: SpeechModel) {
+    func selectModel(_ model: SpeechModel, prepared: (any SpeechProvider)? = nil) {
         guard !isBusy else { return }
         settings.selectedModelID = model.id
         provider?.cancel()
         loading?.task.cancel()
-        provider = nil
-        preparedModelID = nil
+        provider = prepared
+        preparedModelID = prepared == nil ? nil : model.id
         loading = nil
         saveSettings()
         warmUpSelectedModel()
@@ -598,6 +608,31 @@ final class AppModel {
             vocabulary = previous
             ToastWindow.shared.show(Toast(failure: "Couldn’t delete word", error))
         }
+    }
+
+    func finishOnboarding() {
+        settings.completedOnboardingVersion = Self.onboardingVersion
+        settings.onboardingStep = 0
+        saveSettings()
+    }
+
+    func showOnboarding() {
+        settings.completedOnboardingVersion = 0
+        settings.onboardingStep = 0
+        saveSettings()
+    }
+
+    /// Moves 0.1.0's UserDefaults flag into the workspace, honouring it only while that workspace still exists.
+    private func migrateLegacyOnboarding() {
+        let key = "onboardingCompleted"
+        let defaults = UserDefaults.standard
+        guard storageIsReadable, defaults.object(forKey: key) != nil else { return }
+        if defaults.bool(forKey: key), settings.completedOnboardingVersion == 0,
+           FileManager.default.fileExists(atPath: store.stateURL.path) {
+            settings.completedOnboardingVersion = Self.onboardingVersion
+            guard (try? persist()) != nil else { return }
+        }
+        defaults.removeObject(forKey: key)
     }
 
     func saveSettings() {

@@ -174,7 +174,9 @@ Add an entry to `SpeechModel.catalog` in
 [`SpeechProvider.swift`](../Sources/BetterWisprCore/Speech/SpeechProvider.swift).
 Use a stable ID, a compatible Core ML model folder name, the correct tokenizer
 repository, an honest resource description and `.whisperKit` as its engine. Parakeet
-entries use `.parakeet` and a `modelName` that `ParakeetProvider.version(for:)` maps.
+entries use `.parakeet` and a `modelName` that `ParakeetProvider.source(for:)` maps
+to a FluidAudio version, repository and download size. The `modelName` must equal
+the repository's `folderName`, because FluidAudio loads files from that folder.
 Model IDs are persisted, so renaming/removing one requires a fallback or migration.
 
 Verify that the model/tokenizer match before presenting the entry as supported.
@@ -245,8 +247,10 @@ when no language is supplied. WhisperKit uses locally loaded Core ML weights and
 tokenizers. Its tokenizer adapter exists because the upstream public loader can
 fall back to the network; see [source attribution](oss-reuse.md).
 
-Parakeet's optional phrase booster is FluidAudio's CTC word-spotting model. It
-downloads only from the Vocabulary page or `--download-phrase-booster`, into
+Parakeet's phrase booster is FluidAudio's CTC word-spotting model. It downloads
+with each explicit Parakeet install, in parallel with the model, or from the
+Vocabulary page or `--download-phrase-booster`. A failed booster download leaves
+the model installed. It goes into
 FluidAudio's shared cache (`CtcModels.defaultCacheDirectory(for: .ctc110m)`),
 because FluidAudio reads the booster's tokenizer from that fixed folder. A
 `.betterwispr-installed` marker is written after the files load. `prepare`

@@ -4,6 +4,23 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [0.1.1] - 2026-10-08
+
+### Added
+- More local models in Models: Parakeet Ultra (a further-trained TDT v3 with punctuation), Parakeet TDT-CTC 110M (a small English model), Parakeet Japanese, Whisper Large v3 Turbo (compressed) and Whisper Small. Each downloads only when you choose Download.
+- Help > Show Welcome Guide replays the welcome guide.
+- `BetterWisprCLI --download-model` shows install progress.
+
+### Changed
+- Parakeet installs fetch the model in one pass instead of one pass per file, and the phrase booster downloads alongside it by default. Model sizes in Models include the booster, which downloads once and is shared by every Parakeet model. If the booster download fails, the model still installs and Vocabulary offers it again.
+- Model downloads run separately from dictation. You can dictate with the current model while another downloads, and When it finishes, BetterWispr switches to the new model, unless you picked a different one meanwhile or are mid-dictation.
+- Download progress only moves forward and covers the whole install, from the download to setup on this Mac. Models, the welcome guide and Vocabulary offer Cancel during a download and Retry after a failure.
+- The welcome guide's completion is saved with your workspace and versioned, so a reset workspace shows the guide again. Quitting midway reopens the guide on the same step. The 0.1.0 preference flag is migrated once and then removed.
+
+### Fixed
+- The welcome guide's speech model download no longer stops when Escape, the capsule, the menu or a shortcut release cancels dictation, and a failed download now shows its error in the guide.
+- Parakeet Japanese never applies the English phrase booster.
+
 ## [0.1.0] - 2026-10-08
 
 ### Added

@@ -56,6 +56,8 @@ import Testing
     pro.modelID = "pulse-pro"
     #expect(throws: SpeechAPIError.self) { try pro.validateLanguage("hi") }
     try pro.validateLanguage("en")
+    #expect(throws: SpeechAPIError.self) { try SpeechConnection(api: .smallest).validateLanguage("ar") }
+    try SpeechConnection(api: .smallest).validateLanguage("hi")
 
     let custom = try APISpeechProvider.request(SpeechConnection(api: .openAICompatible), key: "", wav: wav, language: nil)
     #expect(custom.value(forHTTPHeaderField: "Authorization") == nil)

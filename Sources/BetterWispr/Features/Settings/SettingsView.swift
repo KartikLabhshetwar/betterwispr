@@ -24,17 +24,7 @@ struct SettingsView: View {
                 .disabled(model.isBusy)
                 Picker(selection: setting(\.language)) {
                     Text(model.selectedModel.engine == .apple ? "System language" : "Detect automatically").tag("auto")
-                    Text("English").tag("en")
-                    Text("Hindi").tag("hi")
-                    Text("Spanish").tag("es")
-                    Text("French").tag("fr")
-                    Text("German").tag("de")
-                    Text("Italian").tag("it")
-                    Text("Portuguese").tag("pt")
-                    Text("Japanese").tag("ja")
-                    Text("Korean").tag("ko")
-                    Text("Chinese").tag("zh")
-                    Text("Arabic").tag("ar")
+                    ForEach(Self.spokenLanguages, id: \.code) { Text($0.name).tag($0.code) }
                 } label: {
                     Text("Spoken language")
                     Text("Choose a language for more consistent recognition.")
@@ -102,6 +92,13 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .toggleStyle(.switch)
     }
+
+    static let spokenLanguages = [
+        (code: "en", name: "English"), (code: "hi", name: "Hindi"), (code: "es", name: "Spanish"),
+        (code: "fr", name: "French"), (code: "de", name: "German"), (code: "it", name: "Italian"),
+        (code: "pt", name: "Portuguese"), (code: "ja", name: "Japanese"), (code: "ko", name: "Korean"),
+        (code: "zh", name: "Chinese"), (code: "ar", name: "Arabic"),
+    ]
 
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {
         Binding(

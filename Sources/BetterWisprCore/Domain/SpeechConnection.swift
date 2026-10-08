@@ -87,7 +87,11 @@ public struct SpeechConnection: Identifiable, Codable, Equatable, Hashable, Send
         let code = language.flatMap { $0 == "auto" ? nil : Locale(identifier: $0).language.languageCode?.identifier }
         if api == .smallest {
             guard let code else {
-                throw SpeechAPIError.configuration("Choose a spoken language in Settings for Smallest AI. This connection requires an explicit language.")
+                throw SpeechAPIError.configuration("Smallest AI needs a specific spoken language. Open Settings and change Spoken language from Detect automatically to English, Hindi or another language.")
+            }
+            let supported = ["en", "hi", "zh", "ko", "ja", "yue", "ms", "id", "tl", "it", "es", "pt", "de", "fr", "uk", "ru", "pl", "cs", "sk", "nl", "lv", "et", "ro", "fi", "sv", "bg", "hu", "da", "lt", "mt", "kn", "ml", "mr", "gu", "te", "or", "bn", "pa", "ta"]
+            guard supported.contains(code) else {
+                throw SpeechAPIError.configuration("Smallest AI does not support the selected language. Open Settings and choose a supported Spoken language.")
             }
             if modelID == "pulse-pro", code != "en" {
                 throw SpeechAPIError.configuration("Pulse Pro requires English. Choose English in Settings or use the pulse model.")

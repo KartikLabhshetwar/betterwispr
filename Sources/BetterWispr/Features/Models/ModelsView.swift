@@ -171,7 +171,13 @@ private struct SpeechConnectionEditor: View {
     @State private var key = ""
     @State private var removeKey = false
     @State private var error: String?
+    @State private var language: String?
     @Environment(\.dismiss) private var dismiss
+
+    private var spokenLanguage: Binding<String> {
+        Binding(get: { language ?? ((try? connection.validateLanguage(model.settings.language)) == nil ? "en" : model.settings.language) },
+                set: { language = $0 })
+    }
 
     private var original: SpeechConnection? { (forNotes ? model.settings.notesConnections : model.settings.speechConnections).first { $0.id == connection.id } }
     private var canKeepKey: Bool { original?.keychainAccount == connection.keychainAccount }
@@ -202,7 +208,12 @@ private struct SpeechConnectionEditor: View {
                         Toggle("Use without an API key", isOn: $removeKey)
                     }
                     if connection.api == .smallest {
-                        Text("Use pulse for multilingual speech or pulse-pro for English. Choose a spoken language in Settings; automatic detection is not configured for this connection.")
+                        Picker("Spoken language", selection: spokenLanguage) {
+                            ForEach(SettingsView.spokenLanguages.filter { (try? connection.validateLanguage($0.code)) != nil }, id: \.code) {
+                                Text($0.name).tag($0.code)
+                            }
+                        }
+                        Text("Smallest AI can’t detect the language automatically. Saving sets Spoken language in Settings, which every model uses. Use pulse for multilingual speech or pulse-pro for English.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 } header: {
@@ -231,6 +242,7 @@ private struct SpeechConnectionEditor: View {
             key = ""
             removeKey = false
             error = nil
+            language = nil
         }
     }
 
@@ -239,8 +251,14 @@ private struct SpeechConnectionEditor: View {
         connection.endpoint = connection.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
         connection.modelID = connection.modelID.trimmingCharacters(in: .whitespacesAndNewlines)
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = spokenLanguage.wrappedValue
         do {
+            if connection.api == .smallest { try connection.validateLanguage(language) }
             try model.saveConnection(connection, key: removeKey ? "" : key.isEmpty && canKeepKey ? nil : key, forNotes: forNotes)
+            if connection.api == .smallest, model.settings.language != language {
+                model.settings.language = language
+                model.saveSettings()
+            }
             dismiss()
         } catch { self.error = error.localizedDescription }
     }

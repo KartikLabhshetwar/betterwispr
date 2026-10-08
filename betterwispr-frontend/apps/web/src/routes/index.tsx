@@ -1,18 +1,9 @@
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  ClockCounterClockwiseIcon,
-  CpuIcon,
-  CursorTextIcon,
-  MicrophoneIcon,
-  ShieldCheckIcon,
-  TextAaIcon,
-  type Icon,
-} from "@phosphor-icons/react";
+import { ArrowRightIcon, CheckIcon } from "@phosphor-icons/react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import DownloadCTA, { ClosingCTA } from "@/components/download-cta";
 import HeroDemo from "@/components/hero-demo";
+import FeatureBento from "@/components/feature-bento";
 import { comparisons } from "@/lib/comparisons";
 import { pageHead } from "@/lib/seo";
 
@@ -25,39 +16,6 @@ export const Route = createFileRoute("/")({
       "/",
     ),
 });
-
-const FEATURES: { icon: Icon; title: string; body: string }[] = [
-  {
-    icon: ShieldCheckIcon,
-    title: "Stays on your Mac",
-    body: "Speech is transcribed by models running on your Mac. There is no account, no API key and no cloud fallback.",
-  },
-  {
-    icon: MicrophoneIcon,
-    title: "Hold to talk",
-    body: "Hold ⌥ Space while you speak and release to finish. Prefer a toggle? Switch to press to toggle in Settings.",
-  },
-  {
-    icon: CursorTextIcon,
-    title: "Types where you were",
-    body: "The text is pasted into the app you were using. If automatic paste is blocked, retrieve the transcript from the dashboard and copy it yourself.",
-  },
-  {
-    icon: CpuIcon,
-    title: "Models you choose",
-    body: "Apple speech, Parakeet TDT v3 for 25 European languages, or Whisper Large v3 Turbo. Download once, then work offline.",
-  },
-  {
-    icon: TextAaIcon,
-    title: "Your vocabulary",
-    body: "Add names and terms as hints, and set replacements so the words you use come out the way you spell them.",
-  },
-  {
-    icon: ClockCounterClockwiseIcon,
-    title: "History you control",
-    body: "Dictations are kept locally with both the raw and the corrected text. Turn history off whenever you like.",
-  },
-];
 
 const FAQS = [
   [
@@ -143,17 +101,7 @@ function HomeComponent() {
         >
           Speak instead of typing, in any app on your Mac
         </h2>
-        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-200 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map(({ icon: FeatureIcon, title, body }) => (
-            <div key={title} className="bg-white p-8">
-              <FeatureIcon className="size-5 text-zinc-900" />
-              <h3 className="mt-4 text-base font-medium text-zinc-900">
-                {title}
-              </h3>
-              <p className="mt-2 text-sm text-zinc-500">{body}</p>
-            </div>
-          ))}
-        </div>
+        <FeatureBento />
       </section>
 
       <section

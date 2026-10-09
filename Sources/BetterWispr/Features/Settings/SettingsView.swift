@@ -65,6 +65,10 @@ struct SettingsView: View {
                         .fixedSize()
                     }
                     RowDivider()
+                    SettingRow("Vocabulary", caption: vocabularyCaption) {
+                        Button("Open Vocabulary") { model.selectedPage = .vocabulary }
+                    }
+                    RowDivider()
                     SettingRow("Input sensitivity", caption: "Lower filters help quiet voices but let more background noise through.") {
                         Picker("Input sensitivity", selection: setting(\.silenceThreshold)) {
                             Text("Standard").tag(Float(0.002))
@@ -149,6 +153,15 @@ struct SettingsView: View {
         guard current != "auto", !choices.contains(where: { $0.code == current }) else { return choices }
         let name = Locale.current.localizedString(forLanguageCode: current) ?? current
         return choices + [(code: current, name: "\(name) (not supported by \(selected.name))")]
+    }
+
+    private var vocabularyCaption: String {
+        guard model.selectedModel.engine == .parakeet else {
+            return "Add the names and terms you say often so they’re written your way."
+        }
+        return model.phraseBoosterInstalled
+            ? "Add the names and terms you say often. When you speak English, the phrase booster listens for them and fixes their spelling."
+            : "Add the names and terms you say often, then download the phrase booster there so Parakeet listens for them. About 100 MB, runs on this Mac."
     }
 
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {

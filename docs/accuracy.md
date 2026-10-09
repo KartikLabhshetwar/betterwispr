@@ -242,6 +242,45 @@ fluent speech that looks like a restart. It is not part of the app. Shipping it
 would need a deletion check measured on both sets, an explicit model download
 and a native runtime.
 
+## Accented conversational English, 2026-10-10
+
+Measured on the same Mac with a release build of `BetterWisprCLI` from commit
+cd8e2ca and Light cleanup. The corpus is 300 segments of
+[EdAcc](https://huggingface.co/datasets/edinburghcstr/edacc) fetched by
+`scripts/fetch_bench_corpus.py --accents`: 100 evenly spaced segments per accent
+from the validation and test splits, each with at least four words, skipping
+segments marked as overlapping, foreign, DTMF or no speech. Tags and the fillers
+um, uh, er, hmm and mm are removed from the reference. Segments run 0.5 to 52 s,
+4.6 s at the median. This is unscripted video-call conversation with verbatim
+references, not dictation, and each accent has few speakers.
+
+| Accent | Speakers | Reference words | v3 | v3, Light | v2 | v2, Light | 110M | 110M, Light |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Indian English | 5 | 1751 | 14.51% | 13.65% | 14.45% | 14.85% | 15.71% | 17.13% |
+| Nigerian English | 3 | 2186 | 16.42% | 17.98% | 16.70% | 18.98% | 22.00% | 24.34% |
+| Mainstream US English | 16 | 1895 | 16.78% | 14.83% | 17.68% | 17.52% | 16.89% | 18.36% |
+| All | 24 | 5832 | 15.96% | 15.66% | 16.34% | 17.27% | 18.45% | 20.23% |
+
+- Bootstrap 95% intervals over clips put v2 minus v3 between -0.7 and +1.4
+  points overall and across zero for every accent, so this corpus does not
+  separate the two. 110M minus v3 is +1.2 to +3.8 points overall and +3.8 to +7.5
+  points on Nigerian English.
+- Speakers vary more than accents. Among speakers with more than one segment,
+  v3 WER runs from 12.7% to 19.8% for Indian English, 8.0% to 18.0% for Nigerian
+  English and 10.0% to 32.5% for US English.
+- WER is six to seven times the LibriSpeech figure above for every accent, including
+  US English, so conversational speech rather than accent drives most of it.
+- With v3, Light cleanup lowered errors on 74 segments by 135 and raised them on
+  51 by 117. Most rises are removals of "you know", stutters and repeated words
+  that the verbatim reference keeps, which is the intended dictation behavior.
+  One is not: "drinking more and more and more" became "drinking more and more".
+- Real misrecognitions are mostly similar-sounding words, such as pick for speak,
+  pocket for bucket, frames for flames and globe for club, and are most frequent
+  in Nigerian English.
+- Recognition p50 / p95 was 0.042 s / 0.118 s for v3, 0.041 s / 0.074 s for v2
+  and 0.016 s / 0.040 s for 110M. Preparing each model took 4 to 22 s on the
+  first load after the rebuild and 0.20 to 0.26 s when run again.
+
 ## Reproducible evaluation
 
 Create a consented local corpus of natural 3–30 second dictation clips, with a
@@ -263,10 +302,12 @@ UTF-8 JSON object per line:
 ```
 
 `BetterWisprCLI --bench` writes these lines for a manifest of clips, and
-`scripts/fetch_bench_corpus.py` builds the read-speech manifest used above.
+`scripts/fetch_bench_corpus.py` builds the read-speech manifest used above, or
+with `--accents` the EdAcc manifest.
 
 ```sh
 python3 -I scripts/fetch_bench_corpus.py /tmp/bench 40
+python3 -I scripts/fetch_bench_corpus.py /tmp/accents 100 --accents
 swift build -c release --product BetterWisprCLI
 .build/release/BetterWisprCLI --bench /tmp/bench/manifest.jsonl --model parakeet-v3 > results.jsonl
 python3 scripts/evaluate_transcripts.py results.jsonl --group language

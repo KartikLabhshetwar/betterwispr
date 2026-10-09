@@ -82,7 +82,7 @@ struct VocabularyView: View {
     private var phraseBoosterSection: some View {
         Section {
             if model.phraseBoosterInstalled {
-                Label("Phrase booster is on. Parakeet checks the spelling of these words on this Mac.", systemImage: "checkmark.circle")
+                Label("Phrase booster is on. When you speak English, it listens for these words and fixes the spelling where your voice matches one. It runs on this Mac.", systemImage: "checkmark.circle")
                     .foregroundStyle(.secondary)
             } else {
                 let installation = model.installation?.id == AppModel.phraseBoosterID ? model.installation : nil

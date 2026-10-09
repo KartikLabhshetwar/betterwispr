@@ -18,31 +18,31 @@ SOURCES = [
     ("pl", "facebook/multilingual_librispeech", "polish", "test", 520, "transcript"),
 ]
 
-def rows(dataset, config, split, offset, length, where=None):
-    params = {"dataset": dataset, "config": config, "split": split, "offset": offset, "length": length}
-    query = urllib.parse.urlencode(params | ({"where": where} if where else {}))
+def rows(dataset, config, split, offset, length):
+    query = urllib.parse.urlencode({"dataset": dataset, "config": config, "split": split, "offset": offset, "length": length})
     for attempt in range(8):
         try:
-            with urllib.request.urlopen(f"https://datasets-server.huggingface.co/{'filter' if where else 'rows'}?{query}", timeout=120) as r:
+            with urllib.request.urlopen(f"https://datasets-server.huggingface.co/rows?{query}", timeout=120) as r:
                 return json.load(r)["rows"]
         except (urllib.error.HTTPError, TimeoutError) as error:
             if getattr(error, "code", 503) not in (429, 500, 502, 503, 504) or attempt == 7:
                 raise
             time.sleep(15 * (attempt + 1))
 
-def edacc(accent):
-    """Evenly spaced EdAcc segments of one accent with at least four scorable words, fillers and noise tags removed."""
-    usable = []
+def edacc():
+    """Evenly spaced EdAcc segments per accent with at least four scorable words, fillers and noise tags removed."""
+    usable = {accent: [] for _, accent in ACCENTS}
     for split in ("validation", "test"):
         offset = 0
-        while batch := rows("edinburghcstr/edacc", "default", split, offset, 100, f"\"accent\"='{accent}'"):
-            for i, item in enumerate(batch):
-                words = re.sub(r"<[^>]+>|\b(?:UM|UH|ER|HMM|MM)\b", " ", item["row"]["text"]).split()
-                if not UNSCORABLE.search(item["row"]["text"]) and len(words) >= 4:
-                    usable.append((f"{split[0]}{offset + i:05d}", item["row"], " ".join(words)))
+        while batch := rows("edinburghcstr/edacc", "default", split, offset, 100):
+            for item in batch:
+                row = item["row"]
+                words = re.sub(r"<[^>]+>|\b(?:UM|UH|ER|HMM|MM)\b", " ", row["text"]).split()
+                if row["accent"] in usable and not UNSCORABLE.search(row["text"]) and len(words) >= 4:
+                    usable[row["accent"]].append((f"{split[0]}{item['row_idx']:05d}", row, " ".join(words)))
             offset += 100
-            time.sleep(2)
-    return usable[::max(1, len(usable) // PER_LANG)][:PER_LANG]
+            time.sleep(1)
+    return {accent: found[::max(1, len(found) // PER_LANG)][:PER_LANG] for accent, found in usable.items()}
 
 def save(clip_id, language, audio, reference):
     src = OUT / f"{clip_id}.src"
@@ -56,8 +56,9 @@ def save(clip_id, language, audio, reference):
 
 manifest = []
 if "--accents" in sys.argv:
+    picked = edacc()
     for language, accent in ACCENTS:
-        for key, row, reference in edacc(accent):
+        for key, row, reference in picked[accent]:
             save(f"{language}-{key}", language, row["audio"][0]["src"], reference)
 else:
     for lang, dataset, config, split, total, field in SOURCES:

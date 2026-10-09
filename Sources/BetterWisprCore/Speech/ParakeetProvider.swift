@@ -16,6 +16,7 @@ public final class ParakeetProvider: SpeechProvider {
     private var boostingSession: (terms: [String], session: VocabularyBoostingSession)?
 
     nonisolated static let maximumBoostingTerms = ContextBiasingConstants.extraLargeVocabThreshold
+    nonisolated static let boostingMinSimilarity: Float = 0.65
 
     public init(modelsDirectory: URL = WhisperKitProvider.defaultModelsDirectory) {
         self.modelsDirectory = modelsDirectory
@@ -69,11 +70,18 @@ public final class ParakeetProvider: SpeechProvider {
         return terms
     }
 
+    nonisolated static func alreadySaysTerm(_ replacement: (original: String, replacement: String)) -> Bool {
+        let key = { (text: String) in text.lowercased().filter { $0.isLetter || $0.isNumber } }
+        let spoken = key(replacement.original)
+        let term = key(replacement.replacement)
+        return !term.isEmpty && spoken != term && spoken.contains(term)
+    }
+
     nonisolated static func restoringPunctuation(original: String, rescored: String, replacements: [(original: String, replacement: String)]) -> String {
         let originalWords = original.split(separator: " ")
         let rescoredWords = rescored.split(separator: " ")
         let spans = replacements
-            .map { (original: $0.original.split(separator: " "), replacement: $0.replacement.split(separator: " ")) }
+            .map { (original: $0.original.split(separator: " "), replacement: $0.replacement.split(separator: " "), keepsOriginal: alreadySaysTerm($0)) }
             .filter { !$0.original.isEmpty && !$0.replacement.isEmpty }
         var words: [String] = []
         var originalIndex = 0
@@ -82,14 +90,18 @@ public final class ParakeetProvider: SpeechProvider {
             if let span = spans.first(where: {
                 originalWords[originalIndex...].starts(with: $0.original) && rescoredWords[rescoredIndex...].starts(with: $0.replacement)
             }) {
-                let first = originalWords[originalIndex]
-                let last = originalWords[originalIndex + span.original.count - 1]
-                let leading = first.firstIndex { $0.isLetter || $0.isNumber }.map { String(first[..<$0]) } ?? ""
-                let trailing = last.lastIndex { $0.isLetter || $0.isNumber }.map { String(last[last.index(after: $0)...]) } ?? ""
-                var replaced = span.replacement.map(String.init)
-                if !replaced[0].hasPrefix(leading) { replaced[0] = leading + replaced[0] }
-                if !replaced[replaced.count - 1].hasSuffix(trailing) { replaced[replaced.count - 1] += trailing }
-                words += replaced
+                if span.keepsOriginal {
+                    words += span.original.map(String.init)
+                } else {
+                    let first = originalWords[originalIndex]
+                    let last = originalWords[originalIndex + span.original.count - 1]
+                    let leading = first.firstIndex { $0.isLetter || $0.isNumber }.map { String(first[..<$0]) } ?? ""
+                    let trailing = last.lastIndex { $0.isLetter || $0.isNumber }.map { String(last[last.index(after: $0)...]) } ?? ""
+                    var replaced = span.replacement.map(String.init)
+                    if !replaced[0].hasPrefix(leading) { replaced[0] = leading + replaced[0] }
+                    if !replaced[replaced.count - 1].hasSuffix(trailing) { replaced[replaced.count - 1] += trailing }
+                    words += replaced
+                }
                 originalIndex += span.original.count
                 rescoredIndex += span.replacement.count
             } else if originalWords[originalIndex] == rescoredWords[rescoredIndex] {
@@ -222,7 +234,7 @@ public final class ParakeetProvider: SpeechProvider {
         await loadPhraseBoosterIfInstalled()
         guard let phraseBooster else { return nil }
         if let boostingSession, boostingSession.terms == terms { return boostingSession.session }
-        let vocabulary = CustomVocabularyContext(terms: terms.map { CustomVocabularyTerm(text: $0) })
+        let vocabulary = CustomVocabularyContext(terms: terms.map { CustomVocabularyTerm(text: $0) }, minSimilarity: Self.boostingMinSimilarity)
         guard let session = try? await VocabularyBoostingSession(vocabulary: vocabulary, ctcModels: phraseBooster, config: VocabularyBoostingSession.itnDefaultConfig) else { return nil }
         boostingSession = (terms, session)
         return session
@@ -244,7 +256,7 @@ public final class ParakeetProvider: SpeechProvider {
             item.shouldReplace ? item.replacementWord.map { (original: item.originalWord, replacement: $0) } : nil
         }
         return (restoringPunctuation(original: result.text, rescored: rescored.text, replacements: replacements),
-                replacements.count { $0.original != $0.replacement })
+                replacements.count { $0.original != $0.replacement && !alreadySaysTerm($0) })
     }
 }
 

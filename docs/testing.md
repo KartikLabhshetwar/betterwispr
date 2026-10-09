@@ -404,6 +404,36 @@ Downloads happen before the restricted process. Test audio is not committed to
 the repository. `sandbox-exec` is a macOS development verification tool, not the
 app's runtime sandbox or a cross-platform test dependency.
 
+## Phrase booster validation record, 2026-10-10
+
+Environment: Apple M5, macOS 26.6.2 (25G83), debug app bundle from the working
+tree on top of 836452d, Parakeet TDT v3 with the phrase booster installed,
+English, Light cleanup, Left Option hold-to-talk, MacBook Pro microphone and
+speakers.
+
+- `swift build`, `swift test` (98 tests) and `python3 Tests/evaluate_check.py`
+  passed. With the guard for widened replacements disabled,
+  `boostedReplacementsNeverSwallowNeighbouringWords` failed.
+- The running build was quit and the rebuilt bundle launched. Vocabulary showed
+  "Phrase booster is on", and "Supabase" and "Vercel" were added through the
+  Add a Word form.
+- With an empty TextEdit document focused, a script held Left Option, played
+  "We deploy the frontend on Vercel and keep the data in Supabase." through the
+  speakers with `say -v Samantha` and released. TextEdit received "We deploy the
+  front and on Vercel and keep the data in Supabase." about 0.7 s after the
+  release, and the history entry recorded 2 vocabulary fixes. The clipboard held
+  the dictation briefly, then matched the earlier image clipboard byte for byte
+  1.5 s later.
+- "We should render the page before the release and say thanks to everyone."
+  was pasted unchanged with 0 vocabulary fixes, and the clipboard was restored.
+- Holding Left Option, speaking, then pressing Escape in BetterWispr showed
+  "Transcript cancelled" with Undo. Nothing reached TextEdit within 7 s, no
+  history entry was added and the clipboard was unchanged.
+- **Not exercised:** a human voice at the microphone, Bluetooth headsets,
+  non-English live dictation, Undo after cancellation, switching apps during
+  transcription, and the network-denied run with the new floor. Synthetic
+  speech played through speakers is not a measure of accuracy.
+
 ## Automated checks
 
 ```sh

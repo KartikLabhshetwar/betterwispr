@@ -19,7 +19,7 @@ func run() async throws {
           --download-model MODEL_ID
           --download-phrase-booster
           --transcribe-file PATH [--model MODEL_ID] [--language en] [--vocabulary "Term,Other term"]
-          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--cleanup light|medium] [--notes-model OLLAMA_MODEL]
+          --bench MANIFEST.jsonl [--model MODEL_ID] [--language auto|en] [--vocabulary "Term,Other term"] [--cleanup light|medium] [--notes-model OLLAMA_MODEL]
             Each manifest line is {"id", "language", "audio", "reference"}. Prints one JSON line per clip
             with the hypothesis and recognition seconds. Without --language, each clip uses its own language.
             --cleanup adds the app's cleanup of English text; medium edits with Apple's on-device model
@@ -76,6 +76,7 @@ func run() async throws {
     }
     try await provider.prepare(model: model, download: options["--download-model"] != nil)
     FileHandle.standardError.write(Data("Prepared \(model.name) in \(started.duration(to: clock.now)).\n".utf8))
+    let vocabulary = options["--vocabulary"].map { $0.split(separator: ",").map(String.init) } ?? []
     if let path = options["--bench"] {
         guard let cleanup = CleanupLevel(rawValue: options["--cleanup"] ?? "none") else {
             throw CLIError.usage("--cleanup must be light or medium.")
@@ -84,11 +85,10 @@ func run() async throws {
         settings.cleanup = cleanup
         settings.notesModel = options["--notes-model"]
         try await bench(manifest: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), provider: provider,
-                        language: options["--language"], settings: settings)
+                        language: options["--language"], vocabulary: vocabulary, settings: settings)
     } else if let path = options["--transcribe-file"] {
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         let language = options["--language"].flatMap { $0 == "auto" ? nil : $0 }
-        let vocabulary = options["--vocabulary"].map { $0.split(separator: ",").map(String.init) } ?? []
         let transcript = try await provider.transcribe(audioURL: url, language: language, vocabulary: vocabulary)
         print(transcript)
         FileHandle.standardError.write(Data("Completed in \(started.duration(to: clock.now)).\n".utf8))
@@ -116,7 +116,7 @@ struct BenchResult: Codable {
 
 /// Transcribes every manifest clip with the prepared provider, one JSON line per clip on stdout.
 @MainActor
-func bench(manifest: URL, provider: any SpeechProvider, language: String?, settings: AppSettings) async throws {
+func bench(manifest: URL, provider: any SpeechProvider, language: String?, vocabulary: [String], settings: AppSettings) async throws {
     let decoder = JSONDecoder()
     let encoder = JSONEncoder()
     encoder.outputFormatting = .withoutEscapingSlashes
@@ -125,7 +125,7 @@ func bench(manifest: URL, provider: any SpeechProvider, language: String?, setti
         let clip = try decoder.decode(BenchClip.self, from: Data(line.utf8))
         let spoken = (language ?? clip.language) == "auto" ? nil : language ?? clip.language
         let started = clock.now
-        let hypothesis = try await provider.transcribe(audioURL: URL(fileURLWithPath: clip.audio), language: spoken, vocabulary: [])
+        let hypothesis = try await provider.transcribe(audioURL: URL(fileURLWithPath: clip.audio), language: spoken, vocabulary: vocabulary)
         var result = BenchResult(id: clip.id, language: clip.language, reference: clip.reference, hypothesis: hypothesis,
                                  seconds: seconds(started.duration(to: clock.now)))
         if settings.cleanup != .none {

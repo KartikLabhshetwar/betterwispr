@@ -83,7 +83,11 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    decoded word is replaced only when a term fits the audio better. BetterWispr
    uses FluidAudio's stricter `itnDefaultConfig` similarity floors, because the
    default config replaced "We should render" with "Supabase" on a synthetic
-   clip, and keeps the punctuation the decoder put around a replaced word. Boosting runs
+   clip, and keeps the punctuation the decoder put around a replaced word. It
+   also raises the spelling similarity a replacement needs to 0.65, and keeps
+   the decoded words when they already contain the term, because the lower
+   floor swapped everyday words for listed terms in conversation (see
+   [Phrase booster floor](#phrase-booster-floor-2026-10-10)). Boosting runs
    when the language is English, or automatic and the decoded text reads as English,
    since the booster is English-only. Before that check, automatic mode with a
    vocabulary rewrote a German clip, turning "meine" into "Mike" and "Zauber" into
@@ -280,6 +284,56 @@ references, not dictation, and each accent has few speakers.
 - Recognition p50 / p95 was 0.042 s / 0.118 s for v3, 0.041 s / 0.074 s for v2
   and 0.016 s / 0.040 s for 110M. Preparing each model took 4 to 22 s on the
   first load after the rebuild and 0.20 to 0.26 s when run again.
+
+## Phrase booster floor, 2026-10-10
+
+Measured on the same Mac with release builds of `BetterWisprCLI`, Parakeet v3,
+English and Light cleanup, using `--bench MANIFEST --model parakeet-v3
+--vocabulary "A,B,…"`. Three runs per setting:
+
+- **Absent.** The 300 EdAcc segments above with 20 product and name terms that
+  none of them say (Granola, Vercel, Supabase, Kubernetes, Postgres, Figma,
+  Notion, Linear, Slack, Mem0, BetterWispr, Parakeet, Claude, Anthropic,
+  Tailwind, Ollama, Sparkle, Labhshetwar, Kartik, MDX). Any change is a false
+  replacement.
+- **Present.** The same segments with 14 names they do say (Eragon, Paolini,
+  Cinna, Dubai, Thai, Arabian, Harry Potter, Edinburgh, Instagram, Wikipedia,
+  Manchester, Glasgow, London, Lisbon). A replacement is counted true when the
+  new words appear in the reference.
+- **Synthetic.** 84 clips from macOS `say`: 12 sentences using the absent
+  terms, read by Rishi and Aman (Indian English), Daniel, Karen, Moira, Tessa
+  and Samantha. The clips are not committed.
+
+| Setting | Absent WER | Absent clips changed | Present WER | Present true / false | Synthetic WER | Synthetic true / false |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| No vocabulary | 16.22% | 0 | 16.22% | 0 / 0 | 14.29% | 0 / 0 |
+| `itnDefaultConfig` (0.1.4 before this fix) | 17.42% | 44 | 16.90% | 4 / 47 | 7.14% | 41 / 7 |
+| Floor 0.60 | 16.74% | 23 | 16.54% | 4 / 27 | 7.14% | 41 / 7 |
+| Floor 0.65 | 16.31% | 5 | 16.29% | 4 / 7 | 6.44% | 40 / 0 |
+| Floor 0.70 | 16.22% | 0 | 16.27% | 3 / 5 | 8.82% | 25 / 0 |
+| Floor 0.75 | 16.22% | 0 | 16.22% | 3 / 3 | 9.10% | 25 / 0 |
+| Floor 0.65, decoded words kept when they contain the term | 16.31% | 5 | 16.23% | 4 / 4 | 6.44% | 40 / 0 |
+
+- FluidAudio picks a similarity floor of 0.50 for up to 10 terms and 0.55 for
+  11 to 100, and the stricter config does not raise it. At that floor the
+  booster turned "not like" and "not seen" into "Notion" and "Thank" into
+  "Thai" in conversation that never said them.
+- 0.65 is the lowest floor tried that kept all but one synthetic fix and
+  removed most false replacements. 0.70 lost 16 of the 41 synthetic fixes.
+  The floor was chosen on these same three sets, so it may be tuned to them.
+- The rescorer sometimes widened a replacement to a neighbouring word, writing
+  "Harry Potter" over "seven Harry Potter", "to Harry Potter" and "with Harry
+  Potter". When the decoded words already contain the term, BetterWispr now
+  keeps them and does not count a vocabulary fix.
+- Remaining false replacements include "list one" to "Lisbon", "cinema" to
+  "Cinna" and "Dragon" to "Eragon" in the present set, and "option" to
+  "Notion", "cause" to "Claude" and "lines" to "Linear" in the absent set.
+- With a non-empty vocabulary, recognition took 0.105 s longer per clip at the
+  median than without one (0.153 s against 0.045 s), measured on the absent
+  set after the first clip. The first clip also builds the boosting session.
+- Turning off FluidAudio's spotter rescue (`FLUID_SPOTTER_RESCUE=0`), tapering
+  the weight for short terms, or both, left absent WER at 17.33% to 17.42% and
+  present WER at 16.90%, so neither is used.
 
 ## Reproducible evaluation
 

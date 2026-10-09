@@ -414,6 +414,19 @@ func everyListedParakeetV3LanguageReachesTheDecoderAsAHint(_ id: String) throws 
     ) == "four five")
 }
 
+@Test func boostedReplacementsNeverSwallowNeighbouringWords() {
+    let widened = [(original: "seven Harry Potter", replacement: "Harry Potter")]
+    #expect(ParakeetProvider.restoringPunctuation(
+        original: "Have you seen all the seven Harry Potter movies?",
+        rescored: "Have you seen all the Harry Potter movies?",
+        replacements: widened
+    ) == "Have you seen all the seven Harry Potter movies?")
+    #expect(ParakeetProvider.alreadySaysTerm(widened[0]))
+    #expect(ParakeetProvider.alreadySaysTerm((original: "GitHub's", replacement: "GitHub")))
+    #expect(!ParakeetProvider.alreadySaysTerm((original: "Karthik.", replacement: "Kartik")))
+    #expect(!ParakeetProvider.alreadySaysTerm((original: "Next JS", replacement: "NextJS")))
+}
+
 @Test func phraseBoosterDownloadsIntoTheFolderItLoadsFrom() {
     #expect(CtcModelVariant.ctc110m.repo.folderName == ParakeetProvider.phraseBoosterDirectory.lastPathComponent)
 }

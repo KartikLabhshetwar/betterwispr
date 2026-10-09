@@ -96,6 +96,7 @@ final class AppModel {
     var models: [SpeechModel] { SpeechModel.catalog + settings.speechConnections.map(\.speechModel) }
     @ObservationIgnored lazy var updater = AppUpdater()
     let meetings: MeetingModel
+    let meetingDetector: MeetingDetector
     var installation: ModelInstallation?
     var phraseBoosterInstalled = false
     var microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
@@ -148,6 +149,7 @@ final class AppModel {
         self.store = store
         self.startsServices = startsServices
         meetings = MeetingModel(store: startsServices ? nil : MeetingStore(directory: store.directory.appendingPathComponent("Meetings")))
+        meetingDetector = MeetingDetector(meetings: meetings)
         do {
             let state = try store.load()
             settings = state.settings
@@ -173,6 +175,7 @@ final class AppModel {
         }
         refreshMicrophones()
         microphoneObserver = AudioInputObserver { [weak self] in self?.refreshMicrophones() }
+        meetingDetector.isEnabled = settings.detectMeetings
         globalShortcut.onPress = { [weak self] in self?.shortcutPressed() }
         globalShortcut.onRelease = { [weak self] in self?.shortcutReleased() }
         warmUpSelectedModel()
@@ -806,6 +809,7 @@ final class AppModel {
             statusMessage = "Could not save settings: \(error.localizedDescription)"
         }
         applyAppearance()
+        if startsServices { meetingDetector.isEnabled = settings.detectMeetings }
         onPresentationChange?()
     }
 

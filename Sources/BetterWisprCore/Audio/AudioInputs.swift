@@ -55,8 +55,8 @@ public enum AudioInputs {
 
     private static let system = AudioObjectID(kAudioObjectSystemObject)
 
-    fileprivate static func address(_ selector: AudioObjectPropertySelector,
-                                    scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
+    static func address(_ selector: AudioObjectPropertySelector,
+                        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal) -> AudioObjectPropertyAddress {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
@@ -89,7 +89,7 @@ public enum AudioInputs {
         return composition[kAudioAggregateDeviceIsPrivateKey] as? Bool ?? false
     }
 
-    private static func string(_ selector: AudioObjectPropertySelector, of id: AudioObjectID) -> String? {
+    static func string(_ selector: AudioObjectPropertySelector, of id: AudioObjectID) -> String? {
         var property = address(selector)
         var value: Unmanaged<CFString>?
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)

@@ -213,3 +213,28 @@ private actor FakeNotesModel: NotesLanguageModel {
                           decisions: [], actionItems: ["Me: send the deck", ""])
     }
 }
+
+@Test func meetingDetectionMapsRecordingHelpersToTheirAppAndRecognizesBrowserCallsByTitle() {
+    #expect(MeetingPlatform.app(recording: "com.google.Chrome.helper") == "com.google.Chrome")
+    #expect(MeetingPlatform.app(recording: "com.tinyspeck.slackmacgap.helper") == "com.tinyspeck.slackmacgap")
+    #expect(MeetingPlatform.app(recording: "com.apple.WebKit.GPU") == "com.apple.Safari")
+    #expect(MeetingPlatform.app(recording: "us.zoom.xos") == "us.zoom.xos")
+    #expect(MeetingPlatform.app(recording: "com.google.Chromecast") == nil)
+    #expect(MeetingPlatform.app(recording: "org.betterwispr.app") == nil)
+
+    var read: [String] = []
+    let meetings = MeetingPlatform.meetings(in: ["com.google.Chrome", "us.zoom.xos", "com.brave.Browser"]) { app in
+        read.append(app)
+        return app == "com.google.Chrome"
+            ? ["Inbox - Gmail - Google Chrome", "Meet - Daily Scrum – Microphone recording - Google Chrome"]
+            : ["Quarterly plan - Notion - Brave"]
+    }
+    #expect(meetings == [DetectedMeeting(platform: .googleMeet, appID: "com.google.Chrome"),
+                         DetectedMeeting(platform: .zoom, appID: "us.zoom.xos")])
+    #expect(read == ["com.brave.Browser", "com.google.Chrome"])
+
+    #expect(MeetingPlatform.page(titled: "Meet – abc-defg-hij") == .googleMeet)
+    #expect(MeetingPlatform.page(titled: "Weekly sync | Microsoft Teams") == .teams)
+    #expect(MeetingPlatform.page(titled: "Huddle in #design - Acme - Slack") == .slack)
+    #expect(MeetingPlatform.page(titled: "Budget - Google Sheets") == nil)
+}

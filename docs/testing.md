@@ -450,6 +450,10 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   pasteboard representations, not just plain text.
 - [ ] Change clipboard contents while recognition/paste is pending. New user
   clipboard contents must not be replaced by an old snapshot.
+- [ ] With "Copy to clipboard" off, the pill returns to idle as soon as the text
+  appears, without a spinner after the paste. Start a second dictation within
+  half a second of the first paste; both transcripts are pasted, and pasting
+  manually afterwards gives the clipboard from before the first dictation.
 - [ ] Switch to another app while recognition is pending. It must not paste into
   the newly focused app. The capsule shows "Copied, not pasted." with the text
   and a Copy button, with a progress line that empties over five seconds before the card closes.

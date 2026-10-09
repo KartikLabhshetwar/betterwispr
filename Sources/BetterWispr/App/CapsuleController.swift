@@ -109,7 +109,8 @@ final class CapsuleController {
     }
 
     func update() {
-        if model.settings.showCapsule || model.phase != .idle || model.meetings.activity != .idle || model.meetings.message != nil { show() }
+        if model.settings.showCapsule || model.phase != .idle || model.meetings.activity != .idle || model.meetings.message != nil
+            || model.meetingDetector.meeting != nil { show() }
         else { panel.orderOut(nil) }
     }
 
@@ -117,6 +118,7 @@ final class CapsuleController {
         withObservationTracking {
             _ = model.meetings.activity
             _ = model.meetings.message
+            _ = model.meetingDetector.meeting
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 self?.update()

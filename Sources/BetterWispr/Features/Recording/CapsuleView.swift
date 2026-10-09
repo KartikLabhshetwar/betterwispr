@@ -17,11 +17,17 @@ struct CapsuleView: View {
             DictationFailure(title: "Notetaker needs attention", message: $0)
         })
     }
+    private var meetingPrompt: DetectedMeeting? {
+        model.isBusy || model.meetings.activity != .idle ? nil : model.meetingDetector.meeting
+    }
     private var showsCard: Bool {
         switch model.phase {
         case .cancelled, .completed, .unpasted, .failed: true
-        default: failure != nil
+        default: failure != nil || meetingPrompt != nil
         }
+    }
+    private var surfaceRadius: CGFloat {
+        if model.phase != .idle { 24 } else if failure == nil, meetingPrompt != nil { 26 } else if showsCard { 22 } else { 18 }
     }
     private var showsToolbar: Bool { !showsCard && !model.isBusy && !isMeetingCapturing && hover.isHovering }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
@@ -44,11 +50,16 @@ struct CapsuleView: View {
         .animation(spring, value: model.isHeldSession)
         .animation(spring, value: model.meetings.activity)
         .animation(spring, value: failure)
+        .animation(spring, value: meetingPrompt)
         .animation(spring, value: hover.isHovering)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hover.target)
         .onChange(of: failure) {
             guard let failure else { return }
             AccessibilityNotification.Announcement("\(failure.title) \(failure.message)").post()
+        }
+        .onChange(of: meetingPrompt) {
+            guard let meetingPrompt else { return }
+            AccessibilityNotification.Announcement("\(meetingPrompt.platform.name) meeting detected. You can start the notetaker from the capsule.").post()
         }
         .onChange(of: model.unpasted) {
             guard model.unpasted != nil else { return }
@@ -78,6 +89,9 @@ struct CapsuleView: View {
             } else if case .completed(let message) = model.phase {
                 completionCard(message)
                     .transition(swap)
+            } else if let meetingPrompt {
+                meetingCard(meetingPrompt)
+                    .transition(swap)
             } else if isNotetaking {
                 notetakingPill
                     .transition(swap)
@@ -93,7 +107,7 @@ struct CapsuleView: View {
         }
         .background {
             if !showsToolbar {
-                CapsuleGlass(cornerRadius: model.phase != .idle ? 24 : showsCard ? 22 : 18)
+                CapsuleGlass(cornerRadius: surfaceRadius)
             }
         }
         .overlay(alignment: .bottom) {
@@ -261,6 +275,88 @@ struct CapsuleView: View {
         }
         .padding(.horizontal, 22)
         .frame(height: 48)
+    }
+
+    private func meetingCard(_ meeting: DetectedMeeting) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: "video.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color(red: 1, green: 0.78, blue: 0.28))
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Meeting detected")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(Color(red: 0.2, green: 0.84, blue: 0.47))
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                    Text(meeting.platform.name)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .lineLimit(1)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 6)
+            HStack(spacing: 0) {
+                Button {
+                    model.meetingDetector.dismiss()
+                    model.startNotetaker()
+                } label: {
+                    Text("Start notetaker")
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.leading, 12)
+                        .padding(.trailing, 9)
+                        .frame(height: 30)
+                        .contentShape(Rectangle())
+                }
+                Rectangle()
+                    .fill(.white.opacity(0.18))
+                    .frame(width: 1, height: 14)
+                Menu {
+                    Button("Not now", action: model.meetingDetector.dismiss)
+                    Button("Turn off meeting detection") {
+                        model.settings.detectMeetings = false
+                        model.saveSettings()
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .frame(width: 26, height: 30)
+                        .contentShape(Rectangle())
+                }
+                .menuStyle(.button)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("More options")
+                .accessibilityLabel("More options")
+            }
+            .foregroundStyle(.white)
+            .buttonStyle(.plain)
+            .background(.white.opacity(0.1), in: Capsule())
+            .overlay { Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+            Button(action: model.meetingDetector.dismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .frame(width: 24, height: 24)
+                    .background(.white.opacity(0.06), in: Circle())
+                    .overlay { Circle().strokeBorder(.white.opacity(0.18), lineWidth: 1) }
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Dismiss")
+            .accessibilityLabel("Dismiss meeting prompt")
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 12)
+        .frame(width: 384, height: 52)
     }
 
     private func dismissFailure() {

@@ -113,6 +113,30 @@ tabs backed by the existing meeting fields.
 A session token guards every continuation, so a stopped or quit meeting never
 receives a late segment or summary.
 
+### Meeting detection
+
+`MeetingDetector` offers the notetaker in the capsule when a call starts. It is
+on by default and turned off by `AppSettings.detectMeetings`. It only reads
+local state and never records anything itself.
+
+1. `MicrophoneActivityObserver` listens to Core Audio's process object list and
+   to each process's `kAudioProcessPropertyIsRunningInput`. These are reported
+   from macOS 14.2. Older systems detect nothing.
+2. `MeetingPlatform.app(recording:)` maps the recording processes to known apps.
+   Helper processes such as `com.google.Chrome.helper` map to their app, and
+   `com.apple.WebKit.GPU` maps to Safari. Unknown apps, BetterWispr included,
+   are ignored.
+3. Native call apps (Zoom, Teams, Slack, Webex, FaceTime, Discord, WhatsApp,
+   Signal and Telegram) count as a call while they record. A browser counts only
+   when one of its windows is titled like Google Meet, Teams, Zoom, Slack, Webex,
+   Whereby, Jitsi Meet or Discord. Titles are read through Accessibility with a
+   0.25 second timeout. While an unmatched browser records, titles are checked
+   again every 3 seconds.
+4. Each call is offered once. Starting the notetaker, choosing Not now or letting
+   the prompt expire after 30 seconds marks that app's call as answered. Calls
+   that run while the notetaker is active are answered too. An app's answer is
+   forgotten when it stops recording.
+
 `AppSettings.notesSelection` resolves the legacy Ollama choice plus the new optional
 CLI or notes-connection selection. Old workspaces decode without changing providers.
 `notesConnections` reuses `SpeechConnection` metadata and URL/key validation, with

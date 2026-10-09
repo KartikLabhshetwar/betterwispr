@@ -33,6 +33,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - Light cleanup resolves a correction after a lone "sorry" that restarts on in, at, on, from, near, into, by or with. "I live in Ahmedabad sorry in Delhi" becomes "I live in Delhi" and "meet at 5 sorry at 6" becomes "meet at 6". Apologies such as "sorry for the wait", "so sorry in advance" and "sorry, the train was late" stay.
 - Cleanup no longer drops a repeated number word as a stutter, so "twenty twenty five" and "fifty fifty" keep both words.
 - Meeting notes no longer lag while recording. The Me and Them meters used to redraw the whole notetaker window and the floating pill on every audio buffer, about 140 times a second. Now the levels update at most 30 times a second and only the meters and the clock redraw.
+- The pill no longer keeps spinning for about three quarters of a second after your words are pasted, and the next dictation can start right away. BetterWispr used to wait in place before putting your previous clipboard back. It now restores the clipboard in the background, and when you dictate again before that happens, the clipboard you had before the first dictation is the one that comes back.
 - Tapping the notetaker pill while a meeting is still starting no longer silently cancels it. A tap stops a meeting only once it is recording; Cancel in the notetaker window, the pill's menu and the menu bar still cancel a meeting that is starting.
 
 ## [0.1.3] - 2026-10-08

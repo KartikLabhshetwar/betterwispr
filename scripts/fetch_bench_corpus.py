@@ -21,12 +21,12 @@ SOURCES = [
 def rows(dataset, config, split, offset, length, where=None):
     params = {"dataset": dataset, "config": config, "split": split, "offset": offset, "length": length}
     query = urllib.parse.urlencode(params | ({"where": where} if where else {}))
-    for attempt in range(6):
+    for attempt in range(8):
         try:
             with urllib.request.urlopen(f"https://datasets-server.huggingface.co/{'filter' if where else 'rows'}?{query}", timeout=120) as r:
                 return json.load(r)["rows"]
-        except urllib.error.HTTPError as error:
-            if error.code != 429 or attempt == 5:
+        except (urllib.error.HTTPError, TimeoutError) as error:
+            if getattr(error, "code", 503) not in (429, 500, 502, 503, 504) or attempt == 7:
                 raise
             time.sleep(15 * (attempt + 1))
 

@@ -161,3 +161,29 @@ import Testing
     #expect(NSApplication.shared.appearance == nil)
     #expect(try LocalStore(directory: folder).load().settings.theme == .system)
 }
+
+@Test @MainActor func meetingPromptAppearsOncePerCallAndNeverAlongsideTheNotetaker() {
+    let model = AppModel(store: LocalStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)),
+                         startsServices: false)
+    let detector = model.meetingDetector
+    let zoom = DetectedMeeting(platform: .zoom, appID: "us.zoom.xos")
+    let meet = DetectedMeeting(platform: .googleMeet, appID: "com.google.Chrome")
+
+    detector.update([zoom], recording: [zoom.appID])
+    #expect(detector.meeting == zoom)
+    detector.dismiss()
+    detector.update([zoom], recording: [zoom.appID])
+    #expect(detector.meeting == nil)
+    detector.update([], recording: [])
+    detector.update([zoom], recording: [zoom.appID])
+    #expect(detector.meeting == zoom)
+
+    detector.update([meet], recording: [meet.appID])
+    #expect(detector.meeting == meet)
+    model.meetings.activity = .recording(UUID())
+    detector.update([meet], recording: [meet.appID])
+    #expect(detector.meeting == nil)
+    model.meetings.activity = .idle
+    detector.update([meet], recording: [meet.appID])
+    #expect(detector.meeting == nil)
+}

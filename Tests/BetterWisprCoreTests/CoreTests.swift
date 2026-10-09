@@ -160,6 +160,9 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("Let's meet at 5, no wait, at 6", language: "en") == "Let's meet at 6")
     #expect(TranscriptCleaner.clean("Send it to Sam, no, send it to Alex.", language: "en") == "Send it to Alex.")
     #expect(TranscriptCleaner.clean("Book the window seat, I mean, the aisle seat", language: "en") == "Book the aisle seat")
+    #expect(TranscriptCleaner.clean("I live in Ahmedabad, sorry, in Delhi.", language: "en") == "I live in Delhi.")
+    #expect(TranscriptCleaner.clean("I live in Ahmedabad sorry in Delhi", language: "en") == "I live in Delhi")
+    #expect(TranscriptCleaner.clean("Let's meet at 5 sorry at 6.", language: "en") == "Let's meet at 6.")
 }
 
 @Test func cleanerKeepsCorrectionLookalikes() {
@@ -169,6 +172,13 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("Is it at 5? No, at 6.", language: "en") == "Is it at 5? No, at 6.")
     #expect(TranscriptCleaner.clean("Thanks for coming, sorry for the wait.", language: "en") == "Thanks for coming, sorry for the wait.")
     #expect(TranscriptCleaner.clean("Go to Ahmedabad, sorry, no, Delhi", language: "en") == "Go to Ahmedabad, sorry, no, Delhi")
+    #expect(TranscriptCleaner.clean("Thanks for coming sorry for the wait.", language: "en") == "Thanks for coming sorry for the wait.")
+    #expect(TranscriptCleaner.clean("We need to talk, sorry to interrupt.", language: "en") == "We need to talk, sorry to interrupt.")
+    #expect(TranscriptCleaner.clean("I asked about it sorry about that.", language: "en") == "I asked about it sorry about that.")
+    #expect(TranscriptCleaner.clean("I'm in the office so sorry in advance.", language: "en") == "I'm in the office so sorry in advance.")
+    #expect(TranscriptCleaner.clean("I'll be in the office late sorry in advance.", language: "en") == "I'll be in the office late sorry in advance.")
+    #expect(TranscriptCleaner.clean("I missed the call, sorry, the train was late.", language: "en") == "I missed the call, sorry, the train was late.")
+    #expect(TranscriptCleaner.clean("Thanks for the help everyone sorry the call ran late.", language: "en") == "Thanks for the help everyone sorry the call ran late.")
 }
 
 @Test func cleanerRemovesRepeatedPhrases() {
@@ -197,6 +207,25 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("Uh, um.", language: nil) == "")
     #expect(TranscriptCleaner.clean("Wir treffen uns um acht Uhr", language: nil) == "Wir treffen uns um acht Uhr")
     #expect(TranscriptCleaner.clean("", language: "en") == "")
+}
+
+@Test func emailDictationLaysOutGreetingBodyAndSignOff() {
+    #expect(EmailDictation.compose("Write an email to Sarah saying I will be on holiday tomorrow. Thanks. Best regards, Cardic.")
+        == "Hi Sarah,\n\nI will be on holiday tomorrow. Thanks.\n\nBest regards,\nCardic")
+    #expect(EmailDictation.compose("Draft an email to John that the report is ready, kind regards, cardic.")
+        == "Hi John,\n\nThe report is ready.\n\nKind regards,\nCardic")
+    #expect(EmailDictation.compose("write an email to priya patel saying that the deploy is done") == "Hi Priya Patel,\n\nThe deploy is done.")
+    #expect(EmailDictation.compose("Write an email to the team, saying lunch is at noon. Cheers, Kartik.") == "Hi Team,\n\nLunch is at noon.\n\nCheers,\nKartik")
+    #expect(EmailDictation.compose("Write an email to Sam saying I'm out today. Thanks.") == "Hi Sam,\n\nI'm out today.\n\nThanks")
+    #expect(EmailDictation.compose("Write an email to Sam saying thanks.") == "Hi Sam,\n\nThanks.")
+    #expect(EmailDictation.compose("Write an email to Sam saying I'm out. Thanks, see you soon.") == "Hi Sam,\n\nI'm out. Thanks, see you soon.")
+}
+
+@Test func emailDictationIgnoresOrdinaryDictation() {
+    #expect(EmailDictation.compose("I will write an email to Sarah saying I'm late.") == nil)
+    #expect(EmailDictation.compose("Write an email to Sarah.") == nil)
+    #expect(EmailDictation.compose("Send the report to Sarah saying it is done.") == nil)
+    #expect(EmailDictation.compose("I live in Delhi.") == nil)
 }
 
 @Test func voiceCommandsInsertPunctuationAndBacktrack() {

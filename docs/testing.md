@@ -6,6 +6,39 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Email command, "sorry" repairs and Style apps check, 2026-10-09, version 0.1.4
+
+On an Apple M5 with macOS 26.6.2, Parakeet TDT v3 transcribed eight
+`say`-synthesized clips through `BetterWisprCLI`. They were then run through
+Light cleanup, voice commands and the email composer in a test. "I live in
+Mdabad, sorry, in Delhi." became "I live in Delhi." and "Let's meet at 5 sorry
+at 6." became "Let's meet at 6.". "Thanks for coming, sorry for the wait."
+stayed. Two clips came back as "Mdabadsari", which no text rule can split.
+"Write an email to Sarah saying I will be on holiday tomorrow. Thanks. Best
+regards, Cardic." became a "Hi Sarah," email with the sign-off on its own lines.
+The model heard "Kartik" as "Cardic", which a Vocabulary entry would fix. The
+new "sorry" rule changed none of the 190 saved dictations on this Mac. None of
+those dictations had a tone applied, because every app they went to (T3 Code,
+Chrome, Brave, VS Code, Finder and Slack) uses a context set to Formal.
+`swift build`, `swift test` (94 tests), `Tests/evaluate_check.py` and
+`scripts/build-app.sh` passed, and the app launched. Screen capture returned a
+black image, so the Style page footer, the capsule, toast and page animations
+and a live email dictation into Mail have not been seen or exercised.
+
+## Parakeet v3 languages and booster check, 2026-10-09, version 0.1.4
+
+On an Apple M5 with macOS 26.6.2, the release `BetterWisprCLI` ran Parakeet TDT
+v3 over 355 read-speech clips in eight languages, once with each clip's language
+and once on automatic. [The accuracy notes](accuracy.md#parakeet-tdt-v3-baseline-2026-10-09)
+list the per-language results. Before the booster fix, a German clip on
+automatic with `--vocabulary` turned "meine" into "Mike" and "Zauber" into
+"Zowber". After it, the German output was unchanged and an English clip on
+automatic was still boosted. `swift build`, `swift test` and
+`Tests/evaluate_check.py` passed. The new language test fails when one listed
+code is changed to one FluidAudio does not accept. The Settings language picker
+was not opened in the running app, and live dictation in a non-English language
+has not been exercised.
+
 ## Bluetooth playback check, 2026-10-09, version 0.1.3
 
 The user reported that YouTube audio in their AirPods lost quality while
@@ -439,6 +472,12 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Expect "Hello, how are you?" or the model's casing of it.
 - [ ] Say "Send it Monday. Sorry, remove that. Send it Tuesday." Only "Send it
   Tuesday." is pasted. "Please remove that file" stays as spoken.
+- [ ] In Mail, say "Write an email to Sarah saying I will be on holiday
+  tomorrow, thanks, best regards" and your name. Expect "Hi Sarah,", the body
+  and "Best regards," with your name on separate lines. "I will write an email
+  later" stays as spoken.
+- [ ] Say "I live in Ahmedabad sorry in Delhi". Expect "I live in Delhi". "Sorry
+  for the wait" and "sorry in advance" stay as spoken.
 - [ ] In Slack, say "ping at the rate KV". Expect "ping @KV". Whether Slack then
   opens its mention picker is Slack's behavior; record what happens.
 - [ ] Say "question mark" alone until the model mishears it, for example as
@@ -534,6 +573,13 @@ These checks do not establish live provider acceptance or recognition quality.
 - [ ] Install an older signed release, publish a newer GitHub release with its
   `appcast.xml`, then check for updates. The older build downloads, verifies and
   installs the newer one and relaunches at the new version.
+- [ ] With automatic installs off, leave the older build running in the
+  background past a scheduled check while another app is active. A toast offers
+  Update, the menu bar shows "Install BetterWispr" with the new version, and
+  either one brings Sparkle's update window to the front.
+- [ ] With automatic installs on, let a scheduled check download the update. A
+  Restart toast and the menu bar item appear, and either one installs the update
+  and relaunches at the new version.
 - [ ] Turn off automatic checks and relaunch. A network monitor shows no request
   for the appcast until you choose "Check for Updates…".
 

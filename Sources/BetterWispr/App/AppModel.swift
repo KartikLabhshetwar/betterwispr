@@ -354,14 +354,17 @@ final class AppModel {
                 let heard = VocabularyProcessor.correctedCommands(entries, in: cleaned)
                 var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
-                if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
+                if english, let email = EmailDictation.compose(spoken) {
+                    spoken = email
+                } else if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
                     let polished = await TranscriptPolisher.polish(spoken, settings: writingSettings)
                     try Task.checkCancellation()
                     guard self.generation == token else { return }
-                    spoken = polished ?? spoken
+                    spoken = StyleFormatter.apply(tone, to: polished ?? spoken)
+                } else if english {
+                    spoken = StyleFormatter.apply(tone, to: spoken)
                 }
-                if english { spoken = StyleFormatter.apply(tone, to: spoken) }
                 let (text, fixes) = VocabularyProcessor.corrected(entries, in: spoken)
                 guard !text.isEmpty else { self.fail(.noSpeech); return }
                 self.partialTranscript = text

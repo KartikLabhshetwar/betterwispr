@@ -6,95 +6,116 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var model: AppModel
 
+    private static let voiceCommands = [
+        ("“comma”, “question mark”, “full stop”", ", ? ."),
+        ("“add a period”, “add a colon”", ". :"),
+        ("“new line”, “new paragraph”", "Line breaks"),
+        ("“scratch that”, “sorry, remove that”", "Deletes the last sentence"),
+        ("“at the rate KV”, “at sign KV”", "@KV"),
+        ("“write an email to Sam saying …, best regards, Kartik”", "Hi Sam, body and sign-off"),
+    ]
+
     var body: some View {
-        Form {
-            Section("Dictation") {
-                MicrophonePicker(model: model) {
-                    Text("Microphone")
-                    Text("Used for dictation and meeting notes. Automatic follows Sound settings, and a chosen mic is used whenever it’s connected. Recording from Bluetooth headphones drops their sound to call quality until you stop; choose your Mac’s own mic to avoid that.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                SettingsSection("Shortcut") {
+                    ShortcutRecorder(model: model)
+                    RowDivider()
+                    SettingRow("Behavior", caption: model.settings.dictationMode == .hold
+                        ? "Hold to speak and release to finish. A quick tap starts hands-free dictation."
+                        : "Press once to speak. Press again or click ✓ to finish.") {
+                        Picker("Behavior", selection: setting(\.dictationMode)) {
+                            Text("Hold to talk").tag(DictationMode.hold)
+                            Text("Press to toggle").tag(DictationMode.toggle)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                        .disabled(model.isBusy)
+                    }
                 }
-                ShortcutRecorder(model: model)
-                Picker(selection: setting(\.dictationMode)) {
-                    Text("Hold to talk").tag(DictationMode.hold)
-                    Text("Press to toggle").tag(DictationMode.toggle)
-                } label: {
-                    Text("Shortcut behavior")
-                    Text("Hold and release to finish, or tap once for hands-free dictation. Click ✓ or press the shortcut again when you’re done.")
-                }
-                .disabled(model.isBusy)
-                Picker(selection: setting(\.language)) {
-                    Text(model.selectedModel.engine == .apple ? "System language" : "Detect automatically").tag("auto")
-                    ForEach(Self.spokenLanguages, id: \.code) { Text($0.name).tag($0.code) }
-                } label: {
-                    Text("Spoken language")
-                    Text("Choose a language for more consistent recognition.")
-                }
-                Picker(selection: setting(\.silenceThreshold)) {
-                    Text("Standard").tag(Float(0.002))
-                    Text("Quiet voice").tag(Float(0.0005))
-                    Text("No silence filter").tag(Float(0))
-                } label: {
-                    Text("Input sensitivity")
-                    Text("Quiet voices may need a lower filter. More background noise can pass through.")
-                }
-                .disabled(model.isBusy)
-                Toggle(isOn: setting(\.autoPaste)) {
-                    Text("Paste into the active app")
-                    Text("Requires Accessibility permission. Otherwise, text is copied.")
-                }
-                Toggle(isOn: setting(\.copyToClipboard)) {
-                    Text("Copy to clipboard")
-                    Text("Keep each dictation ready to paste again. When off, your clipboard is left as it was.")
-                }
-                Toggle(isOn: setting(\.learnCorrections)) {
-                    Text("Learn from my corrections")
-                    Text("When you fix a misheard word in History, or in the text field within 30 seconds of a paste, it is added to Vocabulary.")
-                }
-            }
 
-            Section {
-                LabeledContent("“comma”, “question mark”, “full stop”", value: ", ? .")
-                LabeledContent("“add a period”, “add a colon”", value: ". :")
-                LabeledContent("“new line”, “new paragraph”", value: "Line breaks")
-                LabeledContent("“scratch that”, “sorry, remove that”", value: "Deletes the last sentence")
-                LabeledContent("“at the rate KV”, “at sign KV”", value: "@KV")
-            } header: {
-                Text("Voice Commands")
-            } footer: {
-                Text("Say these while dictating in English or Auto language. Words like “the Oxford comma” stay as written.")
-            }
+                SettingsSection("Microphone and language") {
+                    SettingRow("Microphone", caption: (model.settings.microphone == nil ? "Follows your Sound settings." : "Used whenever it’s connected.")
+                        + " Bluetooth headphones drop to call quality while recording.") {
+                        MicrophonePicker(model: model) { Text("Microphone") }
+                            .labelsHidden()
+                            .frame(maxWidth: 240)
+                    }
+                    RowDivider()
+                    SettingRow("Spoken language", caption: "A fixed language gives more consistent results.") {
+                        Picker("Spoken language", selection: setting(\.language)) {
+                            Text(model.selectedModel.engine == .apple ? "System language" : "Detect automatically").tag("auto")
+                            ForEach(languageChoices, id: \.code) { Text($0.name).tag($0.code) }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    RowDivider()
+                    SettingRow("Input sensitivity", caption: "Lower filters help quiet voices but let more background noise through.") {
+                        Picker("Input sensitivity", selection: setting(\.silenceThreshold)) {
+                            Text("Standard").tag(Float(0.002))
+                            Text("Quiet voice").tag(Float(0.0005))
+                            Text("No filter").tag(Float(0))
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                        .disabled(model.isBusy)
+                    }
+                }
 
-            Section("Workspace") {
-                Toggle(isOn: setting(\.soundEffects)) {
-                    Text("Dictation sounds")
-                    Text("Subtle feedback when you finish, cancel, or need attention. Sounds stay quiet during meeting capture.")
+                SettingsSection("After you speak") {
+                    SettingToggle("Paste into the active app", caption: "Needs Accessibility. Otherwise, text is copied.", isOn: setting(\.autoPaste))
+                    RowDivider()
+                    SettingToggle("Copy to clipboard", caption: "Keep each dictation ready to paste again. When off, your clipboard is left as it was.", isOn: setting(\.copyToClipboard))
+                    RowDivider()
+                    SettingToggle("Learn from my corrections", caption: "Words you fix in History, or in the text field within 30 seconds of a paste, are added to Vocabulary.", isOn: setting(\.learnCorrections))
                 }
-                Toggle(isOn: setting(\.showCapsule)) {
-                    Text("Floating recording capsule")
-                    Text("Keep a small voice control at the bottom of your screen.")
-                }
-                Toggle(isOn: setting(\.launchAtLogin)) {
-                    Text("Open at login")
-                    Text("Have BetterWispr ready when your Mac starts.")
-                }
-                Toggle(isOn: setting(\.saveHistory)) {
-                    Text("Save dictation history")
-                    Text("Store text locally so you can find and reuse it later.")
-                }
-            }
 
-            Section {
-                PermissionRow(title: "Microphone", detail: "Needed to hear your voice.", granted: model.microphoneGranted, action: model.requestMicrophone)
-                PermissionRow(title: "Accessibility", detail: "Needed for automatic paste and modifier-only shortcuts.", granted: model.accessibilityGranted, action: model.requestAccessibility)
-            } header: {
-                Text("Permissions")
-            } footer: {
-                Label("Built-in models process speech on this Mac. A selected API connection sends audio to its endpoint. Temporary recordings are removed after processing; external providers control their own retention.", systemImage: "lock.shield")
-                    .foregroundStyle(.secondary)
+                SettingsSection("App") {
+                    SettingToggle("Dictation sounds", caption: "Soft cues when you finish, cancel or need attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
+                    RowDivider()
+                    SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))
+                    RowDivider()
+                    SettingToggle("Open at login", caption: "Have BetterWispr ready when your Mac starts.", isOn: setting(\.launchAtLogin))
+                    RowDivider()
+                    SettingToggle("Save dictation history", caption: "Keep text on this Mac so you can find and reuse it.", isOn: setting(\.saveHistory))
+                }
+
+                SettingsSection("Permissions") {
+                    PermissionStatusRow(title: "Microphone", caption: "Needed to hear your voice.", granted: model.microphoneGranted, action: model.requestMicrophone)
+                    RowDivider()
+                    PermissionStatusRow(title: "Accessibility", caption: "Needed for automatic paste and modifier-key shortcuts.", granted: model.accessibilityGranted, action: model.requestAccessibility)
+                } footer: {
+                    Label("Built-in models process speech on this Mac. A selected API connection sends audio to its endpoint. Temporary recordings are removed after processing; external providers control their own retention.", systemImage: "lock.shield")
+                }
+
+                SettingsSection("Voice commands") {
+                    ForEach(Array(Self.voiceCommands.enumerated()), id: \.offset) { index, command in
+                        if index > 0 { RowDivider() }
+                        SettingRow(command.0) {
+                            Text(command.1)
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.06), in: .capsule)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                } footer: {
+                    Text("Say these while dictating in English or Auto language. Words like “the Oxford comma” stay as written.")
+                }
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity)
         }
-        .formStyle(.grouped)
         .toggleStyle(.switch)
+        .animation(.ui, value: model.microphoneGranted)
+        .animation(.ui, value: model.accessibilityGranted)
     }
 
     static let spokenLanguages = [
@@ -103,6 +124,17 @@ struct SettingsView: View {
         (code: "pt", name: "Portuguese"), (code: "ja", name: "Japanese"), (code: "ko", name: "Korean"),
         (code: "zh", name: "Chinese"), (code: "ar", name: "Arabic"),
     ]
+
+    private var languageChoices: [(code: String, name: String)] {
+        let selected = model.selectedModel
+        let choices = selected.languages.map { codes in
+            codes.map { (code: $0, name: Locale.current.localizedString(forLanguageCode: $0) ?? $0) }.sorted { $0.name < $1.name }
+        } ?? Self.spokenLanguages
+        let current = model.settings.language
+        guard current != "auto", !choices.contains(where: { $0.code == current }) else { return choices }
+        let name = Locale.current.localizedString(forLanguageCode: current) ?? current
+        return choices + [(code: current, name: "\(name) (not supported by \(selected.name))")]
+    }
 
     private func setting<Value>(_ keyPath: WritableKeyPath<AppSettings, Value>) -> Binding<Value> {
         Binding(
@@ -123,41 +155,43 @@ private struct ShortcutRecorder: View {
     private var shortcut: DictationShortcut { model.settings.shortcut }
 
     var body: some View {
-        LabeledContent {
+        SettingRow("Keyboard shortcut", caption: caption) {
             HStack(spacing: 6) {
-                if shortcut != .optionSpace {
+                if shortcut != .optionSpace, !isCapturing {
                     Button("Reset to \(DictationShortcut.optionSpace.spokenName)", systemImage: "arrow.counterclockwise") {
                         stop()
                         model.changeShortcut(.optionSpace)
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                     .help("Reset to \(DictationShortcut.optionSpace.displayName)")
+                    .transition(.opacity)
                 }
                 recordButton
                     .accessibilityLabel(isCapturing ? "Keyboard shortcut, waiting for keys" : "Keyboard shortcut, \(shortcut.spokenName)")
                     .accessibilityHint("Click, then press a shortcut, or press and release a modifier key such as Option.")
             }
             .disabled(model.isBusy)
-        } label: {
-            Text("Keyboard shortcut")
-            if isCapturing {
-                Text(feedback ?? "Press and release ⌃, ⌥, ⇧ or ⌘ alone, use a key combination, or press an F-key. Esc cancels.")
-            } else {
-                Text(model.settings.dictationMode == .hold ? "Hold to speak and release to finish. Tap for hands-free dictation." : "Press once to speak. Press again or click ✓ to finish.")
-                if shortcut.isModifierOnly { Text("Requires Accessibility permission. Uses the left or right key you recorded.") }
-            }
         }
+        .animation(.ui, value: isCapturing)
         .onChange(of: feedback) { _, text in if let text { AccessibilityNotification.Announcement(text).post() } }
         .onDisappear(perform: stop)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in stop() }
+    }
+
+    private var caption: String? {
+        if isCapturing { return feedback ?? "Press and release ⌃, ⌥, ⇧ or ⌘ alone, use a key combination, or press an F-key. Esc cancels." }
+        return shortcut.isModifierOnly ? "Needs Accessibility. Uses the left or right key you recorded." : "Starts dictation from any app."
     }
 
     @ViewBuilder private var recordButton: some View {
         let button = Button {
             if isCapturing { stop() } else { start() }
         } label: {
-            Text(isCapturing ? (held.isEmpty ? "Type shortcut…" : held.symbols + " …") : shortcut.displayName).frame(minWidth: 96)
+            Text(isCapturing ? (held.isEmpty ? "Type shortcut…" : held.symbols + " …") : shortcut.displayName)
+                .frame(minWidth: 96)
+                .contentTransition(.opacity)
         }
         if isCapturing { button.buttonStyle(.borderedProminent) } else { button.buttonStyle(.bordered) }
     }
@@ -248,6 +282,119 @@ struct MicrophonePicker<Label: View>: View {
             }
         } label: {
             label
+        }
+    }
+}
+
+struct SettingsSection<Content: View, Footer: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+    @ViewBuilder let footer: Footer
+
+    init(_ title: String, @ViewBuilder content: () -> Content, @ViewBuilder footer: () -> Footer) {
+        self.title = title
+        self.content = content()
+        self.footer = footer()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(title)
+            Card(padding: 0) {
+                VStack(spacing: 0) { content }
+            }
+            footer
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.horizontal, 4)
+        }
+    }
+}
+
+extension SettingsSection where Footer == EmptyView {
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.init(title, content: content) { EmptyView() }
+    }
+}
+
+struct SettingRow<Control: View>: View {
+    let title: String
+    var caption: String?
+    @ViewBuilder let control: Control
+
+    init(_ title: String, caption: String? = nil, @ViewBuilder control: () -> Control) {
+        self.title = title
+        self.caption = caption
+        self.control = control()
+    }
+
+    var body: some View {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                if let caption {
+                    Text(caption)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .contentTransition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            control
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .frame(minHeight: 44)
+        .animation(.ui, value: caption)
+    }
+}
+
+struct SettingToggle: View {
+    let title: String
+    let caption: String?
+    @Binding var isOn: Bool
+
+    init(_ title: String, caption: String? = nil, isOn: Binding<Bool>) {
+        self.title = title
+        self.caption = caption
+        _isOn = isOn
+    }
+
+    var body: some View {
+        SettingRow(title, caption: caption) {
+            Toggle(title, isOn: $isOn)
+                .labelsHidden()
+                .controlSize(.small)
+        }
+    }
+}
+
+struct RowDivider: View {
+    var body: some View {
+        Divider().padding(.leading, 16)
+    }
+}
+
+struct PermissionStatusRow: View {
+    let title: String
+    let caption: String
+    let granted: Bool
+    let action: () -> Void
+
+    var body: some View {
+        SettingRow(title, caption: caption) {
+            if granted {
+                Label("Allowed", systemImage: "checkmark.circle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .symbolRenderingMode(.multicolor)
+                    .transition(.opacity)
+            } else {
+                Button("Allow…", action: action)
+                    .transition(.opacity)
+            }
         }
     }
 }

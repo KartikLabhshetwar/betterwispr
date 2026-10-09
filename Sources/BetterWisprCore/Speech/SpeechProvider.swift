@@ -13,9 +13,11 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
     public let modelName: String
     public let tokenizerName: String?
     public let connection: SpeechConnection?
+    /// Language codes the model recognizes; nil when its coverage is not a known fixed list.
+    public let languages: [String]?
 
     public init(id: String, name: String, detail: String, sizeLabel: String, engine: SpeechEngine,
-                modelName: String, tokenizerName: String? = nil, connection: SpeechConnection? = nil) {
+                modelName: String, tokenizerName: String? = nil, connection: SpeechConnection? = nil, languages: [String]? = nil) {
         self.id = id
         self.name = name
         self.detail = detail
@@ -24,21 +26,27 @@ public struct SpeechModel: Identifiable, Hashable, Sendable {
         self.modelName = modelName
         self.tokenizerName = tokenizerName
         self.connection = connection
+        self.languages = languages
     }
+
+    private static let parakeetV3Languages = [
+        "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it",
+        "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
+    ]
 
     public static let catalog: [SpeechModel] = [
         .init(id: "apple", name: "Apple on-device", detail: "Uses an available macOS language pack. No cloud fallback.",
               sizeLabel: "System managed", engine: .apple, modelName: "apple"),
         .init(id: "parakeet-v3", name: "Parakeet TDT v3", detail: "NVIDIA's multilingual model for 25 European languages, with punctuation. Fast on the Neural Engine.",
-              sizeLabel: "~580 MB", engine: .parakeet, modelName: "parakeet-tdt-0.6b-v3"),
+              sizeLabel: "~580 MB", engine: .parakeet, modelName: "parakeet-tdt-0.6b-v3", languages: parakeetV3Languages),
         .init(id: "parakeet-v2", name: "Parakeet TDT v2", detail: "NVIDIA's English-only model, tuned for English accuracy, with punctuation.",
-              sizeLabel: "~560 MB", engine: .parakeet, modelName: "parakeet-tdt-0.6b-v2"),
+              sizeLabel: "~560 MB", engine: .parakeet, modelName: "parakeet-tdt-0.6b-v2", languages: ["en"]),
         .init(id: "parakeet-ultra", name: "Parakeet Ultra", detail: "A version of Parakeet TDT v3 further trained by Moondream, with punctuation. A larger download than v3.",
-              sizeLabel: "~730 MB", engine: .parakeet, modelName: "parakeet-ultra"),
+              sizeLabel: "~730 MB", engine: .parakeet, modelName: "parakeet-ultra", languages: parakeetV3Languages),
         .init(id: "parakeet-110m", name: "Parakeet TDT-CTC 110M", detail: "A small English-only model for Macs with less memory to spare.",
-              sizeLabel: "~330 MB", engine: .parakeet, modelName: "parakeet-tdt-ctc-110m"),
+              sizeLabel: "~330 MB", engine: .parakeet, modelName: "parakeet-tdt-ctc-110m", languages: ["en"]),
         .init(id: "parakeet-ja", name: "Parakeet Japanese", detail: "NVIDIA's Parakeet model for Japanese speech.",
-              sizeLabel: "~720 MB", engine: .parakeet, modelName: "parakeet-ja"),
+              sizeLabel: "~720 MB", engine: .parakeet, modelName: "parakeet-ja", languages: ["ja"]),
         .init(id: "whisper-turbo", name: "Whisper Large v3 Turbo", detail: "Broadest language coverage, including languages Parakeet does not support.",
               sizeLabel: "~1.6 GB", engine: .whisperKit, modelName: "openai_whisper-large-v3-v20240930_turbo", tokenizerName: "openai/whisper-large-v3"),
         .init(id: "whisper-turbo-compressed", name: "Whisper Large v3 Turbo (compressed)", detail: "The languages of Whisper Large v3 Turbo in a compressed build that takes less disk space.",

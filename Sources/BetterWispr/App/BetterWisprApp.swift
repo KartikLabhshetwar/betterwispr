@@ -114,8 +114,12 @@ private struct MenuContents: View {
             openDashboard()
         }
         .keyboardShortcut(",")
-        Button("Check for Updates…") { model.updater.checkForUpdates() }
-            .disabled(!model.updater.canCheckForUpdates)
+        if let version = model.updater.pendingVersion {
+            Button("Install BetterWispr \(version)…") { model.updater.installUpdate() }
+        } else {
+            Button("Check for Updates…") { model.updater.checkForUpdates() }
+                .disabled(!model.updater.canCheckForUpdates)
+        }
         Divider()
         Button("Quit BetterWispr") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
     }

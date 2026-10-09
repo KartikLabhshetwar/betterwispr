@@ -7,6 +7,12 @@ struct Toast {
     let message: String
     let systemImage: String
     var isError = false
+    var action: Action?
+
+    struct Action {
+        let title: String
+        let perform: @MainActor () -> Void
+    }
 }
 
 extension Toast {
@@ -35,7 +41,7 @@ final class ToastWindow {
     func show(_ toast: Toast) {
         dismiss(animated: false)
 
-        let hostingView = NSHostingView(rootView: ToastView(toast: toast))
+        let hostingView = ToastHostingView(rootView: ToastView(toast: toast) { [weak self] in self?.dismiss(animated: true) })
         let size = hostingView.fittingSize
         hostingView.sizingOptions = []
         hostingView.setFrameSize(size)
@@ -47,14 +53,13 @@ final class ToastWindow {
         panel.hasShadow = false
         panel.level = .floating
         panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = true
+        panel.ignoresMouseEvents = toast.action == nil
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = hostingView
 
         guard let screen = NSApp.keyWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
         let origin = NSPoint(x: screen.visibleFrame.midX - size.width / 2, y: screen.visibleFrame.maxY - size.height)
-        let slide: CGFloat = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 10
         panel.setFrameOrigin(NSPoint(x: origin.x, y: origin.y + slide))
         panel.alphaValue = 0
         panel.orderFrontRegardless()
@@ -72,11 +77,13 @@ final class ToastWindow {
         ])
 
         dismissTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(toast.isError ? 4 : 2.5))
+            try? await Task.sleep(for: .seconds(toast.action != nil ? 10 : toast.isError ? 4 : 2.5))
             guard !Task.isCancelled else { return }
             self?.dismiss(animated: true)
         }
     }
+
+    private var slide: CGFloat { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 10 }
 
     private func dismiss(animated: Bool) {
         dismissTask?.cancel()
@@ -88,14 +95,20 @@ final class ToastWindow {
             context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
+            panel.animator().setFrameOrigin(NSPoint(x: panel.frame.minX, y: panel.frame.minY + slide))
         } completionHandler: {
             Task { @MainActor in panel.orderOut(nil) }
         }
     }
 }
 
+private final class ToastHostingView: NSHostingView<ToastView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 private struct ToastView: View {
     let toast: Toast
+    let dismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
@@ -112,6 +125,14 @@ private struct ToastView: View {
                     .lineLimit(2)
                     .frame(maxWidth: 280, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if let action = toast.action {
+                Button(action.title) {
+                    dismiss()
+                    action.perform()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
             }
         }
         .padding(.horizontal, 16)

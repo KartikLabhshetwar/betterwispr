@@ -267,6 +267,14 @@ func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSecond
     #expect(phraseBoosterFiles() == boosterFilesBefore)
 }
 
+@Test(arguments: ["parakeet-v3", "parakeet-ultra"])
+func everyListedParakeetV3LanguageReachesTheDecoderAsAHint(_ id: String) throws {
+    let languages = try #require(SpeechModel.catalog.first { $0.id == id }?.languages)
+    #expect(languages.count == 25)
+    for code in languages { #expect(ParakeetProvider.hint(for: code) != nil, "\(code)") }
+    #expect(ParakeetProvider.hint(for: nil) == nil)
+}
+
 @Test func phraseBoosterCountsAsInstalledOnlyAfterACompletedInstall() throws {
     let directory = FileManager.default.temporaryDirectory.appending(path: "betterwispr-booster-test-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: directory) }

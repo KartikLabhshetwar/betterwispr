@@ -185,12 +185,16 @@ public final class ParakeetProvider: SpeechProvider {
         phraseBooster = try? await CtcModels.loadDirect(from: Self.phraseBoosterDirectory)
     }
 
+    nonisolated static func hint(for language: String?) -> Language? {
+        language.flatMap { Locale(identifier: $0).language.languageCode?.identifier }.flatMap(Language.init(rawValue:))
+    }
+
     public func transcribe(audioURL: URL, language: String?, vocabulary: [String]) async throws -> String {
         guard let manager, !preparing else { throw SpeechError.notPrepared }
         guard transcriptionTask == nil else { throw SpeechError.busy }
         guard audioURL.isFileURL, FileManager.default.fileExists(atPath: audioURL.path) else { throw SpeechError.audioUnavailable }
         try Task.checkCancellation()
-        let hint = language.flatMap { Locale(identifier: $0).language.languageCode?.identifier }.flatMap(Language.init(rawValue:))
+        let hint = Self.hint(for: language)
         let terms = loadedVersion != .tdtJa && (hint == nil || hint == .english) ? Self.boostingTerms(vocabulary) : []
         vocabularyFixes = 0
         let task = Task {
@@ -233,7 +237,8 @@ public final class ParakeetProvider: SpeechProvider {
         var state = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         let result = try await manager.transcribe(samples, decoderState: &state, language: language)
         try Task.checkCancellation()
-        guard let rescored = await session.rescore(text: result.text, tokenTimings: result.tokenTimings ?? [], audioSamples: samples),
+        guard language != nil || TranscriptCleaner.isEnglish(result.text, language: nil),
+              let rescored = await session.rescore(text: result.text, tokenTimings: result.tokenTimings ?? [], audioSamples: samples),
               rescored.wasModified else { return (result.text, 0) }
         let replacements = rescored.replacements.compactMap { item in
             item.shouldReplace ? item.replacementWord.map { (original: item.originalWord, replacement: $0) } : nil

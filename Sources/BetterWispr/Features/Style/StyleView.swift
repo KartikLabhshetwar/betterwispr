@@ -11,6 +11,15 @@ private extension StyleContext {
         }
     }
 
+    var symbol: String {
+        switch self {
+        case .personal: "bubble.left.and.bubble.right"
+        case .work: "briefcase"
+        case .email: "envelope"
+        case .other: "square.grid.2x2"
+        }
+    }
+
     var apps: String {
         switch self {
         case .personal: "WhatsApp, Telegram, Discord, Messages, Signal and Messenger."
@@ -64,54 +73,118 @@ private extension CleanupLevel {
 
 struct StyleView: View {
     @Bindable var model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let spokenSample = "um hey Sam are we are we still on for lunch? I think uh we should leave early to beat the traffic."
 
     var body: some View {
-        Form {
-            Section {
-                Picker(selection: setting(\.cleanup)) {
-                    ForEach(CleanupLevel.allCases, id: \.self) { Text($0.title).tag($0) }
-                } label: {
-                    Text("Auto cleanup")
-                    Text(model.settings.cleanup.detail)
+        let recentApps = recentAppsByContext
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                SettingsSection("Cleanup in every app") {
+                    SettingRow("Auto cleanup", caption: model.settings.cleanup.detail) {
+                        Picker("Auto cleanup", selection: setting(\.cleanup).animation(reveal)) {
+                            ForEach(CleanupLevel.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    VStack(alignment: .leading, spacing: 10) {
+                        example("You say", Self.spokenSample, emphasized: false)
+                        Image(systemName: "arrow.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
+                        example("BetterWispr types", cleanedSample, emphasized: true)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 8, style: .continuous))
+                    .padding([.horizontal, .bottom], 16)
+                    if model.settings.cleanup == .medium {
+                        RowDivider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            NotesModelPicker(model: model)
+                                .disabled(!model.canEditConnections)
+                            if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings) {
+                                Label("\(reason) Until then, Medium dictations get Light cleanup.", systemImage: "exclamationmark.triangle")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 11)
+                        .transition(.opacity)
+                    }
+                } footer: {
+                    Text(cleanupFooter)
                 }
-                .pickerStyle(.segmented)
-                example("You say", Self.spokenSample)
-                example("BetterWispr types", cleanedSample)
-                if model.settings.cleanup == .medium {
-                    NotesModelPicker(model: model)
-                        .disabled(!model.canEditConnections)
-                    if case .unavailable(let reason) = MeetingNotesGenerator.availability(settings: model.settings) {
-                        Label("\(reason) Until then, Medium dictations get Light cleanup.", systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionHeader("Tone by app")
+                    VStack(spacing: 12) {
+                        ForEach(StyleContext.allCases, id: \.self) { context in
+                            toneCard(context, recentApps: recentApps[context])
+                        }
                     }
                 }
-            } header: {
-                Text("Every app")
-            } footer: {
-                Text(cleanupFooter).foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity)
+        }
+        .task { await model.meetings.refreshOllamaModels() }
+    }
 
-            ForEach(StyleContext.allCases, id: \.self) { context in
-                Section {
-                    Picker(selection: tone(context)) {
+    private func toneCard(_ context: StyleContext, recentApps: String?) -> some View {
+        let selected = model.settings.tone(for: context)
+        return Card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: context.symbol)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(Color.primary.opacity(0.06), in: .rect(cornerRadius: 8, style: .continuous))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.title)
+                            .font(.body.weight(.medium))
+                        Text(selected.detail)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Picker("\(context.title) tone", selection: tone(context).animation(reveal)) {
                         ForEach(context.tones, id: \.self) { Text($0.title).tag($0) }
-                    } label: {
-                        Text("Tone")
-                        Text(model.settings.tone(for: context).detail)
                     }
                     .pickerStyle(.segmented)
-                    example("Example", StyleFormatter.apply(model.settings.tone(for: context), to: context.sample))
-                } header: {
-                    Text(context.title)
-                } footer: {
-                    Text(context.apps).foregroundStyle(.secondary)
+                    .labelsHidden()
+                    .fixedSize()
                 }
+                Text(StyleFormatter.apply(selected, to: context.sample))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 8, style: .continuous))
+                    .accessibilityLabel("Example: \(StyleFormatter.apply(selected, to: context.sample))")
+                Text([context.apps, recentApps].compactMap { $0 }.joined(separator: " "))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .formStyle(.grouped)
-        .task { await model.meetings.refreshOllamaModels() }
+    }
+
+    private var reveal: Animation? { reduceMotion ? nil : .smooth(duration: 0.25) }
+
+    private var recentAppsByContext: [StyleContext: String] {
+        Dictionary(grouping: Set(model.history.compactMap(\.appBundleID)), by: { AppCategory(bundleID: $0).style }).compactMapValues { ids in
+            let names = ids.compactMap { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)?.deletingPathExtension().lastPathComponent }.sorted()
+            return names.isEmpty ? nil : "Your recent dictations here went to \(ListFormatter.localizedString(byJoining: names))."
+        }
     }
 
     private var cleanedSample: String {
@@ -134,10 +207,14 @@ struct StyleView: View {
         return "\(destination) It uses the same model as meeting notes, and results vary by model. Other languages, very short dictations and edits that fail, take too long or rewrite too much get Light cleanup. \(original)"
     }
 
-    private func example(_ title: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func example(_ title: String, _ text: String, emphasized: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title)
-            Text(text).foregroundStyle(.secondary)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            Text(text)
+                .foregroundStyle(emphasized ? .primary : .secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
     }

@@ -1,6 +1,8 @@
 # Local transcription accuracy
 
-Research reviewed 2026-10-08. BetterWispr has no measured accuracy benchmark yet.
+Research reviewed 2026-10-08. The only measured accuracy numbers are the
+read-speech Parakeet TDT v3 baseline and the cleanup experiment below. There is
+still no benchmark of natural dictation.
 The goal is to reduce real dictation errors on the user's hardware and languages;
 neither a model leaderboard nor a paper justifies claiming "best accuracy" for
 this application. A network-denied Tiny-model file smoke test and digital-silence
@@ -82,7 +84,10 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    uses FluidAudio's stricter `itnDefaultConfig` similarity floors, because the
    default config replaced "We should render" with "Supabase" on a synthetic
    clip, and keeps the punctuation the decoder put around a replaced word. Boosting runs
-   when the language is English or automatic, since the booster is English-only.
+   when the language is English, or automatic and the decoded text reads as English,
+   since the booster is English-only. Before that check, automatic mode with a
+   vocabulary rewrote a German clip, turning "meine" into "Mike" and "Zauber" into
+   "Zowber".
    On two `say`-synthesized clips it corrected the eight listed terms Parakeet v3
    had misspelled and changed nothing when no vocabulary was given. That is a
    smoke test, not an accuracy measurement. WhisperKit 1.1.0 transcribes with
@@ -115,16 +120,23 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    followed by a word that also appears in the last four words of the same
    sentence and is not a subject pronoun. The cleaner deletes from that earlier
    word through the cue, so "go to Pune, sorry, no, to Delhi" becomes "go to
-   Delhi". A lone "sorry" is an apology, "yes to X, no to Y" has no set-off cue,
-   and a repair that shares no word ("Pune, sorry, no, Delhi") or restarts on a
-   pronoun ("we go, no, we stay") is left alone. "Like", "basically", "sort of"
-   and other repairs and restarts are left alone too. A closed list covers
-   fillers, but general repairs need a trained model and deleting hedges changes
-   meaning ("it basically works"). History keeps the raw output. On the 38 saved
-   Parakeet transcripts available on 2026-10-08, the cleaner removed all 47
-   uh/um and 4 mm tokens and otherwise only collapsed four one-word stutters; no
-   set-off "you know" occurred. Adding the repair rule changed one of those 38
-   outputs, the "Mdabad, sorry, no to Dilli" dictation it was written for.
+   Delhi". A lone "sorry", with or without commas, counts only when the repair
+   restarts on in, at, on, from, near, into, by or with, so "I live in Ahmedabad
+   sorry in Delhi" becomes "I live in Delhi" and "meet at 5 sorry at 6" becomes
+   "meet at 6". Otherwise a lone "sorry" is an apology ("sorry for the wait",
+   "sorry, the train was late"), and "so sorry in" or "sorry in advance" stays.
+   "Yes to X, no to Y" has no set-off cue, and a repair that shares no word
+   ("Pune, sorry, no, Delhi") or restarts on a pronoun ("we go, no, we stay") is
+   left alone. "Like", "basically", "sort of" and other repairs and restarts are
+   left alone too. A closed list covers fillers, but general repairs need a
+   trained model and deleting hedges changes meaning ("it basically works").
+   History keeps the raw output. On the 38 saved Parakeet transcripts available
+   on 2026-10-08, the cleaner removed all 47 uh/um and 4 mm tokens and otherwise
+   only collapsed four one-word stutters; no set-off "you know" occurred. Adding
+   the repair rule changed one of those 38 outputs, the "Mdabad, sorry, no to
+   Dilli" dictation it was written for. Adding the lone "sorry" rule changed none
+   of the 190 saved transcripts available on 2026-10-09; three contain "sorry"
+   and none restarts on a preposition it shares with the words before it.
 
    `VoiceCommands` then writes spoken numbers as digits and spoken symbols as
    @, # and %. "two hundred and fifty thousand" becomes "250,000", "ten
@@ -144,6 +156,17 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    do not form one number ("nineteen ninety nine", "fifty fifty") stay as
    spoken. These rules run only when the language is English or automatic. The
    raw transcript keeps the model's words, and only the final text changes.
+
+   `EmailDictation` then lays out an explicit spoken request such as "write an
+   email to Sarah saying …, best regards, Kartik" as a greeting, a body and a
+   sign-off on their own lines. It needs "write", "draft" or "compose" at the
+   start and "saying", "that", "telling her" or a similar word after the name,
+   so "I will write an email to Sarah" stays as spoken. A sign-off after
+   "thanks" or "cheers" needs a capitalized name, because "thanks, see you
+   soon" is part of the body. A composed email skips the tone and the Medium
+   edit. `TranscriptPolisher` will not follow instructions in the dictation and
+   rejects output much longer than the input, so it cannot write the email
+   itself.
 6. **Measure streaming separately.** Partial text is provisional. Finalize with
    sufficient context, and measure final WER, first-text latency, stop-to-final
    latency and dropped/repeated boundary words. Re-transcribing the full growing
@@ -153,6 +176,71 @@ latency on a Mac or preserve accuracy after conversion/quantization.
 These are engineering recommendations inferred from the sources and failure
 modes above. They do not imply that VAD, model adaptation, streaming decoding or
 an LLM rewrite pipeline are already implemented in BetterWispr.
+
+## Parakeet TDT v3 baseline, 2026-10-09
+
+Measured on an Apple M5 with macOS 26.6.2, a release build of `BetterWisprCLI`
+from commit 33f726a plus the uncommitted 0.1.4 changes, FluidAudio 0.17.5 and a
+warm model cache. The corpus is 355 read-speech clips fetched by
+`scripts/fetch_bench_corpus.py`: 40 evenly spaced clips from each test split of
+LibriSpeech (clean and other) and Multilingual LibriSpeech (German, French,
+Spanish, Italian, Portuguese, Dutch and Polish), with 35 for German after one
+fetch batch failed. This is audiobook speech, not dictation. It measures
+recognition and language handling, not the app's cleanup.
+
+| Language | Clips | WER, language chosen | WER, automatic | CER, language chosen | Recognition p50 / p95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| English | 80 | 2.46% | 2.46% | 0.79% | 0.046 s / 0.117 s |
+| German | 35 | 9.76% | 9.76% | 3.61% | 0.079 s / 0.129 s |
+| French | 40 | 5.21% | 4.86% | 2.02% | 0.116 s / 0.133 s |
+| Spanish | 40 | 7.50% | 7.50% | 3.21% | 0.105 s / 0.134 s |
+| Italian | 40 | 16.49% | 16.49% | 3.27% | 0.102 s / 0.121 s |
+| Portuguese | 40 | 5.38% | 5.38% | 2.03% | 0.106 s / 0.129 s |
+| Dutch | 40 | 12.85% | 12.85% | 3.82% | 0.080 s / 0.124 s |
+| Polish | 40 | 5.35% | 5.35% | 1.16% | 0.108 s / 0.134 s |
+| All | 355 | 7.98% | 7.93% | 2.44% | 0.078 s / 0.129 s |
+
+- English splits into 2.30% WER on test-clean and 2.62% on test-other.
+- Choosing the language matched automatic detection on every set except French,
+  where automatic was better. Parakeet uses the choice only to filter tokens by
+  script, so on this corpus it changed nothing that matters.
+- Italian and Dutch WER is high while CER stays under 4%. Their most frequent
+  differences are archaic spellings in the audiobook references ("esser" for
+  "essere", "pria" for "prima", "z n" for "zijn") that the model writes in
+  modern form. Read those two rows as an upper bound.
+- Recognition took at most 0.28 s on clips of 5 to 17 seconds, 132 to 182 times
+  faster than real time, and preparing the cached model took 0.25 to 0.38 s.
+  Recognition is not where dictation latency comes from on this Mac.
+- Light cleanup changed 2 of the 80 English clips, both by collapsing a doubled
+  word the reader said ("And and", "Truly truly"). WER against the verbatim
+  reference rose to 2.57%, which is the intended dictation behavior.
+
+### Small language model cleanup experiment
+
+The question was whether a small local model that rewrites the transcript after
+recognition helps. The candidate was Superwhisper's
+[S1-mini](https://huggingface.co/superwhisper/s1-mini-GGUF), a Qwen3 0.6B
+fine-tune, run as GGUF Q4_K_M through Ollama with its published prompt,
+temperature 0 and semi-formal styling. It ran after Light cleanup, and its
+output had to pass `TranscriptPolisher`'s acceptance check.
+
+- On 20 `say`-synthesized clips in three voices with fillers, repeats,
+  self-repairs and fluent controls, scored against the intended clean text,
+  WER was 20.3% raw, 16.9% after Light and 2.8% after Light then S1-mini, which
+  fixed every repair and repeat clip. The current Medium path with llama3.1:8b
+  through Ollama scored 12.4% and raised fluent-control WER to 15.3%. Apple's
+  on-device model could not be tested because Apple Intelligence was off.
+- On the 80 fluent English clips above, S1-mini changed 7 and raised WER from
+  2.57% to 2.98%. In one it deleted a real clause, so "as I could not let you, I
+  did not wish to let you go away" became "as I could not let you go away". The
+  acceptance check passed all 80 rewrites because it checks length and new
+  words, not deletions.
+- S1-mini took 0.12 to 0.16 s per call at the median and 0.50 s at most.
+
+S1-mini fixes self-repairs that rules cannot and is fast enough, but it deletes
+fluent speech that looks like a restart. It is not part of the app. Shipping it
+would need a deletion check measured on both sets, an explicit model download
+and a native runtime.
 
 ## Reproducible evaluation
 
@@ -174,7 +262,14 @@ UTF-8 JSON object per line:
 {"id":"silence-001","reference":"","hypothesis":""}
 ```
 
+`BetterWisprCLI --bench` writes these lines for a manifest of clips, and
+`scripts/fetch_bench_corpus.py` builds the read-speech manifest used above.
+
 ```sh
+python3 -I scripts/fetch_bench_corpus.py /tmp/bench 40
+swift build -c release --product BetterWisprCLI
+.build/release/BetterWisprCLI --bench /tmp/bench/manifest.jsonl --model parakeet-v3 > results.jsonl
+python3 scripts/evaluate_transcripts.py results.jsonl --group language
 python3 scripts/evaluate_transcripts.py /path/to/pairs.jsonl
 python3 scripts/evaluate_transcripts.py /path/to/pairs.jsonl --raw
 python3 Tests/evaluate_check.py

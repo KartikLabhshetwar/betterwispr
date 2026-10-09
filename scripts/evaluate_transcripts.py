@@ -82,9 +82,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pairs", type=Path, help="UTF-8 JSONL with reference/hypothesis strings")
     parser.add_argument("--raw", action="store_true", help="keep case, punctuation and symbols")
+    parser.add_argument("--group", metavar="FIELD", help="also score each value of this row field separately")
     args = parser.parse_args()
     try:
-        print(json.dumps(evaluate(read_rows(args.pairs), args.raw), ensure_ascii=False, indent=2))
+        rows = list(read_rows(args.pairs))
+        report = evaluate(rows, args.raw)
+        if args.group:
+            groups = sorted({str(row.get(args.group)) for row in rows})
+            report["groups"] = {group: evaluate([r for r in rows if str(r.get(args.group)) == group], args.raw) for group in groups}
+        print(json.dumps(report, ensure_ascii=False, indent=2))
     except (OSError, ValueError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1

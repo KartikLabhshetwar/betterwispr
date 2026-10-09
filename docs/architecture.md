@@ -22,7 +22,7 @@ Sources/
     Persistence/      SavedState, per-meeting files and atomic local JSON storage
     Audio/            Microphone and system audio capture, temporary recordings and level metering
     Speech/           SpeechProvider contract, model catalog, Apple and WhisperKit
-    Transcription/    English filler/stutter cleanup, optional notes-model polish, writing styles and vocabulary replacements
+    Transcription/    English filler/stutter cleanup, spoken email layout, optional notes-model polish, writing styles and vocabulary replacements
     Notes/            Meeting notes with Apple Intelligence, Ollama, signed-in CLIs and explicit API connections
     Integrations/     Clipboard and guarded paste delivery
   BetterWisprCLI/      Developer entry point for model and file smoke tests
@@ -353,7 +353,12 @@ update only when its EdDSA signature matches `SUPublicEDKey`. Its network use is
 limited to update checks and downloads. Automatic checks are opt-in: Sparkle
 asks on the second launch, and Settings can change automatic checks and
 automatic installs at any time. Update requests carry no audio, transcripts or
-vocabulary, and system profiling stays off. Sparkle keeps these preferences in
+vocabulary, and system profiling stays off. Dictation happens in other apps, so
+`AppUpdater` implements Sparkle's gentle reminders: a scheduled update found
+while BetterWispr is in the background shows an Update toast and an "Install
+BetterWispr" menu bar item instead of Sparkle's alert behind other windows. With
+automatic installs on, a downloaded update shows a Restart toast and the same
+menu item, which installs and relaunches, because the app is rarely quit. Sparkle keeps these preferences in
 its own user defaults, not in `SavedState`. `scripts/release.sh` signs both
 architecture-specific DMGs with the private key in the login keychain and writes
 the appcast. The Apple Silicon item comes first with Sparkle's `arm64` hardware

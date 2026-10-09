@@ -49,8 +49,12 @@ with tempfile.TemporaryDirectory() as folder:
     command = [sys.executable, str(ROOT / "scripts/evaluate_transcripts.py"), str(data)]
     output = subprocess.run(command, capture_output=True, text=True, check=True)
     assert json.loads(output.stdout)["wer"] == 0.6
+    data.write_text("\n".join(json.dumps({**pair, "language": "de" if index else "en"}) for index, pair in enumerate(pairs)), encoding="utf-8")
+    grouped = json.loads(subprocess.run(command + ["--group", "language"], capture_output=True, text=True, check=True).stdout)
+    assert grouped["wer"] == 0.6 and set(grouped["groups"]) == {"en", "de"}
+    assert grouped["groups"]["en"]["utterances"] == 1 and grouped["groups"]["de"]["utterances"] == len(pairs) - 1
     data.write_text('{"reference": broken}', encoding="utf-8")
     output = subprocess.run(command, capture_output=True, text=True)
     assert output.returncode == 1 and "line 1: invalid JSON" in output.stderr
 
-print("Evaluation checks passed (WER, CER, Unicode, silence, validation, CLI).")
+print("Evaluation checks passed (WER, CER, Unicode, silence, validation, CLI, groups).")

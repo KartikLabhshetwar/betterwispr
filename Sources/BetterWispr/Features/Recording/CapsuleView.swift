@@ -25,6 +25,7 @@ struct CapsuleView: View {
     }
     private var showsToolbar: Bool { !showsCard && !model.isBusy && !isMeetingCapturing && hover.isHovering }
     private var spring: Animation? { reduceMotion ? nil : .spring(duration: 0.26, bounce: 0) }
+    private var swap: AnyTransition { reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)) }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -67,25 +68,25 @@ struct CapsuleView: View {
         VStack(spacing: 0) {
             if let failure {
                 failureCard(failure)
-                    .transition(.opacity)
+                    .transition(swap)
             } else if let text = model.unpasted {
                 unpastedCard(text)
-                    .transition(.opacity)
+                    .transition(swap)
             } else if model.phase == .cancelled {
                 cancellationCard
-                    .transition(.opacity)
+                    .transition(swap)
             } else if case .completed(let message) = model.phase {
                 completionCard(message)
-                    .transition(.opacity)
+                    .transition(swap)
             } else if isNotetaking {
                 notetakingPill
-                    .transition(.opacity)
+                    .transition(swap)
             } else if model.isBusy {
                 dictationPill
-                    .transition(.opacity)
+                    .transition(swap)
             } else if showsToolbar {
                 controls
-                    .transition(.opacity)
+                    .transition(swap)
             } else {
                 Color.clear.frame(width: 36, height: 6)
             }
@@ -125,7 +126,7 @@ struct CapsuleView: View {
         .padding(.vertical, 6)
         .background { CapsuleGlass(cornerRadius: 14) }
         .allowsHitTesting(false)
-        .transition(.opacity)
+        .transition(swap)
         .accessibilityElement(children: .combine)
     }
 

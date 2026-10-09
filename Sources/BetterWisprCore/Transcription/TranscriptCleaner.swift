@@ -17,6 +17,8 @@ public enum TranscriptCleaner {
     private static let repairCues: [[String]] = [["sorry"], ["no"], ["wait"], ["oops"], ["actually"], ["i", "mean"]]
     private static let correctingCues: Set<[String]> = [["no"], ["i", "mean"]]
     private static let subjectPronouns: Set<String> = ["i", "we", "you", "he", "she", "it", "they"]
+    private static let repairPrepositions: Set<String> = ["in", "at", "on", "from", "near", "into", "by", "with"]
+    private static let apologyLeads: Set<String> = ["so", "very", "really", "too", "am", "i'm", "i’m", "was", "were", "is", "are", "feel", "felt"]
     private static let repairReach = 4
     private static let sentenceEnders: Set<Character> = [".", "?", "!"]
     private static let terminators = sentenceEnders.union(["…"])
@@ -88,14 +90,14 @@ public enum TranscriptCleaner {
         return setOffBefore && setOffAfter
     }
 
-    /// Turns "to Pune, sorry, no, to Delhi" into "to Delhi" when the repair restarts on a recent non-pronoun word.
+    /// Turns "to Pune, sorry, no, to Delhi" or "in Pune sorry in Delhi" into the repair when it restarts on a recent non-pronoun word.
     private static func dropRepairs(_ tokens: [Token]) -> [Token] {
         var tokens = tokens
         var i = 1
         while i < tokens.count {
             let window = max(0, i - repairReach)..<i
             let sentenceStart = window.last { tokens[$0].trailing.contains(where: terminators.contains) }.map { $0 + 1 } ?? window.lowerBound
-            guard tokens[i - 1].trailing.contains(","), let onset = repairOnset(tokens, at: i),
+            guard let onset = repairOnset(tokens, at: i),
                   let anchor = (sentenceStart..<i).last(where: { tokens[$0].word.lowercased() == tokens[onset].word.lowercased() }),
                   !subjectPronouns.contains(String(tokens[anchor].word.lowercased().prefix { $0 != "'" && $0 != "’" }))
             else { i += 1; continue }
@@ -106,7 +108,7 @@ public enum TranscriptCleaner {
         return tokens
     }
 
-    /// The first repair word after a cue that says "no" or "I mean", set off by a comma unless the cue is compound.
+    /// The first repair word after a comma-set cue that says "no" or "I mean", or after a lone "sorry" that restarts on a place or time word.
     private static func repairOnset(_ tokens: [Token], at start: Int) -> Int? {
         var end = start
         var cues: [[String]] = []
@@ -116,10 +118,14 @@ public enum TranscriptCleaner {
             cues.append(cue)
             end += cue.count
         }
-        guard end > start, end < tokens.count, cues.contains(where: correctingCues.contains),
-              cues.count > 1 || tokens[end - 1].trailing.contains(","),
+        guard end > start, end < tokens.count,
               !tokens[start..<end].contains(where: { $0.trailing.contains(where: terminators.contains) }) else { return nil }
-        return end
+        guard cues == [["sorry"]] else {
+            let setOff = tokens[start - 1].trailing.contains(",") && (cues.count > 1 || tokens[end - 1].trailing.contains(","))
+            return setOff && cues.contains(where: correctingCues.contains) ? end : nil
+        }
+        let restart = tokens[end...].prefix(2).map { $0.word.lowercased() }
+        return repairPrepositions.contains(restart[0]) && restart != ["in", "advance"] && !apologyLeads.contains(tokens[start - 1].word.lowercased()) ? end : nil
     }
 
     private static func destutter(_ tokens: [Token]) -> [Token] {

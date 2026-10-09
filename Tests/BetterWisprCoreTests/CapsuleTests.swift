@@ -141,19 +141,23 @@ import Testing
     #expect(model.phase == .idle)
 }
 
-@Test @MainActor func darkModeIsTheDefaultAndTheToggleSetsTheAppAppearance() throws {
+@Test @MainActor func darkIsTheDefaultThemeAndEachThemeSetsTheAppAppearance() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer {
         NSApplication.shared.appearance = nil
         try? FileManager.default.removeItem(at: folder)
     }
     let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
-    #expect(model.settings.darkMode)
-    model.settings.darkMode = false
+    #expect(model.settings.theme == .dark)
+    model.settings.theme = .light
     model.saveSettings()
     #expect(NSApplication.shared.appearance?.name == .aqua)
-    #expect(try !LocalStore(directory: folder).load().settings.darkMode)
-    model.settings.darkMode = true
+    #expect(try LocalStore(directory: folder).load().settings.theme == .light)
+    model.settings.theme = .dark
     model.saveSettings()
     #expect(NSApplication.shared.appearance?.name == .darkAqua)
+    model.settings.theme = .system
+    model.saveSettings()
+    #expect(NSApplication.shared.appearance == nil)
+    #expect(try LocalStore(directory: folder).load().settings.theme == .system)
 }

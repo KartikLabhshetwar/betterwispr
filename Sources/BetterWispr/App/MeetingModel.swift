@@ -51,6 +51,7 @@ final class MeetingModel {
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var saves: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var heard: (me: Bool, them: Bool) = (false, false)
+    @ObservationIgnored private var levelsShownAt = ContinuousClock.now
 
     init(store: MeetingStore? = nil) {
         self.store = store ?? MeetingStore()
@@ -280,8 +281,7 @@ final class MeetingModel {
                 if session == token { pendingChunks = max(0, pendingChunks - 1) }
             }
             do {
-                let hints = vocabulary.map { $0.replacement.isEmpty ? $0.phrase : $0.replacement }
-                let raw = try await provider.transcribe(audioURL: chunk.url, language: language, vocabulary: hints)
+                let raw = try await provider.transcribe(audioURL: chunk.url, language: language, vocabulary: VocabularyProcessor.hints(vocabulary))
                 guard session == token else { return }
                 let text = VocabularyProcessor.apply(vocabulary, to: TranscriptCleaner.clean(raw, language: language))
                 guard !text.isEmpty else { continue }
@@ -300,7 +300,10 @@ final class MeetingModel {
     }
 
     private func receive(_ levels: (me: Float, them: Float)) {
-        self.levels = levels
+        if levelsShownAt.duration(to: .now) >= .milliseconds(33) {
+            self.levels = levels
+            levelsShownAt = .now
+        }
         if levels.me > 0.05 { heard.me = true }
         if levels.them > 0.01 {
             heard.them = true

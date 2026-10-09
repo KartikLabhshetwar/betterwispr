@@ -1,5 +1,4 @@
 @preconcurrency import AVFoundation
-import AppKit
 import FluidAudio
 import Foundation
 import Testing
@@ -223,7 +222,7 @@ func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSecond
 }
 
 @MainActor
-@Test func microphoneObserverCoalescesDeviceAndDisplayChangesAndIgnoresThemAfterCancel() async throws {
+@Test func microphoneObserverCoalescesChangesAndIgnoresThemAfterCancel() async throws {
     var changes = 0
     let observer = AudioInputObserver { changes += 1 }
     defer { observer.cancel() }
@@ -232,15 +231,10 @@ func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSecond
     }
     try await Task.sleep(for: .milliseconds(600))
     #expect(changes == 1)
-    for _ in 0..<2 {
-        NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
-    }
-    try await Task.sleep(for: .milliseconds(600))
-    #expect(changes == 2)
     observer.scheduleCheck()
     observer.cancel()
     try await Task.sleep(for: .milliseconds(600))
-    #expect(changes == 2)
+    #expect(changes == 1)
 }
 
 @Test func waveformPlaysBufferSlicesAcrossTheirDuration() {

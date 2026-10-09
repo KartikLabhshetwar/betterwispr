@@ -345,14 +345,14 @@ final class AppModel {
                 try await self.prepare(model, language: writingSettings.language)
                 try Task.checkCancellation()
                 guard self.generation == token, let provider = self.provider else { return }
-                let hints = entries.map { $0.replacement.isEmpty ? $0.phrase : $0.replacement }
                 let recognitionStarted = ContinuousClock.now
-                let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: hints)
+                let raw = try await provider.transcribe(audioURL: audio.url, language: language, vocabulary: VocabularyProcessor.hints(entries))
                 Logger(subsystem: "org.betterwispr.app", category: "DictationTiming").notice("Recognition completed: elapsed=\(String(describing: recognitionStarted.duration(to: .now)), privacy: .public) empty=\(raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)")
                 try Task.checkCancellation()
                 guard self.generation == token else { return }
                 let cleaned = cleanup == .none ? raw.trimmingCharacters(in: .whitespacesAndNewlines) : TranscriptCleaner.clean(raw, language: language)
-                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(cleaned) : cleaned
+                let heard = VocabularyProcessor.correctedCommands(entries, in: cleaned)
+                var spoken = language == nil || language?.hasPrefix("en") == true ? VoiceCommands.apply(heard.text) : heard.text
                 let english = TranscriptCleaner.isEnglish(spoken, language: language)
                 if english, cleanup == .medium, MeetingNotesGenerator.availability(settings: writingSettings) == .available {
                     self.statusMessage = "Editing with \(writingSettings.notesModelName)…"
@@ -367,7 +367,7 @@ final class AppModel {
                 self.partialTranscript = text
                 let transcript = Transcript(text: text, rawText: raw, duration: audio.duration,
                                             modelName: model.name, language: language ?? "auto",
-                                            appBundleID: appBundleID, vocabularyFixes: fixes + provider.vocabularyFixes)
+                                            appBundleID: appBundleID, vocabularyFixes: fixes + heard.fixes + provider.vocabularyFixes)
                 var persistenceWarning: String?
                 if writingSettings.saveHistory {
                     self.history.insert(transcript, at: 0)
@@ -889,7 +889,7 @@ final class AppModel {
 
     private func refreshMicrophones() {
         microphones = AudioInputs.available()
-        automaticMicrophone = AudioInputs.automatic()
+        automaticMicrophone = AudioInputs.systemDefault()
     }
 
     func dismissCard() {

@@ -17,7 +17,7 @@ struct VocabularyView: View {
                 Text("Add a Word")
             } footer: {
                 HStack(alignment: .top) {
-                    Text("Leave “Write as” empty to add a spelling hint. Replacements apply to whole phrases, so unrelated words stay intact.")
+                    Text("Leave “Write as” empty to add a spelling hint. To fix a misheard command, write the command, such as “Kocia mark” as “question mark”. Replacements apply to whole phrases, so unrelated words stay intact.")
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 20)
                     Button("Add Word", action: addEntry)

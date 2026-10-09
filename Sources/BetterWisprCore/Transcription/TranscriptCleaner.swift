@@ -9,7 +9,11 @@ public enum TranscriptCleaner {
 
     private static let fillers: Set<String> = ["uh", "uhh", "uhm", "um", "umm", "er", "erm", "hm", "hmm", "mm", "mmm"]
     private static let keptDoubles: Set<String> = ["that", "had", "is", "very", "really", "long", "bye", "no", "ha"]
-    private static let numberWords: Set<String> = ["zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]
+    private static let numberWords: Set<String> = [
+        "zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    ]
     private static let repairCues: [[String]] = [["sorry"], ["no"], ["wait"], ["oops"], ["actually"], ["i", "mean"]]
     private static let correctingCues: Set<[String]> = [["no"], ["i", "mean"]]
     private static let subjectPronouns: Set<String> = ["i", "we", "you", "he", "she", "it", "they"]

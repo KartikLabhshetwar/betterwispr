@@ -47,37 +47,29 @@ import Testing
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }
 
-@Test func chosenMicrophoneIsUsedOnlyWhileConnected() {
-    let builtIn = AudioInputs.Input(device: .init(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone"), connection: .builtIn)
-    let airPods = AudioInputs.Input(device: .init(id: "AA-BB-CC:input", name: "AirPods Pro"), connection: .bluetooth)
-    let renamed = AudioInputs.Input(device: .init(id: airPods.device.id, name: "Kartik’s AirPods"), connection: .bluetooth)
-    func resolve(_ choice: AudioInputs.Input?, _ inputs: [AudioInputs.Input], default systemDefault: AudioInputs.Input?) -> AudioInputDevice? {
-        AudioInputs.resolve(choice?.device, inputs: inputs, systemDefault: systemDefault?.device, lidClosed: false)
+@Test func microphoneIsTheChosenDeviceWhileConnectedOtherwiseTheMacOSDefaultIncludingBluetooth() {
+    let builtIn = AudioInputDevice(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone")
+    let airPods = AudioInputDevice(id: "AA-BB-CC:input", name: "Kartik AirPods Pro")
+    let headset = AudioInputDevice(id: "DD-EE-FF:input", name: "Sony WH-1000XM5")
+    let usb = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
+    let iPhone = AudioInputDevice(id: "iPhone-continuity", name: "iPhone Microphone")
+    let renamed = AudioInputDevice(id: airPods.id, name: "Kartik’s AirPods")
+    func resolve(_ choice: AudioInputDevice?, _ connected: [AudioInputDevice], default systemDefault: AudioInputDevice?) -> AudioInputDevice? {
+        AudioInputs.resolve(choice, inputs: connected.map { AudioInputs.Input(device: $0) }, systemDefault: systemDefault)
     }
-    #expect(resolve(airPods, [builtIn, airPods], default: builtIn) == airPods.device)
-    #expect(resolve(builtIn, [builtIn, airPods], default: airPods) == builtIn.device)
-    #expect(resolve(airPods, [builtIn], default: builtIn) == builtIn.device)
-    #expect(resolve(airPods, [builtIn, renamed], default: builtIn) == renamed.device)
-    #expect(resolve(airPods, [], default: nil) == nil)
-    let usb = AudioInputs.Input(device: .init(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7"), connection: .other)
-    #expect(resolve(usb, [builtIn, airPods], default: airPods) == builtIn.device)
-}
-
-@Test func automaticMicrophoneKeepsBluetoothHeadphonesOutOfCallQuality() {
-    let builtIn = AudioInputs.Input(device: .init(id: "BuiltInMicrophoneDevice", name: "MacBook Pro Microphone"), connection: .builtIn)
-    let usb = AudioInputs.Input(device: .init(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7"), connection: .other)
-    let airPods = AudioInputs.Input(device: .init(id: "AA-BB-CC:input", name: "AirPods Pro"), connection: .bluetooth)
-    let iPhone = AudioInputs.Input(device: .init(id: "iPhone-continuity", name: "iPhone Microphone"), connection: .other)
-    func automatic(_ inputs: [AudioInputs.Input], default systemDefault: AudioInputs.Input?, lidClosed: Bool = false) -> AudioInputDevice? {
-        AudioInputs.resolve(nil, inputs: inputs, systemDefault: systemDefault?.device, lidClosed: lidClosed)
-    }
-    #expect(automatic([iPhone, usb, airPods, builtIn], default: airPods) == builtIn.device)
-    #expect(automatic([iPhone, builtIn, airPods, usb], default: airPods, lidClosed: true) == airPods.device)
-    #expect(automatic([iPhone, usb, airPods], default: airPods) == airPods.device)
-    #expect(automatic([builtIn, airPods, usb], default: usb) == usb.device)
-    #expect(automatic([builtIn, airPods, iPhone], default: iPhone) == iPhone.device)
-    #expect(automatic([builtIn, airPods], default: nil) == nil)
-    #expect(AudioInputs.resolve(airPods.device, inputs: [builtIn, airPods], systemDefault: airPods.device, lidClosed: false) == airPods.device)
+    #expect(resolve(nil, [iPhone, usb, airPods, builtIn], default: airPods) == airPods)
+    #expect(resolve(nil, [builtIn, airPods, headset], default: headset) == headset)
+    #expect(resolve(nil, [builtIn, airPods, usb], default: usb) == usb)
+    #expect(resolve(nil, [builtIn, airPods, iPhone], default: iPhone) == iPhone)
+    #expect(resolve(airPods, [builtIn, headset], default: headset) == headset)
+    #expect(resolve(usb, [builtIn, airPods], default: airPods) == airPods)
+    #expect(resolve(airPods, [builtIn], default: builtIn) == builtIn)
+    #expect(resolve(airPods, [builtIn, airPods], default: builtIn) == airPods)
+    #expect(resolve(airPods, [builtIn, airPods, headset], default: headset) == airPods)
+    #expect(resolve(builtIn, [builtIn, airPods], default: airPods) == builtIn)
+    #expect(resolve(airPods, [builtIn, renamed], default: builtIn) == renamed)
+    #expect(resolve(nil, [builtIn, airPods], default: nil) == nil)
+    #expect(resolve(usb, [builtIn, airPods], default: nil) == nil)
 }
 
 @Test func shortcutsValidateKeysAndRoundTripThroughSettings() throws {
@@ -195,6 +187,7 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(TranscriptCleaner.clean("a long long time ago", language: "en") == "a long long time ago")
     #expect(TranscriptCleaner.clean("call 5 5 5 now", language: "en") == "call 5 5 5 now")
     #expect(TranscriptCleaner.clean("dial one one two", language: "en") == "dial one one two")
+    #expect(TranscriptCleaner.clean("in twenty twenty five, a fifty fifty split", language: "en") == "in twenty twenty five, a fifty fifty split")
     #expect(TranscriptCleaner.clean("uh-huh, that sounds right", language: "en") == "uh-huh, that sounds right")
 }
 
@@ -218,12 +211,127 @@ func standaloneModifiersRoundTripThroughSettings(keyCode: UInt32) throws {
     #expect(VoiceCommands.apply("Please remove that file") == "Please remove that file")
     #expect(VoiceCommands.apply("I love the Oxford comma") == "I love the Oxford comma")
     #expect(VoiceCommands.apply("the period ended") == "the period ended")
+    #expect(VoiceCommands.apply("Exclamatory mark.") == "!")
+    #expect(VoiceCommands.apply("Hyphen.") == "-")
+    #expect(VoiceCommands.apply("colon") == ":")
+    #expect(VoiceCommands.apply("dash") == "–")
+}
+
+@Test func vocabularyTeachesMisheardVoiceCommands() {
+    let entries = [VocabularyEntry(phrase: "Kocia Mark", replacement: "question mark"),
+                   VocabularyEntry(phrase: "Hai fun", replacement: "hyphen"),
+                   VocabularyEntry(phrase: "Coma", replacement: "comma"),
+                   VocabularyEntry(phrase: "at the Red", replacement: "at the rate"),
+                   VocabularyEntry(phrase: "twenty one pilots", replacement: "Twenty One Pilots"),
+                   VocabularyEntry(phrase: "jurassic pyramid", replacement: "Jurassic Period"),
+                   VocabularyEntry(phrase: "better whisper", replacement: "BetterWispr"),
+                   VocabularyEntry(phrase: "Kubernetes", replacement: "")]
+    let dictated = [
+        "Kocia Mark.": "?",
+        "Hai fun.": "-",
+        "Hi, Coma, how are you doing?": "Hi, how are you doing?",
+        "Hey, at the Red Harsh Gupta.": "Hey, @Harsh Gupta.",
+        "I love the jurassic pyramid": "I love the jurassic pyramid",
+    ]
+    for (heard, written) in dictated {
+        #expect(VoiceCommands.apply(VocabularyProcessor.correctedCommands(entries, in: heard).text) == written)
+    }
+    #expect(VocabularyProcessor.correctedCommands(entries, in: "Hi, Coma, Kocia Mark").fixes == 2)
+    #expect(VocabularyProcessor.hints(entries) == ["Twenty One Pilots", "Jurassic Period", "BetterWispr", "Kubernetes"])
+    #expect(!VoiceCommands.isSpokenCommand("") && !VoiceCommands.isSpokenCommand("42") && !VoiceCommands.isSpokenCommand("BetterWispr"))
+    #expect(VoiceCommands.isSpokenCommand("new line") && VoiceCommands.isSpokenCommand("hash forty two"))
 }
 
 @Test func voiceCommandsTurnAtTheRateIntoMentions() {
     #expect(VoiceCommands.apply("ping at the rate KV about it") == "ping @KV about it")
     #expect(VoiceCommands.apply("ask at sign Sam") == "ask @Sam")
-    #expect(VoiceCommands.apply("growing at the rate of 5 percent") == "growing at the rate of 5 percent")
+    #expect(VoiceCommands.apply("growing at the rate of 5 percent") == "growing at the rate of 5%")
+}
+
+@Test func voiceCommandsWriteSpokenNumbersAsDigits() {
+    let expected = [
+        "The budget is two hundred and fifty thousand dollars.": "The budget is 250,000 dollars.",
+        "We have one hundred people and two hundred chairs.": "We have 100 people and 200 chairs.",
+        "one hundred or two hundred": "100 or 200",
+        "one hundred and two hundred": "100 and 200",
+        "from zero to twenty seven": "from zero to 27",
+        "twenty-seven": "27",
+        "Two hundred people came.": "200 people came.",
+        "It cost two hundred.": "It cost 200.",
+        "I waited ten minutes": "I waited 10 minutes",
+        "one thousand two hundred": "1200",
+        "two thousand twenty six": "2026",
+        "one million two hundred thousand": "1,200,000",
+        "five million": "5 million",
+        "two point five million": "2.5 million",
+        "The value is three point five.": "The value is 3.5.",
+        "Update the changelog for zero point one point one.": "Update the changelog for 0.1.1.",
+        "a hundred and fifty": "150",
+        "It has one hundred K views.": "It has 100K views.",
+        "Growth was ten percent this year, almost twenty five percentage.": "Growth was 10% this year, almost 25%.",
+        "five percent": "5%",
+        "5 percent": "5%",
+        "5 per cent": "5%",
+        "fifty percent.": "50%.",
+        "twenty, thirty": "20, 30",
+        "I have one lakh followers.": "I have 1 lakh followers.",
+        "The flat costs fifty lakhs.": "The flat costs 50 lakhs.",
+        "We raised two lakh fifty thousand rupees.": "We raised 2,50,000 rupees.",
+        "The budget is one crore twenty lakh.": "The budget is 1,20,00,000.",
+        "Revenue was two point five crore.": "Revenue was 2.5 crore.",
+        "It costs twelve hundred dollars.": "It costs 1200 dollars.",
+        "twenty five hundred": "2500",
+        "I have over ten thousand hundred followers.": "I have over 10,000 hundred followers.",
+        "Ten thousand one lakh.": "10,000 1 lakh.",
+        "five thousand million": "5000 million",
+    ]
+    for (spoken, written) in expected {
+        #expect(VoiceCommands.apply(spoken) == written)
+    }
+    let unchanged = [
+        "one of them", "no one", "at one point we", "two or three", "give me five minutes", "at one point we left",
+        "a hundred times", "a thousand thanks", "what percentage of users", "nineteen ninety nine", "fifty fifty",
+        "eleven thirty", "twenty first century", "call 5 5 5 now",
+    ]
+    for text in unchanged {
+        #expect(VoiceCommands.apply(text) == text)
+    }
+}
+
+@Test func voiceCommandsWriteSpokenSymbols() {
+    let expected = [
+        "Ping at the rate K V about it.": "Ping @KV about it.",
+        "At the rate k v.": "@kv.",
+        "At the rate.": "@",
+        "at sign": "@",
+        "at symbol": "@",
+        "Send it to kartik at the rate gmail dot com.": "Send it to kartik@gmail.com.",
+        "Send it to Kardich at the rategmail.com.": "Send it to Kardich@gmail.com.",
+        "Send it to Kardak at the rategmail. com": "Send it to Kardak@gmail.com",
+        "visit example dot com": "visit example.com",
+        "Book it on mysite dot in.": "Book it on mysite.in.",
+        "Post it with hashtag launch day.": "Post it with #launch day.",
+        "hash tag launch": "#launch",
+        "Check issue hash forty two.": "Check issue #42.",
+        "Hash.": "#",
+        "Hashtag.": "#",
+        "hash sign": "#",
+        "hash symbol": "#",
+        "Percentage.": "%",
+        "Percent.": "%",
+        "percent sign": "%",
+        "percentage sign": "%",
+    ]
+    for (spoken, written) in expected {
+        #expect(VoiceCommands.apply(spoken) == written)
+    }
+    for text in [
+        "the interest at the rate is high", "the dot com bubble", "a red dot in the corner",
+        "Sales fell. Net income rose.",
+        "We need to hash out a plan using a hash map.",
+    ] {
+        #expect(VoiceCommands.apply(text) == text)
+    }
 }
 
 @Test func correctionLearnerKeepsVocabularyFixesOnly() {

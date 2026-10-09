@@ -93,7 +93,9 @@ punctuation, line breaks and "scratch that" from Scribe
 revision `3c69a914a2767f5d3a3917f7b8b609b082d09164`, MIT. The upstream license
 and copyright are retained in the source. Changes delete back to the previous
 sentence, accept "remove that" only when set off by punctuation or an apology,
-keep phrases like "the Oxford comma" as prose and turn "at the rate KV" into "@KV".
+keep phrases like "the Oxford comma" as prose, turn "at the rate KV" into "@KV"
+and add the # and % symbols and spoken email addresses. `SpokenNumbers.swift`
+is original BetterWispr code.
 
 `Sources/BetterWisprCore/Transcription/CorrectionLearner.swift` ports
 [`src/utils/correctionLearner.js`](https://github.com/OpenWhispr/openwhispr/blob/4881a74d7273e3d12ca91a0b46204ad80ea03e9a/src/utils/correctionLearner.js)

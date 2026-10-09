@@ -6,6 +6,16 @@ public enum VocabularyProcessor {
         corrected(entries, in: text).text
     }
 
+    /// The spellings to boost; spoken commands are left out because boosting them rewrites neighbouring words.
+    public static func hints(_ entries: [VocabularyEntry]) -> [String] {
+        entries.filter { !VoiceCommands.isSpokenCommand($0.replacement) }.map { $0.replacement.isEmpty ? $0.phrase : $0.replacement }
+    }
+
+    /// Applies only the entries written as a spoken command, so "Kocia Mark" can become "question mark" before voice commands run.
+    public static func correctedCommands(_ entries: [VocabularyEntry], in text: String) -> (text: String, fixes: Int) {
+        corrected(entries.filter { VoiceCommands.isSpokenCommand($0.replacement) }, in: text)
+    }
+
     /// Applies vocabulary and counts the matches whose spelling actually changed.
     public static func corrected(_ entries: [VocabularyEntry], in text: String) -> (text: String, fixes: Int) {
         let entries = entries.filter { !$0.phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

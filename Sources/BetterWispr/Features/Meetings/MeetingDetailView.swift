@@ -168,8 +168,8 @@ struct MeetingDetailView: View {
                         HStack(spacing: 12) {
                             microphoneMenu
                             Spacer(minLength: 0)
-                            LevelMeter(label: "Me", level: meetings.levels.me, reduceMotion: reduceMotion)
-                            LevelMeter(label: "Them", level: meetings.levels.them, reduceMotion: reduceMotion)
+                            LevelMeter(meetings: meetings, speaker: .me, reduceMotion: reduceMotion)
+                            LevelMeter(meetings: meetings, speaker: .them, reduceMotion: reduceMotion)
                         }
                         .padding(.horizontal, 14)
                         .frame(height: 38)
@@ -360,8 +360,7 @@ struct MeetingDetailView: View {
     @ViewBuilder private func transcript(_ meeting: Meeting) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 12) {
-                Label(durationLabel(isRecording ? meetings.elapsed : meeting.duration), systemImage: "clock")
-                    .monospacedDigit()
+                MeetingClock(meetings: meetings, duration: meeting.duration, isRecording: isRecording)
                 Spacer()
                 Button { showsSearch.toggle(); transcriptQuery = "" } label: {
                     Image(systemName: "magnifyingglass")
@@ -461,27 +460,41 @@ struct MeetingDetailView: View {
     private static let audioSettings = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
 }
 
+/// Reads the audio level in its own body so the meter's many updates a second don't rebuild the transcript.
 private struct LevelMeter: View {
-    let label: String
-    let level: Float
+    let meetings: MeetingModel
+    let speaker: Speaker
     let reduceMotion: Bool
 
     var body: some View {
+        let level = min(1, max(0, speaker == .me ? meetings.levels.me : meetings.levels.them))
         HStack(spacing: 5) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(speaker.label).font(.caption).foregroundStyle(.secondary)
             Capsule()
                 .fill(.quaternary)
                 .frame(width: 30, height: 5)
                 .overlay(alignment: .leading) {
                     Capsule()
-                        .fill(label == "Me" ? Color.green : Color.blue)
-                        .frame(width: 30 * CGFloat(min(1, max(0, level))))
+                        .fill(speaker == .me ? Color.green : Color.blue)
+                        .frame(width: 30 * CGFloat(level))
                 }
                 .animation(reduceMotion ? nil : .linear(duration: 0.1), value: level)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(label) level")
-        .accessibilityValue("\(Int(min(1, max(0, level)) * 100)) percent")
+        .accessibilityLabel("\(speaker.label) level")
+        .accessibilityValue("\(Int(level * 100)) percent")
+    }
+}
+
+/// Reads the running time in its own body so each tick redraws only the clock.
+private struct MeetingClock: View {
+    let meetings: MeetingModel
+    let duration: TimeInterval
+    let isRecording: Bool
+
+    var body: some View {
+        Label(durationLabel(isRecording ? meetings.elapsed : duration), systemImage: "clock")
+            .monospacedDigit()
     }
 }
 

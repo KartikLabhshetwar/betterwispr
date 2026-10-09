@@ -41,11 +41,16 @@ Sources/
    drains the in-flight input buffer and closes the file before preparing the
    selected provider and recognizing it.
 4. Pass the recording URL, selected language and vocabulary hints to the provider.
+   Entries written as a voice command ("question mark", "at the rate") are not
+   hints, because boosting command words drops neighbouring words.
    Provider partial callbacks are provisional text during recognition, not audio
    streaming while capture is still running.
 5. Post-process the recognized text in a fixed order. Auto cleanup **None**
    only trims; **Light** (the default) removes English filled pauses and
-   unpunctuated stutters. Apply voice commands for English and Auto. For English
+   unpunctuated stutters. Apply vocabulary entries written as a voice command,
+   so a misheard "Kocia Mark" becomes "question mark". Then apply voice
+   commands, spoken numbers as digits and the @, # and % symbols for English
+   and Auto. For English
    text, **Medium** then asks the notes model the user chose in Models (Apple
    Intelligence, Ollama, a signed-in CLI or an API connection) for a clarity edit
    with `TranscriptPolisher` instructions. The edit is bounded by a timeout and
@@ -168,17 +173,16 @@ deleted, and its expand button opens the meeting in the dashboard instead.
 `AudioInputs` lists Core Audio devices with an input stream, keyed by UID, and
 skips private aggregate devices (Core Audio's per-process default aggregate and
 BetterWispr's system audio tap). `AppSettings.microphone` is the saved choice;
-nil means Automatic, which follows the macOS default input with one exception.
-Recording from a Bluetooth headset's microphone switches its playback to the
-call profile (measured 48 to 24 kHz on AirPods Pro), so when the default input
-is Bluetooth and IOKit reports no closed MacBook lid (desktops never do),
-Automatic uses the built-in microphone. A closed lid disconnects the built-in microphone, so
-the Bluetooth default is used then. Other inputs, such as USB, dock or HDMI
-capture devices, are not substituted automatically because some deliver only
-silence. A chosen microphone is used only while it is connected, otherwise
-Automatic is used. Both recorders use `MicrophoneInput`, an input-only Core Audio
-queue bound to that UID. It requests the device's native rate/channel count and
-20 ms interleaved Float32 buffers. Audio Queue delivers buffers on a serial
+nil means Automatic, which is the macOS default input, Bluetooth headsets
+included. A chosen microphone is used only while it is connected, otherwise
+Automatic is used; there is no other fallback. Recording from a Bluetooth
+headset's microphone switches the headset to its call profile (measured 48 to
+24 kHz playback on AirPods Pro), so its sound drops to call quality while a
+dictation or meeting records from it and recovers when recording stops.
+Choosing the built-in microphone in Settings avoids that. Both recorders use
+`MicrophoneInput`, an input-only Core Audio queue bound to that UID. It
+requests the device's native rate/channel count and 20 ms interleaved Float32
+buffers. Audio Queue delivers buffers on a serial
 worker, where existing writers handle files and levels. No file writes or locks
 run on the hardware's real-time IO thread. Stop disposes the queue
 synchronously, so no callback runs after it returns. The microphone is active only during recording.
@@ -199,9 +203,8 @@ buffers, so a Bluetooth device's larger batches do not dilute brief, quiet
 speech. Waveform calibration remembers digital silence and timestamps delivered
 slices in the past instead of replaying them with another buffer of delay.
 
-`AudioInputObserver` reports connects, disconnects, default-input changes and
-screen-parameter changes (closing the lid on an external display removes the
-built-in screen), debounced on the main actor. The settings picker and the meeting card's
+`AudioInputObserver` reports connects, disconnects and default-input changes,
+debounced on the main actor. The settings picker and the meeting card's
 microphone menu refresh from it. During capture it also listens for the selected
 device's stream-format, nominal-rate and alive-state changes, including Bluetooth
 profile changes that keep the same UID. The recorders restart when the resolved

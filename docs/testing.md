@@ -441,6 +441,10 @@ retries. They do not access Keychain, mount disk images or submit to Apple.
   Tuesday." is pasted. "Please remove that file" stays as spoken.
 - [ ] In Slack, say "ping at the rate KV". Expect "ping @KV". Whether Slack then
   opens its mention picker is Slack's behavior; record what happens.
+- [ ] Say "question mark" alone until the model mishears it, for example as
+  "Kocia Mark". Add that as a Vocabulary phrase written as "question mark" and
+  say it again. Expect "?". "In a coma" and "at the red light" stay as spoken
+  unless you added "coma" or "at the red" yourself.
 - [ ] Dictate a name into TextEdit, fix the spelling within 30 seconds and wait
   about 4 seconds. Expect a "Learned" toast and a Learned entry in Vocabulary.
   Repeat in Notes and in a freshly launched Electron app such as Claude or
@@ -622,19 +626,19 @@ were not exercised in this UI pass.
   appearing after the switch.
 - [ ] With Microphone set to Automatic, connect and disconnect AirPods and a USB
   mic during a meeting. The card's microphone label follows the macOS default
-  input each time, except that an AirPods default keeps the built-in mic while
-  the lid is open, and Me entries keep appearing. Pick a specific mic from the
-  card menu mid-meeting; capture switches to it without stopping the meeting.
+  input each time, AirPods included, and Me entries keep appearing. Pick a
+  specific mic from the card menu mid-meeting; capture switches to it without
+  stopping the meeting.
 - [ ] With Microphone set to Automatic and AirPods as the macOS input and
-  output, play a video and dictate. The picker shows "Automatic (MacBook Pro
-  Microphone)", the waveform follows your voice, and the video keeps full sound
-  quality. Choose the AirPods in Settings and repeat; playback drops to call
-  quality only while recording and recovers after it stops.
+  output, play a video and dictate. The picker shows "Automatic" with the
+  AirPods name, the waveform follows your voice, and playback drops to call
+  quality only while recording and recovers after it stops. Choose the built-in
+  microphone in Settings and repeat; the video keeps full sound quality.
 - [ ] With Microphone set to Automatic and AirPods as the macOS input, start a
   meeting with the lid open, then close the lid on an external display. Me
-  capture moves to the AirPods and keeps producing entries. Open the lid;
-  capture returns to the built-in mic. Repeat during a dictation; speech from
-  before and after closing the lid is transcribed.
+  capture stays on the AirPods and keeps producing entries, before and after
+  the lid opens again. Repeat during a dictation; speech from before and after
+  closing the lid is transcribed.
 - [ ] With the AirPods chosen in Settings, start dictation. Repeat immediately
   after connecting them and after an app starts/stops headset playback. The
   waveform moves and stopping produces a nonempty recording. Repeat with a USB microphone.
@@ -642,7 +646,7 @@ were not exercised in this UI pass.
   and a USB mic, then choose the AirPods in Settings and disconnect/reconnect
   the headset. Speech captured before
   and after each switch is retained at the correct speed. Repeat with the AirPods
-  as the macOS default; Automatic stays on the built-in mic.
+  as the macOS default; Automatic records from the AirPods.
 - [ ] During a meeting, repeat those switches and headset profile changes.
   "Me" capture resumes, earlier chunks remain, offsets stay ordered, and
   "Them" capture continues. Repeat with a specifically selected microphone.
@@ -653,7 +657,9 @@ were not exercised in this UI pass.
   system audio running. Reconnecting an input resumes the meeting microphone.
 - [ ] Choose a USB mic in Settings, unplug it, and dictate. Dictation uses
   Automatic; the picker shows the mic as "(not connected)". Plug it back in
-  and it is used again without reselecting.
+  and it is used again without reselecting. Repeat with saved AirPods turned
+  off and another Bluetooth headset as the macOS input; dictation records from
+  that headset.
 - [ ] The microphone list in Settings and in the card matches System Settings,
   Sound, Input, and never lists "CADefaultDeviceAggregate" or
   "BetterWispr Meeting Audio", including while a meeting is recording.

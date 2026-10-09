@@ -4,6 +4,24 @@ All notable changes to BetterWispr are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/). The current version lives in `VERSION`.
 
+## [0.1.4] - 2026-10-09
+
+### Added
+- English dictation writes spoken numbers as digits with every speech model, including Parakeet models that write numbers as words. "Two hundred and fifty thousand" becomes 250,000, "one hundred or two hundred" becomes "100 or 200", "two point five million" becomes "2.5 million" and "zero point one point one" becomes 0.1.1. A lone small number ("give me five minutes"), "a hundred times", ordinals, years said as pairs ("nineteen ninety nine") and digit-by-digit phone numbers stay as spoken.
+- Spoken numbers understand Indian English "lakh" and "crore": "one lakh" becomes "1 lakh", "two lakh fifty thousand" becomes 2,50,000 and "two point five crore" becomes "2.5 crore". "Twelve hundred" becomes 1200, and a phrase that is not one number keeps its readable part as digits, so "ten thousand hundred followers" becomes "10,000 hundred followers".
+- English dictation writes spoken symbols. "At the rate" or "at sign" writes @ ("ping at the rate KV" becomes "ping @KV", "name at the rate gmail dot com" becomes name@gmail.com), "hashtag launch" becomes #launch, "issue hash forty two" becomes "issue #42" and "ten percent" or "ten percentage" becomes 10%. Saying only "at the rate", "hash", "hashtag", "percent" or "percentage" writes just the symbol. Phrases like "hash out a plan" and "what percentage of users" stay as words. An address the model hears as "gmail. com" or "at the rategmail.com" is joined back into one address.
+- Vocabulary can fix a voice command the speech model mishears in your accent. Add what it wrote as the spoken phrase and the command as "Write as", such as "Kocia Mark" written as "question mark", "Coma" as "comma", "at the Red" as "at the rate" or "Hai fun" as "hyphen". These entries run before voice commands, so the dictation gets "?", a comma, "@" or "-". They are not sent to the phrase booster, because boosting command words dropped neighbouring words in testing.
+- "Exclamatory mark" writes "!", and saying only "hyphen", "colon" or "dash" writes just that mark.
+
+### Changed
+- While a dictation is being transcribed, the pill shows a spinner instead of the moving bars.
+- Automatic microphone follows Sound settings again, so AirPods and other Bluetooth headsets are used when macOS picks them, with the lid open or closed. A chosen microphone that is disconnected now falls back to the same macOS default instead of skipping a connected headset. Recording from a Bluetooth headset's microphone still drops its playback to call quality until you stop; choose your Mac's own microphone in Settings to avoid that.
+
+### Fixed
+- Cleanup no longer drops a repeated number word as a stutter, so "twenty twenty five" and "fifty fifty" keep both words.
+- Meeting notes no longer lag while recording. The Me and Them meters used to redraw the whole notetaker window and the floating pill on every audio buffer, about 140 times a second. Now only the meters and the clock redraw, at most 30 times a second.
+- Tapping the notetaker pill while a meeting is still starting no longer silently cancels it. A tap stops a meeting only once it is recording; Cancel in the notetaker window, the pill's menu and the menu bar still cancel a meeting that is starting.
+
 ## [0.1.3] - 2026-10-08
 
 ### Fixed

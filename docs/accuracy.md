@@ -88,6 +88,16 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    smoke test, not an accuracy measurement. WhisperKit 1.1.0 transcribes with
    its greedy sampler only, so biasing methods that need beam search do not
    apply to it without upstream work.
+   Spoken commands are not boosted. On 16 `say` clips in two Indian English
+   voices, boosting "comma", "at the rate", "question mark", "exclamation mark"
+   and "hyphen" with Parakeet v2 fixed 2 clips and broke 11. "In a coma" became
+   "in a comma", "the red light" became "the rate light", and the word before a
+   command was dropped ("Is this right question mark" became "Is this question
+   mark?"). Instead, a vocabulary entry whose replacement is wholly a voice
+   command, such as "Kocia Mark" written as "question mark", is applied before
+   voice commands, so a user's own mishearing still becomes "?". Those entries
+   are not sent as hints. Mishearings such as "coma" and "at the red" are not
+   built in, because "in a coma" and "at the red light" are real phrases.
 5. **Separate recognition from rewriting.** First measure verbatim output. Local
    formatting or an optional local LLM must be scored separately and must not
    silently change negation, numbers, names or intent. Preserve raw and edited
@@ -115,6 +125,25 @@ latency on a Mac or preserve accuracy after conversion/quantization.
    uh/um and 4 mm tokens and otherwise only collapsed four one-word stutters; no
    set-off "you know" occurred. Adding the repair rule changed one of those 38
    outputs, the "Mdabad, sorry, no to Dilli" dictation it was written for.
+
+   `VoiceCommands` then writes spoken numbers as digits and spoken symbols as
+   @, # and %. "two hundred and fifty thousand" becomes "250,000", "ten
+   percent" becomes "10%" and "two point five million" becomes "2.5 million".
+   Indian English scales follow the models' own style: "one lakh" becomes "1
+   lakh", "two lakh fifty thousand" becomes "2,50,000" with Indian grouping and
+   "two point five crore" becomes "2.5 crore". "Twelve hundred" becomes "1200".
+   When a larger scale or "hundred" cannot join the number before it, the
+   readable part is written as digits and the rest stays as spoken, so "ten
+   thousand hundred" becomes "10,000 hundred" and "ten thousand one lakh"
+   becomes "10,000 1 lakh".
+   "at the rate KV" becomes "@KV", "hashtag launch" becomes "#launch", "issue
+   hash forty two" becomes "issue #42" and "kartik at the rate gmail dot com"
+   becomes "kartik@gmail.com". Formatting changes how a number is written, not
+   its value. A lone digit word ("give me five minutes"), "a hundred times",
+   ordinals, spoken digit strings ("5 5 5") and neighbouring number words that
+   do not form one number ("nineteen ninety nine", "fifty fifty") stay as
+   spoken. These rules run only when the language is English or automatic. The
+   raw transcript keeps the model's words, and only the final text changes.
 6. **Measure streaming separately.** Partial text is provisional. Finalize with
    sufficient context, and measure final WER, first-text latency, stop-to-final
    latency and dropped/repeated boundary words. Re-transcribing the full growing

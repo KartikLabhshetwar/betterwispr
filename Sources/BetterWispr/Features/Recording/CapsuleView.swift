@@ -298,9 +298,16 @@ struct CapsuleView: View {
                 .help("Cancel dictation")
                 .accessibilityLabel("Cancel dictation")
             }
-            Waveform(mode: waveformMode, animated: !reduceMotion, count: model.isHeldSession ? 13 : 9)
-                .frame(maxWidth: .infinity)
-                .accessibilityLabel(waveformLabel)
+            if model.phase == .transcribing {
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("Transcribing")
+            } else {
+                CapsuleWaveform(model: model, isNotetaking: isNotetaking, animated: !reduceMotion, count: model.isHeldSession ? 13 : 9)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(waveformLabel)
+            }
             if !model.isHeldSession {
                 Button(action: model.toggleRecording) {
                     Image(systemName: "checkmark")
@@ -328,7 +335,7 @@ struct CapsuleView: View {
 
     private var notetakingPill: some View {
         HStack(spacing: 4) {
-            Waveform(mode: waveformMode, animated: !reduceMotion, count: 13)
+            CapsuleWaveform(model: model, isNotetaking: isNotetaking, animated: !reduceMotion, count: 13)
                 .frame(maxWidth: .infinity)
                 .accessibilityLabel(waveformLabel)
             RoundedRectangle(cornerRadius: 2)
@@ -345,7 +352,7 @@ struct CapsuleView: View {
         .padding(.trailing, 4)
         .frame(width: 100, height: 26)
         .contentShape(Capsule())
-        .onTapGesture { model.meetings.stop() }
+        .onTapGesture { if isMeetingRecording { model.meetings.stop() } }
         .contextMenu {
             Button("Stop notetaker", action: model.meetings.stop)
         }
@@ -389,22 +396,10 @@ struct CapsuleView: View {
         .background { CapsuleGlass(cornerRadius: 14) }
     }
 
-    private var waveformMode: Waveform.Mode {
-        if isNotetaking {
-            return isMeetingRecording ? .listening(VoiceLevels(values: [max(model.meetings.levels.me, model.meetings.levels.them)])) : .waiting
-        }
-        switch model.phase {
-        case .recording: return .listening(model.voiceLevels)
-        case .transcribing: return .processing
-        default: return .waiting
-        }
-    }
-
     private var waveformLabel: String {
         if isNotetaking { return isMeetingRecording ? "Meeting audio level" : "Starting notetaker" }
         switch model.phase {
         case .recording: return "Microphone input level"
-        case .transcribing: return "Transcribing"
         default: return "Starting microphone"
         }
     }
@@ -417,6 +412,26 @@ private struct CapsuleCardButtonStyle: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.white.opacity(configuration.isPressed ? 0.2 : 0.08), in: RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// Reads the live audio level in its own body so each level update redraws only the bars, not the whole capsule.
+private struct CapsuleWaveform: View {
+    let model: AppModel
+    let isNotetaking: Bool
+    let animated: Bool
+    let count: Int
+
+    var body: some View {
+        Waveform(mode: mode, animated: animated, count: count)
+    }
+
+    private var mode: Waveform.Mode {
+        if isNotetaking {
+            guard case .recording = model.meetings.activity else { return .waiting }
+            return .listening(VoiceLevels(values: [max(model.meetings.levels.me, model.meetings.levels.them)]))
+        }
+        return model.phase == .recording ? .listening(model.voiceLevels) : .waiting
     }
 }
 

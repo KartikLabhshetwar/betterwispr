@@ -11,7 +11,7 @@ struct SettingsView: View {
             Section("Dictation") {
                 MicrophonePicker(model: model) {
                     Text("Microphone")
-                    Text("Used for dictation and meeting notes. Automatic follows Sound settings, but uses your Mac’s own mic instead of Bluetooth headphones while the lid is open, since recording through headphones drops them to call-quality sound. A chosen mic is used whenever it’s connected.")
+                    Text("Used for dictation and meeting notes. Automatic follows Sound settings, and a chosen mic is used whenever it’s connected. Recording from Bluetooth headphones drops their sound to call quality until you stop; choose your Mac’s own mic to avoid that.")
                 }
                 ShortcutRecorder(model: model)
                 Picker(selection: setting(\.dictationMode)) {

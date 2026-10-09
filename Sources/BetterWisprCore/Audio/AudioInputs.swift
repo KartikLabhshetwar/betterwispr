@@ -1,8 +1,6 @@
 @preconcurrency import AVFoundation
-import AppKit
 import CoreAudio
 import Foundation
-import IOKit.pwr_mgt
 
 /// A microphone keyed by its Core Audio UID, so a saved choice survives unplugging and reconnecting.
 public struct AudioInputDevice: Codable, Hashable, Identifiable, Sendable {
@@ -27,32 +25,23 @@ public enum AudioInputs {
         return device(id)
     }
 
-    /// The microphone Automatic records from right now.
-    public static func automatic() -> AudioInputDevice? { resolve(nil) }
-
-    /// The chosen microphone while it is connected, otherwise Automatic.
+    /// The chosen microphone while it is connected, otherwise Automatic, which is the macOS default input.
     public static func resolve(_ choice: AudioInputDevice?) -> AudioInputDevice? {
-        resolve(choice, inputs: inputs(), systemDefault: systemDefault(), lidClosed: isLidClosed())
+        resolve(choice, inputs: inputs(), systemDefault: systemDefault())
     }
 
-    /// Recording from a Bluetooth headset drops its playback to call quality, so Automatic uses the Mac's own mic while the lid is open.
-    static func resolve(_ choice: AudioInputDevice?, inputs: [Input], systemDefault: AudioInputDevice?, lidClosed: Bool) -> AudioInputDevice? {
-        if let choice, let chosen = inputs.first(where: { $0.device.id == choice.id }) { return chosen.device }
-        guard !lidClosed, inputs.first(where: { $0.device.id == systemDefault?.id })?.connection == .bluetooth,
-              let builtIn = inputs.first(where: { $0.connection == .builtIn }) else { return systemDefault }
-        return builtIn.device
+    static func resolve(_ choice: AudioInputDevice?, inputs: [Input], systemDefault: AudioInputDevice?) -> AudioInputDevice? {
+        inputs.first { $0.device.id == choice?.id }?.device ?? systemDefault
     }
 
     struct Input {
-        enum Connection { case builtIn, bluetooth, other }
         var id = AudioDeviceID(kAudioObjectUnknown)
         let device: AudioInputDevice
-        let connection: Connection
     }
 
     static func captureDevice(_ choice: AudioInputDevice?) throws -> (AudioInputDevice, AudioDeviceID, AVAudioFormat) {
         let inputs = inputs()
-        guard let device = resolve(choice, inputs: inputs, systemDefault: systemDefault(), lidClosed: isLidClosed()),
+        guard let device = resolve(choice, inputs: inputs, systemDefault: systemDefault()),
               let id = inputs.first(where: { $0.device.id == device.id })?.id else { throw AudioRecordingError.unavailable }
         var property = address(kAudioDevicePropertyStreamFormat, scope: kAudioObjectPropertyScopeInput)
         var stream = AudioStreamBasicDescription()
@@ -77,27 +66,7 @@ public enum AudioInputs {
         guard AudioObjectGetPropertyDataSize(system, &property, 0, nil, &size) == noErr else { return [] }
         var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(system, &property, 0, nil, &size, &ids) == noErr else { return [] }
-        return ids.compactMap { id in device(id).map { Input(id: id, device: $0, connection: connection(id)) } }
-    }
-
-    private static func connection(_ id: AudioDeviceID) -> Input.Connection {
-        var property = address(kAudioDevicePropertyTransportType)
-        var transport: UInt32 = 0
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(id, &property, 0, nil, &size, &transport) == noErr else { return .other }
-        switch transport {
-        case kAudioDeviceTransportTypeBuiltIn: return .builtIn
-        case kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE: return .bluetooth
-        default: return .other
-        }
-    }
-
-    /// A closed MacBook lid disconnects the built-in microphone, which then records only silence.
-    private static func isLidClosed() -> Bool {
-        let root = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPMrootDomain"))
-        defer { IOObjectRelease(root) }
-        return IORegistryEntryCreateCFProperty(root, kAppleClamshellStateKey as CFString, kCFAllocatorDefault, 0)?
-            .takeRetainedValue() as? Bool ?? false
+        return ids.compactMap { id in device(id).map { Input(id: id, device: $0) } }
     }
 
     private static func device(_ id: AudioDeviceID) -> AudioInputDevice? {
@@ -169,13 +138,12 @@ final class AudioCaptureProgress {
     }
 }
 
-/// Calls `onChange` on the main actor once microphones, the macOS default input or the displays (as when a lid closes) settle.
+/// Calls `onChange` on the main actor once microphones or the macOS default input settle.
 @MainActor
 public final class AudioInputObserver {
     private static let selectors = [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultInputDevice]
     private let onChange: @MainActor () -> Void
     private var listener: AudioObjectPropertyListenerBlock?
-    private var screens: (any NSObjectProtocol)?
     private var deviceID: AudioDeviceID?
     private static var deviceProperties: [AudioObjectPropertyAddress] {
         [AudioInputs.address(kAudioDevicePropertyNominalSampleRate),
@@ -194,16 +162,11 @@ public final class AudioInputObserver {
             AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &property, .main, listener)
         }
         self.listener = listener
-        screens = NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.scheduleCheck() }
-        }
     }
 
     public func cancel() {
         settling?.cancel()
         observeDevice(nil)
-        screens.map(NotificationCenter.default.removeObserver)
-        screens = nil
         guard let listener else { return }
         for selector in Self.selectors {
             var property = AudioInputs.address(selector)

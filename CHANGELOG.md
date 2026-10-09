@@ -23,6 +23,8 @@ All notable changes to BetterWispr are listed here. The format follows
 - Settings is laid out as cards (Shortcut, Microphone and language, After you speak, App, Permissions and Voice commands), and each option has a short line explaining what it does.
 - Style shows what each cleanup level does to a sample sentence as you switch levels. Each app context has its own card with an icon, its tone choices and a preview of the tone, and the apps it covers are listed underneath.
 - While a dictation is being transcribed, the pill shows a spinner instead of the moving bars.
+- The notetaker window is calmer. The date and speech model share one line under the title, the tabs are plain text with an underline that slides to the open tab, and the transcript tools sit on the page instead of in a gray box. While recording, the bottom of the window is one bar with the timer, live Me and Them waveforms, a microphone menu and a red Stop button, with the consent reminder underneath. Before the first words arrive, the transcript says it is listening instead of showing an empty box.
+- Recording waveforms in the pill, the notetaker and Home now scroll from right to left with your voice. Each bar is a moment of sound, louder syllables stand taller and pauses drop flat, instead of a fixed shape that wobbled at one height.
 - Automatic microphone follows Sound settings again, so AirPods and other Bluetooth headsets are used when macOS picks them, with the lid open or closed. A chosen microphone that is disconnected now falls back to the same macOS default instead of skipping a connected headset. Recording from a Bluetooth headset's microphone still drops its playback to call quality until you stop; choose your Mac's own microphone in Settings to avoid that.
 
 ### Fixed
@@ -30,7 +32,7 @@ All notable changes to BetterWispr are listed here. The format follows
 - With Spoken language set to Detect automatically and words in Vocabulary, Parakeet no longer rewrites other languages into your vocabulary terms. The phrase booster understands only English, and it turned German "meine" into "Mike". It now runs automatically only when the transcript reads as English.
 - Light cleanup resolves a correction after a lone "sorry" that restarts on in, at, on, from, near, into, by or with. "I live in Ahmedabad sorry in Delhi" becomes "I live in Delhi" and "meet at 5 sorry at 6" becomes "meet at 6". Apologies such as "sorry for the wait", "so sorry in advance" and "sorry, the train was late" stay.
 - Cleanup no longer drops a repeated number word as a stutter, so "twenty twenty five" and "fifty fifty" keep both words.
-- Meeting notes no longer lag while recording. The Me and Them meters used to redraw the whole notetaker window and the floating pill on every audio buffer, about 140 times a second. Now only the meters and the clock redraw, at most 30 times a second.
+- Meeting notes no longer lag while recording. The Me and Them meters used to redraw the whole notetaker window and the floating pill on every audio buffer, about 140 times a second. Now the levels update at most 30 times a second and only the meters and the clock redraw.
 - Tapping the notetaker pill while a meeting is still starting no longer silently cancels it. A tap stops a meeting only once it is recording; Cancel in the notetaker window, the pill's menu and the menu bar still cancel a meeting that is starting.
 
 ## [0.1.3] - 2026-10-08

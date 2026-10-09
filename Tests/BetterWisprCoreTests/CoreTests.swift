@@ -33,6 +33,7 @@ import Testing
     #expect(settings.dictationMode == .hold)
     #expect(!settings.copyToClipboard)
     #expect(settings.soundEffects)
+    #expect(settings.darkMode)
     #expect(settings.shortcut == .optionSpace)
     #expect(settings.microphone == nil)
     #expect(settings.completedOnboardingVersion == 0)
@@ -43,6 +44,7 @@ import Testing
     toggled.onboardingStep = 2
     toggled.copyToClipboard = true
     toggled.soundEffects = false
+    toggled.darkMode = false
     toggled.microphone = AudioInputDevice(id: "AppleUSBAudioEngine:Shure:MV7:1", name: "Shure MV7")
     #expect(try JSONDecoder().decode(AppSettings.self, from: JSONEncoder().encode(toggled)) == toggled)
 }

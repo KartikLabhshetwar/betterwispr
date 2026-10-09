@@ -74,6 +74,8 @@ struct SettingsView: View {
                 }
 
                 SettingsSection("App") {
+                    SettingToggle("Dark mode", caption: "Use the dark look in every BetterWispr window. Turn off for light.", isOn: setting(\.darkMode))
+                    RowDivider()
                     SettingToggle("Dictation sounds", caption: "Soft cues when you finish, cancel or need attention. Quiet during meeting capture.", isOn: setting(\.soundEffects))
                     RowDivider()
                     SettingToggle("Floating recording capsule", caption: "A small voice control at the bottom of your screen.", isOn: setting(\.showCapsule))

@@ -487,23 +487,56 @@ struct Waveform: View {
     let animated: Bool
     var color: Color = .white
     var count = 5
+    @State private var history = LevelHistory()
+
+    private static let barWidth: CGFloat = 2
+    private static let pitch: CGFloat = 4.5
+    private static let slotDuration = 0.06
+    private static let loudnessExpansion: Float = 3
 
     var body: some View {
-        if animated && mode != .waiting {
+        switch mode {
+        case .listening(let levels) where animated:
+            TimelineView(.animation) { context in
+                scrolling(levels, at: context.date)
+            }
+        case .processing where animated:
             TimelineView(.animation) { context in
                 bars(at: context.date)
             }
-        } else {
+        default:
             bars(at: .now)
         }
     }
 
+    /// Draws the loudest level of each recent slot as a bar, newest sliding in on the right like a recorder's trace.
+    private func scrolling(_ levels: VoiceLevels, at date: Date) -> some View {
+        let position = date.timeIntervalSinceReferenceDate / Self.slotDuration
+        history.record(levels.value(at: date), in: Int(position), count: count + 1)
+        let values = history.values
+        let slide = CGFloat(1 - position.truncatingRemainder(dividingBy: 1))
+        let color = color
+        return Canvas { context, size in
+            let fade = size.width * 0.3
+            for (index, value) in values.enumerated() {
+                let x = size.width - Self.barWidth + (slide - CGFloat(values.count - 1 - index)) * Self.pitch
+                guard x + Self.barWidth > 0, x < size.width else { continue }
+                let loudness = pow(min(1, max(0, value)), Self.loudnessExpansion)
+                let height = Self.barWidth + (size.height - Self.barWidth) * CGFloat(loudness)
+                let bar = CGRect(x: x, y: (size.height - height) / 2, width: Self.barWidth, height: height)
+                let opacity = 0.95 * min(1, max(0, (x + Self.barWidth) / fade))
+                context.fill(Path(roundedRect: bar, cornerRadius: Self.barWidth / 2), with: .color(color.opacity(opacity)))
+            }
+        }
+        .frame(width: CGFloat(count) * Self.pitch - (Self.pitch - Self.barWidth), height: 14)
+    }
+
     private func bars(at date: Date) -> some View {
-        HStack(spacing: 2.5) {
+        HStack(spacing: Self.pitch - Self.barWidth) {
             ForEach(0..<count, id: \.self) { index in
                 Capsule()
                     .fill(color.opacity(mode == .waiting ? 0.4 : 0.95))
-                    .frame(width: 2, height: 3 + 11 * height(of: index, at: date))
+                    .frame(width: Self.barWidth, height: 3 + 11 * height(of: index, at: date))
             }
         }
         .frame(height: 14)
@@ -518,12 +551,27 @@ struct Waveform: View {
         case .waiting:
             return 0
         case .listening(let levels):
-            let level = CGFloat(levels.value(at: date))
-            let envelope = 1 - 0.85 * distance * distance
-            let motion = animated ? 0.75 + 0.125 * (sin(time * 9.1 + position * 1.7) + sin(time * 5.3 + position * 0.8) + 2) / 2 : 1
-            return level * envelope * motion
+            return CGFloat(levels.value(at: date)) * (1 - 0.85 * distance * distance)
         case .processing:
             return 0.12 + 0.3 * (1 + sin(time * 6 - position * 0.75)) / 2
         }
+    }
+}
+
+/// Keeps the loudest level heard in each recent time slot, oldest first; recording the same slot again only raises it.
+private final class LevelHistory {
+    private(set) var values: [Float] = []
+    private var slot = 0
+
+    func record(_ level: Float, in slot: Int, count: Int) {
+        if values.count != count || slot < self.slot {
+            values = Array(repeating: 0, count: count)
+            self.slot = slot
+        }
+        let elapsed = min(slot - self.slot, count)
+        values.removeFirst(elapsed)
+        values.append(contentsOf: repeatElement(level, count: elapsed))
+        values[count - 1] = max(values[count - 1], level)
+        self.slot = slot
     }
 }

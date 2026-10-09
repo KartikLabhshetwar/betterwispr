@@ -158,6 +158,7 @@ final class AppModel {
             statusMessage = "Could not read your saved workspace. It has been left untouched: \(error.localizedDescription)"
         }
         guard startsServices else { return }
+        applyAppearance()
         migrateLegacyOnboarding()
         if !models.contains(where: { $0.id == settings.selectedModelID }) { settings.selectedModelID = "apple" }
         settings.launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -804,7 +805,12 @@ final class AppModel {
             settings.launchAtLogin = SMAppService.mainApp.status == .enabled
             statusMessage = "Could not save settings: \(error.localizedDescription)"
         }
+        applyAppearance()
         onPresentationChange?()
+    }
+
+    private func applyAppearance() {
+        NSApplication.shared.appearance = NSAppearance(named: settings.darkMode ? .darkAqua : .aqua)
     }
 
     private func persist() throws {

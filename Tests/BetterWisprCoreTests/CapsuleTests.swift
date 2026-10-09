@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import BetterWisprCore
@@ -138,4 +139,21 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: url.path))
     model.undoCancellation()
     #expect(model.phase == .idle)
+}
+
+@Test @MainActor func darkModeIsTheDefaultAndTheToggleSetsTheAppAppearance() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer {
+        NSApplication.shared.appearance = nil
+        try? FileManager.default.removeItem(at: folder)
+    }
+    let model = AppModel(store: LocalStore(directory: folder), startsServices: false)
+    #expect(model.settings.darkMode)
+    model.settings.darkMode = false
+    model.saveSettings()
+    #expect(NSApplication.shared.appearance?.name == .aqua)
+    #expect(try !LocalStore(directory: folder).load().settings.darkMode)
+    model.settings.darkMode = true
+    model.saveSettings()
+    #expect(NSApplication.shared.appearance?.name == .darkAqua)
 }

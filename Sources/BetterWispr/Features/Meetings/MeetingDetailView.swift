@@ -8,31 +8,23 @@ struct MeetingDetailView: View {
     @State private var tab = Tab.transcript
     @State private var transcriptQuery = ""
     @State private var showsSearch = false
-    @State private var showsModelNote = true
     @State private var showsEchoes = false
+    @Namespace private var tabUnderline
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Tab: String, CaseIterable {
         case thoughts = "My thoughts", transcript = "Transcript", summary = "Summary"
-
-        var symbol: String {
-            switch self {
-            case .thoughts: "square.and.pencil"
-            case .transcript: "waveform"
-            case .summary: "sparkles"
-            }
-        }
     }
 
     var body: some View {
         if let meeting = meetings.meeting(id) {
             VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 26) {
+                VStack(alignment: .leading, spacing: 20) {
                     header(meeting)
                     tabs
                 }
                 .padding(.horizontal, 32)
-                .padding(.top, 30)
+                .padding(.top, 26)
                 .frame(maxWidth: 820, alignment: .leading)
                 .frame(maxWidth: .infinity)
                 Divider()
@@ -45,9 +37,16 @@ struct MeetingDetailView: View {
                             case .summary: summary(meeting)
                             }
                         }
-                        .padding(32)
+                        .padding(.horizontal, 32)
+                        .padding(.vertical, 24)
                         .frame(maxWidth: 820, alignment: .leading)
                         .frame(maxWidth: .infinity)
+                    }
+                    .mask {
+                        VStack(spacing: 0) {
+                            Color.black
+                            LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                        }
                     }
                     .onChange(of: meeting.segments.count) {
                         guard tab == .transcript, isRecording, transcriptQuery.isEmpty else { return }
@@ -66,121 +65,82 @@ struct MeetingDetailView: View {
     private var isActive: Bool { meetings.isActive(id) }
 
     private func header(_ meeting: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             TextField("New note", text: text(\.title), axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 38, weight: .regular, design: .serif))
+                .font(.system(size: 34, weight: .regular, design: .serif))
                 .accessibilityLabel("Meeting title")
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    dateLabel(meeting)
-                    modelLabel(meeting)
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    dateLabel(meeting)
-                    modelLabel(meeting)
-                }
-            }
+            Text("\(meeting.createdAt.noteDay) · \(meeting.modelName)")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .help(meeting.createdAt.formatted(date: .long, time: .shortened))
         }
     }
 
-    private func dateLabel(_ meeting: Meeting) -> some View {
-        Text(meeting.createdAt.noteDay)
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(.quaternary))
-            .help(meeting.createdAt.formatted(date: .long, time: .shortened))
-    }
-
-    private func modelLabel(_ meeting: Meeting) -> some View {
-        Label(meeting.modelName, systemImage: "waveform")
-            .font(.callout)
-            .foregroundStyle(.secondary)
-    }
-
     private var tabs: some View {
-        HStack(spacing: 26) {
+        HStack(spacing: 24) {
             ForEach(Tab.allCases, id: \.self) { item in
                 Button { tab = item } label: {
-                    Label {
-                        Text(item.rawValue)
-                    } icon: {
-                        if item != .thoughts {
-                            Image(systemName: item.symbol)
-                                .foregroundStyle(item == .transcript && isRecording ? Color.green : .secondary)
+                    Text(item.rawValue)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(tab == item ? .primary : .secondary)
+                        .padding(.vertical, 10)
+                        .overlay(alignment: .bottom) {
+                            if tab == item {
+                                Capsule().fill(.primary).frame(height: 2)
+                                    .matchedGeometryEffect(id: "underline", in: tabUnderline)
+                            }
                         }
-                    }
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(tab == item ? .primary : .secondary)
-                    .padding(.vertical, 13)
-                    .overlay(alignment: .bottom) {
-                        Rectangle().fill(tab == item ? Color.primary : .clear).frame(height: 2)
-                    }
-                    .contentShape(Rectangle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(tab == item ? .isSelected : [])
             }
         }
+        .animation(reduceMotion ? nil : .ui, value: tab)
     }
 
     private func footer(_ meeting: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 8) {
             if isActive, let issue = meetings.systemAudioIssue ?? (meetings.showsCallAudioHint ? Self.callAudioHint : nil) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "speaker.slash").foregroundStyle(.secondary)
-                    Text(issue).foregroundStyle(.secondary)
+                    Image(systemName: "speaker.slash")
+                    Text(issue).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                     Button("Open Settings") { NSWorkspace.shared.open(Self.audioSettings) }
                 }
                 .font(.callout)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
             }
             switch meetings.activity {
             case .starting(let active) where active == id:
-                HStack {
+                controlBar {
                     progress("Preparing \(meeting.modelName)…")
                     Spacer(minLength: 8)
                     Button("Cancel", action: meetings.stop)
                 }
             case .recording(let active) where active == id:
-                VStack(spacing: 12) {
-                    Text("Always get consent when transcribing others.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                    HStack(spacing: 10) {
-                        Button(action: meetings.stop) {
-                            Label {
-                                Text("Stop")
-                            } icon: {
-                                RoundedRectangle(cornerRadius: 3).fill(.green).frame(width: 12, height: 12)
-                            }
-                            .font(.system(size: 14, weight: .semibold))
-                            .padding(.horizontal, 16)
-                            .frame(height: 38)
-                            .overlay(Capsule().strokeBorder(.quaternary))
-                            .contentShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Stop meeting")
-                        HStack(spacing: 12) {
-                            microphoneMenu
-                            Spacer(minLength: 0)
-                            LevelMeter(meetings: meetings, speaker: .me, reduceMotion: reduceMotion)
-                            LevelMeter(meetings: meetings, speaker: .them, reduceMotion: reduceMotion)
-                        }
-                        .padding(.horizontal, 14)
-                        .frame(height: 38)
-                        .overlay(Capsule().strokeBorder(.quaternary))
+                controlBar {
+                    MeetingClock(meetings: meetings, reduceMotion: reduceMotion)
+                    VStack(alignment: .leading, spacing: 4) {
+                        LevelMeter(meetings: meetings, speaker: .me, reduceMotion: reduceMotion)
+                        LevelMeter(meetings: meetings, speaker: .them, reduceMotion: reduceMotion)
                     }
+                    Spacer(minLength: 0)
+                    microphoneMenu
+                    stopButton
                 }
-                .accessibilityElement(children: .contain)
+                Text("Always get consent when transcribing others.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             case .finishing(let active) where active == id:
-                progress("Transcribing the last few seconds…")
+                controlBar {
+                    progress("Transcribing the last few seconds…")
+                    Spacer(minLength: 0)
+                }
             case .generating(let active) where active == id:
-                HStack {
+                controlBar {
                     if let (step, total) = meetings.generationStep, total > 1 {
                         progress("Writing summary… part \(step) of \(total)")
                     } else {
@@ -197,12 +157,43 @@ struct MeetingDetailView: View {
                 }
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 6)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 14)
-        .background(.bar)
-        .overlay(alignment: .top) { Divider() }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 14)
+        .animation(reduceMotion ? nil : .ui, value: meetings.activity)
+    }
+
+    private func controlBar(@ViewBuilder _ content: () -> some View) -> some View {
+        HStack(spacing: 12) { content() }
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+            .frame(minHeight: 48)
+            .background(Color.cardFill, in: .rect(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.cardStroke))
+            .shadow(color: .black.opacity(0.06), radius: 10, y: 3)
+            .accessibilityElement(children: .contain)
+    }
+
+    private var stopButton: some View {
+        Button(action: meetings.stop) {
+            Label {
+                Text("Stop")
+            } icon: {
+                RoundedRectangle(cornerRadius: 2.5).fill(.white).frame(width: 9, height: 9)
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 32)
+            .background(Color.red, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel("Stop meeting")
     }
 
     private var microphoneMenu: some View {
@@ -210,11 +201,11 @@ struct MeetingDetailView: View {
             MicrophonePicker(model: model) { Text("Microphone") }
                 .pickerStyle(.inline)
         } label: {
-            Label(meetings.microphone?.name ?? "No microphone", systemImage: meetings.microphone == nil ? "mic.slash" : "mic")
+            Image(systemName: meetings.microphone == nil ? "mic.slash" : "mic")
         }
         .menuStyle(.borderlessButton)
-        .lineLimit(1)
-        .help("Choose the microphone for this meeting")
+        .fixedSize()
+        .help(meetings.microphone.map { "Microphone: \($0.name)" } ?? "Choose the microphone for this meeting")
         .accessibilityLabel("Microphone")
         .accessibilityValue(meetings.microphone?.name ?? "None")
     }
@@ -358,9 +349,11 @@ struct MeetingDetailView: View {
     }
 
     @ViewBuilder private func transcript(_ meeting: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                MeetingClock(meetings: meetings, duration: meeting.duration, isRecording: isRecording)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                if !isRecording {
+                    Label(durationLabel(meeting.duration), systemImage: "clock").monospacedDigit()
+                }
                 Spacer()
                 Button { showsSearch.toggle(); transcriptQuery = "" } label: {
                     Image(systemName: "magnifyingglass")
@@ -373,32 +366,13 @@ struct MeetingDetailView: View {
                     .accessibilityLabel("Copy transcript")
             }
             .buttonStyle(.borderless)
+            .font(.callout)
             .foregroundStyle(.secondary)
-            .padding(14)
             if showsSearch {
                 TextField("Find in transcript", text: $transcriptQuery)
                     .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 14)
-            }
-            if isRecording, showsModelNote {
-                HStack(spacing: 8) {
-                    Text("Transcribing with \(meeting.modelName).")
-                    Spacer(minLength: 0)
-                    Button { showsModelNote = false } label: { Image(systemName: "xmark") }
-                        .buttonStyle(.borderless)
-                        .help("Dismiss")
-                        .accessibilityLabel("Dismiss")
-                }
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.quaternary.opacity(0.4))
             }
         }
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
 
         if meeting.segments.isEmpty, !isRecording {
             VStack(spacing: 10) {
@@ -430,22 +404,32 @@ struct MeetingDetailView: View {
         if isActive, !isRecording, meetings.pendingChunks > 0 { progress("Transcribing…") }
     }
 
-    private func listening(_ meeting: Meeting) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Listening…").font(.system(size: 14, weight: .semibold))
-                if meetings.pendingChunks > 0 {
-                    ProgressView().controlSize(.mini).accessibilityLabel("Transcribing")
-                }
-            }
-            if meeting.segments.isEmpty {
+    @ViewBuilder private func listening(_ meeting: Meeting) -> some View {
+        let indicator = Image(systemName: "waveform")
+            .symbolEffect(.variableColor.iterative, options: .repeating, isActive: !reduceMotion)
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+        if meeting.segments.isEmpty {
+            VStack(spacing: 10) {
+                indicator.font(.system(size: 26))
+                Text("Listening").font(.system(size: 21, design: .serif))
                 Text("Words appear here a few seconds after they’re spoken.")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.tertiary)
-                    .bubble()
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 44)
+            .id(Self.listeningAnchor)
+        } else {
+            HStack(spacing: 8) {
+                indicator
+                Text(meetings.pendingChunks > 0 ? "Transcribing…" : "Listening…")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.callout)
+            .id(Self.listeningAnchor)
         }
-        .id(Self.listeningAnchor)
     }
 
     private func text(_ field: WritableKeyPath<Meeting, String>) -> Binding<String> {
@@ -468,17 +452,12 @@ private struct LevelMeter: View {
 
     var body: some View {
         let level = min(1, max(0, speaker == .me ? meetings.levels.me : meetings.levels.them))
-        HStack(spacing: 5) {
-            Text(speaker.label).font(.caption).foregroundStyle(.secondary)
-            Capsule()
-                .fill(.quaternary)
-                .frame(width: 30, height: 5)
-                .overlay(alignment: .leading) {
-                    Capsule()
-                        .fill(speaker == .me ? Color.green : Color.blue)
-                        .frame(width: 30 * CGFloat(level))
-                }
-                .animation(reduceMotion ? nil : .linear(duration: 0.1), value: level)
+        HStack(spacing: 6) {
+            Text(speaker.label)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 30, alignment: .leading)
+            Waveform(mode: .listening(VoiceLevels(values: [level])), animated: !reduceMotion, color: speaker == .me ? .green : .blue, count: 14)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(speaker.label) level")
@@ -489,12 +468,20 @@ private struct LevelMeter: View {
 /// Reads the running time in its own body so each tick redraws only the clock.
 private struct MeetingClock: View {
     let meetings: MeetingModel
-    let duration: TimeInterval
-    let isRecording: Bool
+    let reduceMotion: Bool
 
     var body: some View {
-        Label(durationLabel(isRecording ? meetings.elapsed : duration), systemImage: "clock")
-            .monospacedDigit()
+        HStack(spacing: 7) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 8))
+                .foregroundStyle(.red)
+                .symbolEffect(.pulse, options: .repeating, isActive: !reduceMotion)
+            Text(durationLabel(meetings.elapsed))
+                .font(.system(size: 15, weight: .semibold).monospacedDigit())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Recording")
+        .accessibilityValue(durationLabel(meetings.elapsed))
     }
 }
 

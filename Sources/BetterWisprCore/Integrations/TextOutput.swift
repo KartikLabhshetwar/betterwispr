@@ -24,6 +24,7 @@ public struct ClipboardIntegration: TextOutputIntegration {
 
 @MainActor
 public struct FocusedAppIntegration: TextOutputIntegration {
+    private static var pendingRestore: (items: [NSPasteboardItem], task: Task<Void, Never>)?
     public let keepsCopy: Bool
     public init(keepsCopy: Bool) { self.keepsCopy = keepsCopy }
     public func deliver(_ text: String, to target: NSRunningApplication?) async throws -> OutputResult {
@@ -36,13 +37,15 @@ public struct FocusedAppIntegration: TextOutputIntegration {
             return .copiedForManualPaste
         }
         let pasteboard = NSPasteboard.general
-        let previousItems: [NSPasteboardItem] = pasteboard.pasteboardItems?.map { item in
+        let previousItems: [NSPasteboardItem] = Self.pendingRestore?.items ?? pasteboard.pasteboardItems?.map { item in
             let copy = NSPasteboardItem()
             for type in item.types {
                 if let data = item.data(forType: type) { copy.setData(data, forType: type) }
             }
             return copy
         } ?? []
+        Self.pendingRestore?.task.cancel()
+        Self.pendingRestore = nil
         _ = try await ClipboardIntegration().deliver(text, to: target)
         let ourChange = pasteboard.changeCount
         guard let source = CGEventSource(stateID: .combinedSessionState),
@@ -55,12 +58,16 @@ public struct FocusedAppIntegration: TextOutputIntegration {
         down.postToPid(target.processIdentifier)
         up.postToPid(target.processIdentifier)
         if !keepsCopy {
-            // ponytail: applications expose no paste acknowledgement; allow 750 ms before restoring.
-            try? await Task.sleep(for: .milliseconds(750))
-            if pasteboard.changeCount == ourChange {
-                pasteboard.clearContents()
-                if !previousItems.isEmpty { _ = pasteboard.writeObjects(previousItems) }
-            }
+            Self.pendingRestore = (previousItems, Task {
+                // ponytail: applications expose no paste acknowledgement; allow 750 ms before restoring.
+                try? await Task.sleep(for: .milliseconds(750))
+                guard !Task.isCancelled else { return }
+                Self.pendingRestore = nil
+                if pasteboard.changeCount == ourChange {
+                    pasteboard.clearContents()
+                    if !previousItems.isEmpty { _ = pasteboard.writeObjects(previousItems) }
+                }
+            })
         }
         return .pasted(into: target.localizedName ?? "your app")
     }

@@ -102,7 +102,7 @@ struct OnboardingView: View {
         } else {
             HStack(spacing: 28) {
                 BrandMark(size: 88)
-                Waveform(mode: .listening(VoiceLevels(values: [0.8])), animated: !reduceMotion, color: step.tint)
+                Waveform(mode: .listening(VoiceLevels(values: [0.8])), animated: false, color: step.tint)
                     .scaleEffect(4)
                     .frame(width: 72, height: 56)
                     .accessibilityHidden(true)

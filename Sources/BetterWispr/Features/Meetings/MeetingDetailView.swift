@@ -386,7 +386,7 @@ struct MeetingDetailView: View {
             .padding(.vertical, 44)
         } else {
             let cleaned = meeting.transcriptSegments
-            if cleaned.count < meeting.segments.count {
+            if cleaned != meeting.segments {
                 Toggle("Show repeated microphone audio", isOn: $showsEchoes)
                     .font(.caption).foregroundStyle(.secondary)
             }

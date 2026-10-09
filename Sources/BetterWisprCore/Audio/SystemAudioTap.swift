@@ -39,8 +39,8 @@ final class SystemAudioTap {
         return format
     }
 
-    func start(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>) -> Void) throws {
-        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { @Sendable _, input, _, _, _ in receive(input) }
+    func start(_ receive: @escaping @Sendable (UnsafePointer<AudioBufferList>, UnsafePointer<AudioTimeStamp>) -> Void) throws {
+        let status = AudioDeviceCreateIOProcIDWithBlock(&procID, aggregateID, queue) { @Sendable _, input, inputTime, _, _ in receive(input, inputTime) }
         guard status == noErr, procID != nil else { throw SystemAudioError(step: "listen to system audio", status: status) }
         try check(AudioDeviceStart(aggregateID, procID), aggregateID, "start system audio")
     }

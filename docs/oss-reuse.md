@@ -131,9 +131,9 @@ in particular, no GPL VoiceInk code is incorporated.
 | [VoiceInk](https://github.com/Beingpax/VoiceInk) | [GPL-3.0](https://github.com/Beingpax/VoiceInk/blob/main/LICENSE) | Product/reference research only. Its per-app Power Mode informed the idea of per-app writing styles; the style rules and app registry were written for BetterWispr. No source copied into this Apache-2.0 application. |
 | [Muesli](https://github.com/Muesli-HQ/muesli) | MIT | Native meeting recorder. Its Core Audio system recorder is adapted for meeting notes, as described above. |
 | [AudioCap](https://github.com/insidegui/AudioCap) | BSD-2-Clause | Minimal process tap sample. Its tap and aggregate device setup is adapted for meeting notes, as described above. |
-| [OpenOats](https://github.com/yazinsai/OpenOats) | MIT | Reviewed for labelling the microphone as Me and system audio as Them. No source copied. |
+| [OpenOats](https://github.com/yazinsai/OpenOats) | MIT | Reviewed for labelling the microphone as Me and system audio as Them, and for removing microphone text that repeats overlapping remote speech. BetterWispr's word-run echo filter is original code. No source copied. |
 | [Recap](https://github.com/RecapAI/Recap) | MIT | Native meeting summaries reviewed for product shape. No source copied. |
-| [anarlog (formerly Hyprnote)](https://github.com/fastrepl/anarlog) | MIT | Rust meeting notes app, reference only. No source copied. |
+| [anarlog (formerly Hyprnote)](https://github.com/fastrepl/anarlog) | MIT | Rust meeting notes app, reference only. Its short pause-ended chunks informed the 3 to 20 second meeting chunks. No source copied. |
 | [Meetily](https://github.com/Zackriya-Solutions/meetily) | MIT | Rust meeting minutes app, reference only. No source copied. |
 
 The research table is not the dependency lock file: the actual compiled versions

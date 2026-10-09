@@ -4,11 +4,11 @@ import Testing
 
 @Test func chunkPolicyWaitsForMinimumThenRotatesOnPauseOrMaximum() {
     let policy = ChunkPolicy()
-    #expect(!policy.shouldRotate(duration: 9.9, trailingSilence: 5))
+    #expect(!policy.shouldRotate(duration: 2.9, trailingSilence: 5))
     #expect(!policy.shouldRotate(duration: 12, trailingSilence: 0.5))
-    #expect(policy.shouldRotate(duration: 10, trailingSilence: 0.6))
-    #expect(policy.shouldRotate(duration: 30, trailingSilence: 0))
-    #expect(!policy.shouldRotate(duration: 29.9, trailingSilence: 0))
+    #expect(policy.shouldRotate(duration: 3, trailingSilence: 0.6))
+    #expect(policy.shouldRotate(duration: 20, trailingSilence: 0))
+    #expect(!policy.shouldRotate(duration: 19.9, trailingSilence: 0))
 }
 
 @Test func meetingStoreRoundTripsNewestFirstAndDeletes() throws {
@@ -63,7 +63,7 @@ import Testing
 @Test func meetingHidesCrossChannelEchoesButPreservesRawCaptureAndLaterRepeats() {
     let phrase = "This is a synthetic meeting test. We agreed to launch on Friday."
     var meeting = Meeting(modelName: "Parakeet", language: "en")
-    for (speaker, start, text) in [(Speaker.me, 20.0, phrase.lowercased()), (.them, 0, phrase),
+    for (speaker, start, text) in [(Speaker.me, 20.0, phrase.lowercased()), (.them, 19, phrase),
                                    (.me, 75, phrase), (.me, 22, "Yes, agreed."), (.them, 23, "Yes, agreed.")] {
         meeting.insert(MeetingSegment(speaker: speaker, start: start, duration: 12, text: text, rawText: text))
     }
@@ -73,6 +73,44 @@ import Testing
     #expect(meeting.transcript.contains("[01:15] Me:"))
     #expect(meeting.transcript.contains("[00:22] Me: Yes, agreed."))
     #expect(meeting.segments.first { $0.start == 20 }?.rawText == phrase.lowercased())
+}
+
+@Test func meetingTrimsRemoteWordsTheMicrophoneHeardWhileTheyPlayed() {
+    let remote = "We should ship the new onboarding flow before the end of the month."
+    var meeting = Meeting(modelName: "Parakeet", language: "en")
+    for (speaker, start, text) in [(Speaker.them, 10.0, remote),
+                                   (.me, 9, "Sure. We should ship the new on boarding flow before the end of the month. I agree completely."),
+                                   (.them, 30, "The budget is fixed at five hundred dollars."),
+                                   (.me, 31, "Okay, the budget is fixed at five hundred dollars."),
+                                   (.me, 90, remote)] {
+        meeting.insert(MeetingSegment(speaker: speaker, start: start, duration: 6, text: text, rawText: text))
+    }
+    #expect(meeting.transcriptSegments.filter { $0.speaker == .me }.map(\.text) == ["Sure. I agree completely.", remote])
+    #expect(meeting.transcriptSegments.filter { $0.speaker == .them } == meeting.segments.filter { $0.speaker == .them })
+    #expect(meeting.segments.count == 5)
+    #expect(meeting.segments.first { $0.start == 9 }?.text.hasPrefix("Sure. We should ship") == true)
+}
+
+@Test func meetingTrimsMisheardEchoesButKeepsRepliesThatShareAFewWords() {
+    let reply = "Sounds good, I will check the budget numbers tonight."
+    var meeting = Meeting(modelName: "Parakeet", language: "en")
+    for (speaker, start, text) in [(Speaker.them, 40.0, "Great. I will ping marketing about the campage on budget today."),
+                                   (.me, 43, "Campaign budget today."),
+                                   (.me, 45, reply)] {
+        meeting.insert(MeetingSegment(speaker: speaker, start: start, duration: 4, text: text, rawText: text))
+    }
+    #expect(meeting.transcriptSegments.filter { $0.speaker == .me }.map(\.text) == [reply])
+    #expect(meeting.segments.count == 3)
+}
+
+@Test func meetingTrimsTheWholeEchoWhenItsFirstWordAlsoAppearsEarlier() {
+    var meeting = Meeting(modelName: "Parakeet", language: "en")
+    for (speaker, start, text) in [(Speaker.them, 1.2, "Let's go over the launch plan for next week."),
+                                   (.them, 8.8, "The design review is done and engineering signed off on Tuesday."),
+                                   (.me, 8.2, "The design review is done and it's a good idea.")] {
+        meeting.insert(MeetingSegment(speaker: speaker, start: start, duration: 5, text: text, rawText: text))
+    }
+    #expect(meeting.transcriptSegments.filter { $0.speaker == .me }.map(\.text) == ["it's a good idea."])
 }
 
 @Test func summaryTracksTheCombinedTranscriptAndThoughtsAndLoadsLegacyNotes() throws {

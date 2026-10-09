@@ -6,6 +6,101 @@ version, Mac model, input device, engine/model and date for future runs. A
 successful build does not verify microphone capture, clipboard behavior or
 general recognition accuracy.
 
+## Live meeting capture recheck, 2026-10-10, version 0.1.4
+
+Same Mac, model and kind of script as the check below, after the start, idle
+flush and echo changes, on the MacBook Pro microphone and speakers. Each run
+played five `say` lines 4 seconds apart, the first 1 second after Start Meeting
+Notes was clicked.
+
+- After a relaunch, the first line was fully transcribed and its entry appeared
+  0.97 seconds after it ended, while the model was still loading when it played.
+  The other entries took 0.7 to 1.1 seconds, except one at 2.5 to 2.75 seconds.
+- After a rebuild, "Them" entries appeared 0.87, 1.72, 1.0, 0.96 and 0.92
+  seconds after each line ended.
+- In the first meeting after another rebuild, the first two entries were on
+  time, then every later entry appeared together 55 to 57 seconds after the
+  start, about 10 seconds after Stop. This was seen once and did not happen in
+  the run after the next rebuild. The cause was not found; contention with the
+  launch warm-up compiling the same models is a guess.
+- The echo filter, run on copies of the three saved meetings, hid 11 of 13 "Me"
+  echoes completely. The other two kept words the model invented from the echo,
+  "it's a good idea." and "in the video.", which do not appear in the remote
+  text. Before the run start fix, those two also kept a leading "The".
+- A 10 second sample during a meeting with the notetaker window and the pill
+  showing found the main thread idle 48% of the time and in window server
+  commits in 17% of samples, against 15% and about 60% in the earlier check.
+  Nothing in the meters changed between the two, and the difference is not
+  explained.
+
+Not exercised: AirPods in these runs (the user reported a working AirPods test),
+a USB microphone, a real call and the user's own speech.
+
+## Live meeting capture check, 2026-10-10, version 0.1.4
+
+On an Apple M5 with macOS 26.6.2, a debug app bundle with Parakeet TDT v3 and
+one vocabulary term was driven from the menu bar by a script. It played seven
+`say` lines, alternating two output paths, and read the saved meeting file every
+0.1 seconds to time each entry. Every line plays through the system output, so the
+tap records all seven as "Them" and the microphone hears them from the speakers.
+These runs check timing, chunking and echo removal, not the user's own speech.
+
+- AirPods Pro as input and output: the microphone opened at 24 kHz and once
+  switched to 48 kHz mid-meeting; the recorder restarted it and the meeting
+  continued. The AirPods were not worn, so their microphone also heard the Mac
+  speakers. Before the noise floor change, idle AirPods noise was 0.003 to
+  0.005 RMS, above the 0.002 threshold, and the headset's exact-zero dropout
+  slices made the old quietest-slice estimate zero, so every slice counted as
+  speech. After it, "Me" chunks were 3 to 11 seconds, except one 20.02 second
+  first chunk. The first remote line was cut short once as the microphone
+  started; a Bluetooth profile switch is a guess, not measured.
+- "Them" entries appeared 0.9 to 6.2 seconds after a line ended across three
+  AirPods runs, 0.9 to 1.6 seconds in the last. A 6.2 second wait was seen once
+  and is not explained.
+- "Them" chunks were stamped 3.7 seconds early, because the tap delivers nothing
+  until something plays and chunk times counted only delivered audio. One echo
+  fragment, "Friday morning.", fell outside the 3 second overlap window and
+  stayed under "Me". With chunks stamped by capture time, on the built-in
+  microphone and speakers, "Them" chunks started when each line played. The echo
+  filter hid five of seven "Me" echoes in the first meeting after launch and six
+  of seven in the next. The rest kept misrecognized words that do not match the
+  remote text: "the first time.", "you a little bit of a little bit" and
+  "campaign budget today.".
+- With the app already warm, "Them" entries appeared 0.9 to 1.0 seconds after a
+  line ended. The first entry took 11.3 seconds in the first meeting after the
+  app was rebuilt and 2.9 seconds after a plain relaunch. The command line tool
+  spent 21.1 seconds loading the models the first time after a rebuild and
+  0.24 seconds the next time, and recognized each 3 to 6 second chunk in 0.05 to
+  0.07 seconds. The cause of the 2 seconds after a relaunch was not found.
+- During a meeting with the notetaker window and the pill showing, a 10 second
+  sample found the main thread idle 15% of the time and waiting on window server
+  commits in about 60% of samples, from the animated level meters. Capping the
+  waveform at 30 frames per second raised idle time to 23% in one run and was
+  not kept.
+
+Not exercised: a USB microphone, a real call, AirPods worn in the ears, the
+user's own speech overlapping remote speech, and AirPods as input with the Mac
+speakers as output.
+
+## Meeting chunks and echo filter check, 2026-10-09, version 0.1.4
+
+On an Apple M5 with macOS 26.6.2, a temporary test replayed a real 8.9 second
+microphone recording (48 kHz mono, speech with short pauses) four times in a row
+through `MeetingChunkWriter` in 20 ms buffers. Before the change it produced
+chunks of 30.00 and 5.60 seconds, so the first words waited 30 seconds and a
+sentence was cut at the boundary. After it, the chunks were 8.82, 8.90, 8.90 and
+8.90 seconds, each ending at a pause, plus a 0.08 second chunk with no speech
+that was discarded. The echo filter was run on a copy of a saved real meeting
+with 41 segments: 11 "Me" segments were trimmed and two were hidden because
+fewer than three of their words were left. In two of three trimmed segments
+checked by hand, every removed word appeared in order in the overlapping "Them"
+text. In the third, a "yes yes" that may have been the user's own reply was
+removed with the remote question it sat between. In a release build
+that took about 1 ms, and about 9 ms for a synthetic 410 segment meeting. The two
+new tests fail on the previous code. A live meeting with AirPods or a USB
+microphone, speaker playback picked up during a live call, and changing the output
+device during a meeting have not been exercised.
+
 ## Email command, "sorry" repairs and Style apps check, 2026-10-09, version 0.1.4
 
 On an Apple M5 with macOS 26.6.2, Parakeet TDT v3 transcribed eight
@@ -632,9 +727,14 @@ Additional regression checks:
 - [ ] Edit thoughts during summary generation. The completed summary should be
   marked for update until regenerated with the new text. Cancel generation and
   verify the previous summary remains intact with no late replacement.
-- [ ] Test speaker playback with partial overlap and different recognition results;
-  exact text filtering does not replace acoustic echo cancellation. Verify short
-  replies and intentional later repetitions stay visible.
+- [ ] Take a call on speakers. Stay quiet while the other side talks, then
+  answer while they are still talking. The transcript removes your microphone's
+  copy of their words and keeps your answer; "Show repeated microphone audio"
+  shows the original. Repeat a sentence of theirs a minute later; it stays.
+- [ ] Say a sentence, pause for a second, and watch the "Me" entry appear within a
+  few seconds, with the built-in microphone, AirPods and a USB microphone, in a
+  quiet and a noisy room. Talking without a pause still adds an entry at least
+  every 20 seconds.
 
 
 UI validation on 2026-10-08: inspected the packaged native app in dark appearance

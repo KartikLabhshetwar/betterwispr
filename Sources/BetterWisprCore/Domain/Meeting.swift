@@ -107,7 +107,7 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
         transcriptSegments.map { "[\($0.timestamp)] \($0.speaker.label): \($0.text)" }.joined(separator: "\n")
     }
 
-    /// Keep the original segments on disk; hide speaker playback picked up again by the microphone.
+    /// Keep the original segments on disk; hide remote speech picked up again by the microphone.
     public var transcriptSegments: [MeetingSegment] { MeetingTranscript.removingEchoes(from: segments) }
 
     public var summarySourceFingerprint: String {
@@ -141,22 +141,102 @@ public struct Meeting: Codable, Identifiable, Equatable, Sendable {
 }
 
 public enum MeetingTranscript {
+    private static let echoRun = 3
+    private static let echoGap = 2
+    private static let fragmentWords = 3
+    private static let overlapSlack: TimeInterval = 3
+
+    /// Cuts runs of remote words the microphone picked up while they played; drops Me segments left as fragments.
     public static func removingEchoes(from segments: [MeetingSegment]) -> [MeetingSegment] {
-        func words(_ text: String) -> [String] {
-            text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        segments.compactMap { segment in
+            guard segment.speaker == .me else { return segment }
+            let tokens = words(in: segment.text)
+            let heard = segments.filter {
+                $0.speaker == .them && $0.start < segment.start + segment.duration + overlapSlack
+                    && $0.start + $0.duration > segment.start - overlapSlack
+            }.flatMap { words(in: $0.text).map { $0.lowercased() } }
+            let echo = echoMask(tokens.map { $0.lowercased() }, heard: heard)
+            guard echo.contains(true) else { return segment }
+            guard echo.filter({ !$0 }).count >= fragmentWords else { return nil }
+            var text = ""
+            var position = segment.text.startIndex
+            for index in tokens.indices where echo[index] {
+                text += segment.text[position..<tokens[index].startIndex]
+                position = index + 1 < tokens.count ? tokens[index + 1].startIndex : segment.text.endIndex
+            }
+            text += segment.text[position...]
+            var trimmed = segment
+            trimmed.text = text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+            return trimmed
         }
-        var systemSpeech: [String: [TimeInterval]] = [:]
-        for segment in segments where segment.speaker == .them {
-            let words = words(segment.text)
-            if words.count >= 8 { systemSpeech[words.joined(separator: " "), default: []].append(segment.start) }
+    }
+
+    private static func words(in text: String) -> [Substring] {
+        text.split { !$0.isLetter && !$0.isNumber }
+    }
+
+    /// Marks words in long common runs with `heard`, tolerating misheard, extra or missing words inside a run and short gaps between runs.
+    private static func echoMask(_ mine: [String], heard: [String]) -> [Bool] {
+        var echo = Array(repeating: false, count: mine.count)
+        guard !heard.isEmpty else { return echo }
+        let matches = mine.map { word in heard.map { sounds(word, like: $0) } }
+        var common = Array(repeating: Array(repeating: 0, count: heard.count + 1), count: mine.count + 1)
+        for i in mine.indices.reversed() {
+            for j in heard.indices.reversed() {
+                common[i][j] = matches[i][j] ? common[i + 1][j + 1] + 1 : max(common[i + 1][j], common[i][j + 1])
+            }
         }
-        return segments.filter { segment in
-            guard segment.speaker == .me else { return true }
-            let normalized = words(segment.text).joined(separator: " ")
-            // ponytail: exact cross-channel matches within one 30 s capture chunk only;
-            // audio echo cancellation is needed for mixed speech or differently recognized echoes.
-            return !(systemSpeech[normalized]?.contains { abs($0 - segment.start) <= 30 } ?? false)
+        var runs: [[(mine: Int, heard: Int)]] = []
+        var i = 0, j = 0
+        while i < mine.count, j < heard.count {
+            if matches[i][j] {
+                if let last = runs.last?.last, [1, 2].contains(i - last.mine), [1, 2].contains(j - last.heard) {
+                    runs[runs.count - 1].append((i, j))
+                } else {
+                    runs.append([(i, j)])
+                }
+                i += 1
+                j += 1
+            } else if common[i + 1][j] >= common[i][j + 1] {
+                i += 1
+            } else {
+                j += 1
+            }
         }
+        for run in runs where run.count >= echoRun {
+            var first = run[0]
+            while first.mine > 0, first.heard > 0, matches[first.mine - 1][first.heard - 1] {
+                first = (first.mine - 1, first.heard - 1)
+            }
+            for index in first.mine...run[run.count - 1].mine { echo[index] = true }
+        }
+        var start = 0
+        while start < echo.count {
+            guard !echo[start] else { start += 1; continue }
+            let end = echo[start...].firstIndex(of: true) ?? echo.count
+            if start > 0, end < echo.count, end - start <= echoGap {
+                for index in start..<end { echo[index] = true }
+            }
+            start = end
+        }
+        return echo
+    }
+
+    /// Equal words, or words of four or more letters that differ in at most a quarter of their letters, like "campaign" heard as "campage".
+    private static func sounds(_ word: String, like other: String) -> Bool {
+        if word == other { return true }
+        let a = Array(word), b = Array(other)
+        let allowed = max(a.count, b.count) / 4
+        guard min(a.count, b.count) >= 4, abs(a.count - b.count) <= allowed else { return false }
+        var previous = Array(0...b.count)
+        for i in 1...a.count {
+            var current = [i] + Array(repeating: 0, count: b.count)
+            for j in 1...b.count {
+                current[j] = min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1))
+            }
+            previous = current
+        }
+        return previous[b.count] <= allowed
     }
 }
 

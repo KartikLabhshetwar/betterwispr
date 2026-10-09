@@ -158,6 +158,43 @@ func recordingKeepsItsFileFormatWhenTheMicrophoneChangesFormat(rate: Double) thr
     }
 }
 
+@Test func meetingChunksStartAtCaptureTimeAndSplitWhenDeliveryPauses() throws {
+    let buffer = microphoneTone(1, rate: 48_000, channels: 1)
+    let writer = try MeetingChunkWriter(speaker: .them, format: buffer.format, threshold: 0.002,
+                                        policy: ChunkPolicy(), startOffset: 0.4)
+    for time in [2.0, 3.0, 6.0] { _ = writer.write(buffer, at: time) }
+    writer.finish()
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.error == nil)
+    #expect(ready.chunks.map { [$0.start, $0.duration] } == [[2, 2], [6, 1]])
+    #expect(ready.chunks.allSatisfy { $0.hasSpeech })
+}
+
+@Test func meetingClosesTheOpenChunkOnceSystemAudioStopsArriving() throws {
+    let buffer = microphoneTone(1, rate: 48_000, channels: 1)
+    let writer = try MeetingChunkWriter(speaker: .them, format: buffer.format, threshold: 0.002,
+                                        policy: ChunkPolicy(), startOffset: 0)
+    let unstamped = try MeetingChunkWriter(speaker: .them, format: buffer.format, threshold: 0.002,
+                                           policy: ChunkPolicy(), startOffset: 0)
+    defer {
+        writer.cancel()
+        unstamped.cancel()
+    }
+    _ = writer.write(buffer, at: 2)
+    _ = unstamped.write(buffer)
+    writer.closeIfIdle(at: 3.4)
+    unstamped.closeIfIdle(at: 100)
+    #expect(writer.takeReady().chunks.isEmpty)
+    #expect(unstamped.takeReady().chunks.isEmpty)
+    writer.closeIfIdle(at: 3.6)
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.error == nil)
+    #expect(ready.chunks.map { [$0.start, $0.duration] } == [[2, 1]])
+    #expect(ready.chunks.allSatisfy { $0.hasSpeech })
+}
+
 @MainActor
 @Test func microphoneReadinessAndFinishWaitForCurrentAudioAndCancelCleanly() async throws {
     let progress = AudioCaptureProgress()
@@ -219,6 +256,55 @@ func microphoneSpeechGateDoesNotDiluteBriefSpeechAcrossLargeBuffers(bufferSecond
     defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
     #expect(ready.error == nil)
     #expect(try #require(ready.chunks.first).hasSpeech)
+}
+
+@Test func meetingChunksEndAtPausesAboveASteadyNoiseFloorAndSkipNoiseOnlyAudio() throws {
+    let rate = 16_000.0
+    let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+    let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: 0.002, policy: ChunkPolicy(), startOffset: 0)
+    defer { writer.cancel() }
+    let speech = [1.0..<3, 4..<6]
+    let frames = Int(0.1 * rate)
+    for start in stride(from: 0, to: Int(10 * rate), by: frames) {
+        let buffer = microphoneTone(0.1, rate: rate, channels: 1)
+        for frame in 0..<frames {
+            let time = Double(start + frame) / rate
+            let hum = 0.005 * sin(Float(time) * 2 * .pi * 250)
+            buffer.floatChannelData![0][frame] = hum + (speech.contains { $0.contains(time) } ? 0.1 * sin(Float(time) * 2 * .pi * 440) : 0)
+        }
+        _ = writer.write(buffer)
+    }
+    writer.finish()
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.error == nil)
+    #expect(ready.chunks.map(\.hasSpeech) == [true, true, false, false])
+}
+
+@Test func meetingChunksEndAtPausesWhenHeadsetNoiseHasDropouts() throws {
+    let rate = 16_000.0
+    let format = AVAudioFormat(standardFormatWithSampleRate: rate, channels: 1)!
+    let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: 0.002, policy: ChunkPolicy(), startOffset: 0)
+    defer { writer.cancel() }
+    let slice = Int(0.02 * rate)
+    let frames = Int(0.1 * rate)
+    for start in stride(from: 0, to: Int(10 * rate), by: frames) {
+        let buffer = microphoneTone(0.1, rate: rate, channels: 1)
+        for frame in 0..<frames {
+            let index = start + frame
+            let time = Double(index) / rate
+            let dropout = (index / slice).isMultiple(of: 10)
+            let hiss = 0.004 * sin(Float(time) * 2 * .pi * 250)
+            buffer.floatChannelData![0][frame] = dropout ? 0 : hiss + ((1.0..<3).contains(time) ? 0.1 * sin(Float(time) * 2 * .pi * 440) : 0)
+        }
+        _ = writer.write(buffer)
+    }
+    writer.finish()
+    let ready = writer.takeReady()
+    defer { for chunk in ready.chunks { try? FileManager.default.removeItem(at: chunk.url) } }
+    #expect(ready.error == nil)
+    #expect(ready.chunks.map(\.hasSpeech) == [true, false, false, false])
+    #expect(try #require(ready.chunks.first).duration < 4)
 }
 
 @MainActor

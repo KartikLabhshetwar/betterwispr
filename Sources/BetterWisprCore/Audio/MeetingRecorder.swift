@@ -6,7 +6,7 @@ public struct ChunkPolicy: Sendable {
     public var maximum: TimeInterval
     public var pause: TimeInterval
 
-    public init(minimum: TimeInterval = 10, maximum: TimeInterval = 30, pause: TimeInterval = 0.6) {
+    public init(minimum: TimeInterval = 3, maximum: TimeInterval = 20, pause: TimeInterval = 0.6) {
         self.minimum = minimum
         self.maximum = maximum
         self.pause = pause
@@ -36,7 +36,7 @@ public final class MeetingRecorder {
     public private(set) var microphone: AudioInputDevice?
     private let policy: ChunkPolicy
     private var session: UUID?
-    private var origin = Date()
+    private var origin = ProcessInfo.processInfo.systemUptime
     private var threshold: Float = 0.002
     private var choice: AudioInputDevice?
     private var changingInput = false
@@ -113,7 +113,7 @@ public final class MeetingRecorder {
         try Task.checkCancellation()
         guard session == id else { throw CancellationError() }
         guard allowed else { throw AudioRecordingError.permissionDenied }
-        origin = Date()
+        origin = ProcessInfo.processInfo.systemUptime
         let progress = AudioCaptureProgress()
         microphoneProgress = progress
         inputObserver = AudioInputObserver { [weak self] in
@@ -133,11 +133,12 @@ public final class MeetingRecorder {
         let writer = try MeetingChunkWriter(speaker: .me, format: format, threshold: threshold, policy: policy, startOffset: startOffset)
         let capture = progress.begin()
         let sampleRate = format.sampleRate
+        let origin = origin
         do {
             inputObserver?.observeDevice(input.deviceID)
             try await input.start { @Sendable [weak self] buffer, time in
                 let end = AudioCaptureProgress.endTime(time, frames: buffer.frameLength, sampleRate: sampleRate)
-                let level = writer.write(buffer)
+                let level = writer.write(buffer, at: time.isHostTimeValid ? AVAudioTime.seconds(forHostTime: time.hostTime) - origin : nil)
                 Task { @MainActor [weak self] in
                     guard let self, self.session == id, progress.generation == capture else { return }
                     progress.receive(through: end, generation: capture)
@@ -178,7 +179,7 @@ public final class MeetingRecorder {
             hand(writer.takeReady())
         }
         do {
-            try await runMicrophone(session: id, startOffset: Date().timeIntervalSince(origin))
+            try await runMicrophone(session: id, startOffset: ProcessInfo.processInfo.systemUptime - origin)
         } catch {
             guard session == id else { return }
             microphone = nil
@@ -212,10 +213,13 @@ public final class MeetingRecorder {
             let format = try await tap.prepare()
             guard session == id else { return tap.stop() }
             let created = try MeetingChunkWriter(speaker: .them, format: format, threshold: threshold, policy: policy,
-                                                 startOffset: Date().timeIntervalSince(origin))
+                                                 startOffset: ProcessInfo.processInfo.systemUptime - origin)
             writer = created
-            try tap.start { [weak self] buffers in
-                let level = created.write(buffers)
+            let origin = origin
+            try tap.start { [weak self] buffers, time in
+                let stamp = time.pointee
+                let level = created.write(buffers, at: stamp.mFlags.contains(.hostTimeValid)
+                                              ? AVAudioTime.seconds(forHostTime: stamp.mHostTime) - origin : nil)
                 Task { @MainActor [weak self] in self?.receive(level, from: .them, session: id) }
             }
             writers[.them] = created
@@ -233,6 +237,9 @@ public final class MeetingRecorder {
         if speaker == .me { levels.me = level } else { levels.them = level }
         onLevels?(levels)
         hand(writer.takeReady())
+        guard speaker == .me, let them = writers[.them] else { return }
+        them.closeIfIdle(at: ProcessInfo.processInfo.systemUptime - origin)
+        hand(them.takeReady())
     }
 
     private func hand(_ ready: (chunks: [MeetingAudioChunk], error: (any Error)?)) {
@@ -271,13 +278,15 @@ final class MeetingChunkWriter: @unchecked Sendable {
     private let format: AVAudioFormat
     private let policy: ChunkPolicy
     private let threshold: Float
-    private let startOffset: TimeInterval
     private var file: AVAudioFile?
     private var url: URL?
-    private var elapsedFrames: AVAudioFramePosition = 0
+    private var nextStart: TimeInterval
+    private var chunkStart: TimeInterval = 0
     private var frames: AVAudioFramePosition = 0
     private var activeFrames: AVAudioFramePosition = 0
     private var silentFrames: AVAudioFramePosition = 0
+    private var capturedThrough: TimeInterval?
+    private var recentLevels: [Float] = []
     private var ready: [MeetingAudioChunk] = []
     private var error: (any Error)?
 
@@ -286,20 +295,23 @@ final class MeetingChunkWriter: @unchecked Sendable {
         self.format = format
         self.policy = policy
         self.threshold = threshold.isFinite ? max(0, threshold) : 0.002
-        self.startOffset = startOffset
+        self.nextStart = startOffset
         try open()
     }
 
-    func write(_ list: UnsafePointer<AudioBufferList>) -> (rms: Float, duration: TimeInterval) {
+    func write(_ list: UnsafePointer<AudioBufferList>, at time: TimeInterval? = nil) -> (rms: Float, duration: TimeInterval) {
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: list, deallocator: nil) else { return (0, 0) }
-        return write(buffer)
+        return write(buffer, at: time)
     }
 
-    func write(_ buffer: AVAudioPCMBuffer) -> (rms: Float, duration: TimeInterval) {
+    /// `time` is when the buffer's first frame was captured, in meeting seconds; without it a chunk starts where the last one ended.
+    func write(_ buffer: AVAudioPCMBuffer, at time: TimeInterval? = nil) -> (rms: Float, duration: TimeInterval) {
         lock.lock()
         defer { lock.unlock() }
         let count = AVAudioFramePosition(buffer.frameLength)
+        if let time, isLate(time) { rotate() }
         guard let file, count > 0 else { return (0, seconds(count)) }
+        if frames == 0 { chunkStart = time ?? nextStart }
         do {
             try file.write(from: buffer)
         } catch {
@@ -310,19 +322,27 @@ final class MeetingChunkWriter: @unchecked Sendable {
         let slices = VoiceLevelMeter.slices(of: buffer)
         let rms = slices.map(\.rms).max() ?? 0
         frames += count
+        if let time { capturedThrough = time + seconds(count) }
+        let gate = max(threshold, noiseFloor() * Self.speechOverNoise)
+        recentLevels += slices.map(\.rms)
+        recentLevels.removeFirst(max(0, recentLevels.count - Self.noiseFloorSlices))
         for slice in slices {
-            if slice.rms >= threshold {
+            if slice.rms >= gate {
                 activeFrames += AVAudioFramePosition(slice.frames)
                 silentFrames = 0
             } else {
                 silentFrames += AVAudioFramePosition(slice.frames)
             }
         }
-        if policy.shouldRotate(duration: seconds(frames), trailingSilence: seconds(silentFrames)) {
-            closeChunk()
-            do { try open() } catch { self.error = error }
-        }
+        if policy.shouldRotate(duration: seconds(frames), trailingSilence: seconds(silentFrames)) { rotate() }
         return (rms, seconds(count))
+    }
+
+    /// Closes the open chunk once no audio has arrived for a delivery gap, since a silent tap sends nothing that would close it.
+    func closeIfIdle(at time: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        if isLate(time) { rotate() }
     }
 
     func finish() {
@@ -360,6 +380,11 @@ final class MeetingChunkWriter: @unchecked Sendable {
         }
     }
 
+    private func rotate() {
+        closeChunk()
+        do { try open() } catch { self.error = error }
+    }
+
     private func closeChunk() {
         guard let url else { return }
         file = nil
@@ -367,19 +392,34 @@ final class MeetingChunkWriter: @unchecked Sendable {
         let duration = seconds(frames)
         if frames > 0 {
             // ponytail: an amplitude gate decides speech; use a learned VAD if room noise floods transcription.
-            ready.append(MeetingAudioChunk(url: url, speaker: speaker, start: startOffset + seconds(elapsedFrames), duration: duration,
+            ready.append(MeetingAudioChunk(url: url, speaker: speaker, start: chunkStart, duration: duration,
                                            hasSpeech: seconds(activeFrames) >= 0.3 && duration >= 0.5))
+            nextStart = chunkStart + duration
         } else {
             try? FileManager.default.removeItem(at: url)
         }
-        elapsedFrames += frames
         frames = 0
         activeFrames = 0
         silentFrames = 0
+    }
+
+    private func isLate(_ time: TimeInterval) -> Bool {
+        guard frames > 0, let capturedThrough else { return false }
+        return time - capturedThrough > Self.deliveryGap
     }
 
     private func seconds(_ frames: AVAudioFramePosition) -> TimeInterval {
         Double(frames) / format.sampleRate
     }
 
+    /// The 20th percentile ignores the brief near-silent dropouts Bluetooth headsets emit, which would drag a minimum to zero.
+    private func noiseFloor() -> Float {
+        recentLevels.count < Self.warmupSlices ? 0 : recentLevels.sorted()[recentLevels.count / 5]
+    }
+
+    /// System audio stops arriving while nothing plays, so a late buffer starts a new chunk at its real time.
+    private static let deliveryGap: TimeInterval = 0.5
+    private static let warmupSlices = 150
+    private static let noiseFloorSlices = 500
+    private static let speechOverNoise = pow(Float(10), 10 / 20)
 }

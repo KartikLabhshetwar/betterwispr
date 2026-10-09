@@ -93,18 +93,24 @@ final class MeetingModel {
                 if model.engine == .apple { try AppleSpeechProvider.checkAvailability(language: language) }
                 try model.connection?.validateLanguage(language)
                 let provider = model.makeProvider()
-                try await provider.prepare(model: model, download: false)
-                try Task.checkCancellation()
                 guard let self, self.session == token else { return }
-                self.provider = provider
                 try await self.recorder.start(silenceThreshold: silenceThreshold, microphone: microphone)
                 guard self.session == token else { return }
                 self.systemAudioIssue = self.recorder.systemAudioIssue
                 self.startedAt = Date()
                 self.activity = .recording(meeting.id)
                 self.startTicker(token)
+                try await provider.prepare(model: model, download: false)
+                try Task.checkCancellation()
+                guard self.session == token else { return }
+                self.provider = provider
+                self.drainQueue()
             } catch {
                 guard let self, self.session == token else { return }
+                self.session = UUID()
+                self.recorder.cancel()
+                self.ticker?.cancel()
+                self.discardQueue()
                 self.provider = nil
                 self.activity = .idle
                 if !(error is CancellationError) { self.message = "Couldn’t start the meeting. \(error.localizedDescription)" }
@@ -118,6 +124,7 @@ final class MeetingModel {
             session = UUID()
             work?.cancel()
             recorder.cancel()
+            discardQueue()
             provider = nil
             activity = .idle
             discardIfEmpty(id)
@@ -125,6 +132,7 @@ final class MeetingModel {
         }
         guard case .recording(let id) = activity else { return }
         let token = session
+        let loading = work
         ticker?.cancel()
         let duration = Date().timeIntervalSince(startedAt)
         elapsed = duration
@@ -132,6 +140,7 @@ final class MeetingModel {
         work = Task { [weak self] in
             guard let self, self.session == token else { return }
             await self.recorder.stop()
+            await loading?.value
             await self.drain?.value
             guard self.session == token else { return }
             self.edit(id, save: false) { $0.duration = duration }
@@ -261,16 +270,27 @@ final class MeetingModel {
         activity = .idle
     }
 
+    /// Queues speech while the model may still be loading, so the first words of a meeting are kept.
     private func enqueue(_ chunk: MeetingAudioChunk) {
-        guard chunk.hasSpeech, let id = activity.meetingID, provider != nil else {
+        guard chunk.hasSpeech, activity.meetingID != nil else {
             try? FileManager.default.removeItem(at: chunk.url)
             return
         }
         queue.append(chunk)
         pendingChunks += 1
-        guard drain == nil else { return }
+        drainQueue()
+    }
+
+    private func drainQueue() {
+        guard drain == nil, provider != nil, !queue.isEmpty, let id = activity.meetingID else { return }
         let token = session
         drain = Task { [weak self] in await self?.transcribeQueue(into: id, token: token) }
+    }
+
+    private func discardQueue() {
+        for chunk in queue { try? FileManager.default.removeItem(at: chunk.url) }
+        queue = []
+        pendingChunks = 0
     }
 
     private func transcribeQueue(into id: UUID, token: UUID) async {

@@ -92,9 +92,21 @@ tabs backed by the existing meeting fields.
    starts `MeetingRecorder`. The microphone becomes "Me". On macOS 14.2 and later
    a private Core Audio process tap on a private aggregate device records every
    other app as "Them". If the tap fails, the meeting records the microphone only
-   and says so.
-2. Each source writes 10 to 30 second chunk files to the temporary folder and
-   rotates on a pause. Chunks without speech are deleted unread.
+   and says so. Recording starts before the speech provider finishes loading, so
+   the first words are kept; their chunks wait in the queue until it is ready.
+2. Each source writes 3 to 20 second chunk files to the temporary folder. A chunk
+   ends at the first 0.6 second pause after 3 seconds, or at 20 seconds. A 20 ms
+   slice counts as speech when it is above the silence threshold and at least
+   10 dB above the background noise, the 20th percentile of the last 10 seconds,
+   so steady room or headset noise does not hold a chunk open and the brief
+   near-silent dropouts of Bluetooth headsets do not pull the estimate to zero.
+   The first 3 seconds use the silence threshold alone. Chunks without speech are
+   deleted unread. Each chunk starts at the host time its first buffer was
+   captured, measured from the meeting start, so "Me" and "Them" share one clock.
+   System audio stops arriving while nothing plays, so a buffer more than
+   0.5 seconds later than expected starts a new chunk at its real time, and each
+   microphone buffer closes an open "Them" chunk that has received nothing for
+   0.5 seconds, so the remote speaker's last line does not wait for the next sound.
 3. One serial queue transcribes chunks in order, applies the same cleanup and
    vocabulary as dictation, keeps raw and final text, inserts the segment by start
    time and saves. A failed chunk shows a message and the meeting continues.
@@ -176,15 +188,22 @@ update, including edits made while generation is running. “Update summary” o
 My thoughts and Summary regenerates from both sources using the selected model.
 Older summaries without these optional fields remain readable and can be updated.
 
-`MeetingTranscript.removingEchoes` hides matching microphone/system-audio phrases
-of at least eight words within a 30-second capture window. It runs for transcript
-display, copying/export and summary input, while original segments and raw text stay
-on disk. “Show repeated microphone audio” reveals those segments. This is conservative
-text matching, not acoustic echo cancellation: different recognition, mixed speech
-or different chunk boundaries can still produce echoes, and an intentional long
-verbatim repetition inside that window can be hidden. Short replies and later
-repetitions are retained. Speaker playback can also affect system-tap timestamps;
-those timestamps are capture-chunk offsets, not word-level alignment.
+`MeetingTranscript.removingEchoes` cuts remote speech that the microphone picked
+up while it played. Each "Me" segment is compared word by word with the "Them"
+segments that overlap it, allowing 3 seconds either side. Runs of three or more
+matching words are removed, tolerating one misheard, extra or missing word inside
+a run and gaps of up to two words between runs, and the user's own words around
+them stay. Words match when equal or when, at four or more letters, they differ
+in at most a quarter of their letters ("campaign" and "campage"). A run also takes
+the matching words just before it, because the alignment can pair its first word
+with an earlier remote occurrence. A "Me"
+segment left with fewer than three words is hidden. It runs for transcript
+display, copying/export and summary input, while original segments and raw text
+stay on disk. “Show repeated microphone audio” shows the segments unchanged. This
+is text matching, not acoustic echo cancellation: different recognition can still
+leave echoes, and a short reply that repeats the remote speaker's words while they
+talk can be cut. Repetitions outside the overlap window are kept. Timestamps are
+chunk capture times, not word-level alignment.
 
 
 Starting a meeting from the capsule or the menu bar docks a floating card
